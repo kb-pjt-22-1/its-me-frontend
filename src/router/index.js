@@ -22,7 +22,12 @@ const router = createRouter({
         { path: 'pay', name: 'pay', component: Payments },  
         { path: 'cards', name: 'cards', component: Cards }
       ]
-    }
+    },
+    {
+  path: '/payments',
+  name: 'Payments',
+  component: () => import('@/pages/PaymentsList.vue')
+}
   ]
 })
 

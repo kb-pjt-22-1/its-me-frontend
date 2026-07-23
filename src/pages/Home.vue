@@ -1,6 +1,6 @@
 <template>
       <div class="home-content">
-  <div class="home-container">
+  <div class="layout-container">
     <!-- 1. 헤더 (인사말) -->
     <header>
       <!-- {{ userName }} 변수를 직접 바인딩합니다 -->
@@ -38,7 +38,7 @@
       <div class="section-header">
         <h3>최근 결제 내역</h3>
         <!-- 클릭 시 페이지 이동 -->
-        <span class="view-all" @click="goToTransactions">전체보기</span>
+        <router-link to="/payments" class="view-all">전체보기</router-link>
       </div>
 
       <div v-for="item in recentTransactions" :key="item.id" class="transaction-item">

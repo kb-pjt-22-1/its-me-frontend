@@ -1,8 +1,11 @@
 <!-- App.vue -->
 <template>
   <div id="app">
+    <Header />
     <SidebarMenu />
-    <router-view />
+    <main class="page-container">
+      <router-view /> <!-- 여기서 페이지들이 바뀜 -->
+    </main>
   </div>
 </template>
 
@@ -17,7 +20,7 @@ body, html {
   padding: 0;
   width: 100%;
   height: 100%;
-  background-color: #f0f2f5; /* 여기서 전체 배경색을 지정합니다 */
+  background-color: #ffffff; /* 여기서 전체 배경색을 지정합니다 */
 }
 
 #app {
