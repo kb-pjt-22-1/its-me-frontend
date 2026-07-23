@@ -14,6 +14,7 @@ const router = createRouter({
     { path: '/signup', name: 'signup', component: Signup },
     {
       path: '/',
+      redirect: '/login',
       component: DefaultLayout, // 이제 정확히 파일을 찾을 수 있습니다
       children: [
         { path: '', name: 'home', component: Home },
