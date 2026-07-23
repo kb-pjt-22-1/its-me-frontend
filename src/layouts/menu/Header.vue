@@ -12,8 +12,9 @@
 </template>
 
 <script setup>
+import { toggleMenu } from '@/composables/useMenu';
+
 const goToNotification = () => alert('알림 페이지로 이동');
-const toggleMenu = () => alert('메뉴 열기');
 </script>
 
 <style scoped>

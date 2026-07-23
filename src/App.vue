@@ -1,9 +1,14 @@
 <!-- App.vue -->
 <template>
   <div id="app">
+    <SidebarMenu />
     <router-view />
   </div>
 </template>
+
+<script setup>
+import SidebarMenu from '@/components/SidebarMenu.vue';
+</script>
 
 <style>
 /* 가장 바깥 배경만 여기서 관리 */

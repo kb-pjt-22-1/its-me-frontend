@@ -11,7 +11,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', name: 'login', component: Login },
-    { path: '/signup', name: 'signup', component: Signup },
+    { path: '/signup', name: 'signup', component: () => ('@/pages/auth/Signup.vue') },
     {
       path: '/',
       redirect: '/login',
