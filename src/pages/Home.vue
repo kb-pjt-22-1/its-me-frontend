@@ -1,6 +1,4 @@
 <template>
-  <div class="app-wrapper">
-    <div class="app-container">
       <div class="home-content">
   <div class="home-container">
     <!-- 1. 헤더 (인사말) -->
@@ -53,8 +51,6 @@
     </section>
     </div>
   </div>
-  </div>
-  </div>
 </template>
 
 <script setup>
@@ -94,41 +90,6 @@ const goToTransactions = () => {
 </script>
 
 <style scoped>
-/* 1. 전체 배경 (Sidebar 영역) */
-.app-wrapper {
-  background-color: #f0f2f5; /* 이미지와 비슷한 은은한 회색 */
-  min-height: 100vh;         /* 화면 전체 높이만큼 배경색 채움 */
-  display: flex;
-  justify-content: center;   /* 하얀 화면을 가운데로 정렬 */
-}
-
-/* 2. 실제 앱 내용 (하얀 배경) */
-.app-container {
-  background-color: white;   /* 중간 하얀 배경 */
-  width: 100%;
-  max-width: 800px;          /* 앱의 최대 너비 */
-  box-shadow: 0 0 20px rgba(0,0,0,0.05); /* 약간의 그림자 추가 (선택사항) */
-  min-height: 100vh;         /* 내용이 없어도 화면 끝까지 하얗게 */
-}
-
-/* 3. 기존 home-container는 이제 여백 역할만 하면 됩니다 */
-.home-content {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-/* 전체 레이아웃 (세로로 쌓기) */
-.home-container {
-  display: flex;
-  flex-direction: column;
-  gap: 15px; /* 박스들 사이 간격 */
-  padding: 20px;
-  max-width: 400px;
-  margin: 0 auto;
-}
-
 /* 카드 박스 (전체 너비 100%) */
 .card-box {
   width: 100%;

@@ -19,7 +19,7 @@
   
   /* 앱 컨테이너 너비와 동일하게 */
   width: 100%;
-  max-width: 800px;
+  max-width: 400px;
   
   height: 60px;
   background-color: white;
