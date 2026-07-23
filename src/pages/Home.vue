@@ -24,7 +24,9 @@
     <div class="bottom-container">
       <div class="info-box payment-box">
         <h3>간편 결제</h3>
-        <button @click="goToQuickPay">지금 결제 →</button>
+        <router-link to="/pay" class="pay-link">
+  지금 결제 →
+</router-link>
       </div>
       <div class="info-box benefit-box">
         <h3>이번 달 혜택</h3>
@@ -90,6 +92,14 @@ const goToTransactions = () => {
 </script>
 
 <style scoped>
+.pay-link {
+  text-decoration: none; 
+  color: yellow;           
+  font-weight: bold;    
+  cursor: pointer;
+  display: inline-block; 
+}
+
 /* 카드 박스 (전체 너비 100%) */
 .card-box {
   width: 100%;
