@@ -23,6 +23,11 @@ const router = createRouter({
         { path: 'cards', name: 'cards', component: Cards }
       ]
     },
+{
+  path: '/pay',
+  name: 'Pay',
+  component: () => import('@/pages/Payments.vue') 
+},
     {
   path: '/payments',
   name: 'Payments',
