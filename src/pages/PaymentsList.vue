@@ -38,32 +38,61 @@
 </template>
 
 <style scoped>
-.date-nav { display: flex; justify-content: space-between; padding: 20px 0; font-weight: bold; }
+.date-nav { 
+  display: flex; 
+  justify-content: space-between; 
+  padding: 20px 0; 
+  font-weight: var(--font-weight-medium);
+  color: var(--foreground);
+}
 
 .summary-card { 
-  background: #4A4A4A; /* 어두운 회색 */
-  color: white; 
+  background: var(--primary); /* 테마 강조 색상 적용 */
+  color: var(--primary-foreground); 
   padding: 25px; 
-  border-radius: 16px; 
+  border-radius: var(--radius-lg); /* 테마 둥글기 적용 */
   display: flex; 
   justify-content: space-between;
   margin-bottom: 30px;
 }
 
-.history-group h4 { color: #888; font-size: 0.9rem; margin-bottom: 15px; }
+.history-group h4 { 
+  color: var(--muted-foreground); /* 보조 텍스트 색상 */
+  font-size: 0.9rem; 
+  margin-bottom: 15px; 
+}
 
 .history-item { 
   display: flex; 
   align-items: center; 
   padding: 15px 0; 
-  border-bottom: 1px solid #f0f0f0; 
+  border-bottom: 1px solid var(--border); /* 테마 테두리 색상 */
 }
 
 .item-icon { font-size: 1.5rem; margin-right: 15px; }
+
 .item-info { flex: 1; }
-.name { font-weight: bold; margin-bottom: 4px; }
-.desc { font-size: 0.85rem; color: #888; }
+
+.name { 
+  font-weight: var(--font-weight-medium); 
+  margin-bottom: 4px; 
+  color: var(--foreground);
+}
+
+.desc { 
+  font-size: 0.85rem; 
+  color: var(--muted-foreground); 
+}
+
 .item-price { text-align: right; }
-.price { font-weight: bold; }
-.benefit { font-size: 0.85rem; color: #FFA500; } /* 혜택 강조 색상 */
+
+.price { 
+  font-weight: var(--font-weight-medium); 
+  color: var(--foreground);
+}
+
+.benefit { 
+  font-size: 0.85rem; 
+  color: var(--primary); /* 혜택 강조 색상을 테마의 primary로 통일 */
+}
 </style>

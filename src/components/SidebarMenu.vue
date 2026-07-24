@@ -54,14 +54,54 @@ const handleLogout = () => {
 
 <style scoped>
 .menu-overlay {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: white; z-index: 2000; padding: 20px; overflow-y: auto;
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  width: 100%; 
+  height: 100%;
+  background: var(--background); /* 테마 배경색 적용 */
+  z-index: 2000; 
+  padding: 20px; 
+  overflow-y: auto;
 }
-.profile-card { background: #555; color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+
+.profile-card { 
+  background: var(--primary); /* 테마 주 색상 적용 */
+  color: var(--primary-foreground); 
+  padding: 20px; 
+  border-radius: var(--radius-lg); /* 테마 둥글기 적용 */
+  margin-bottom: 20px; 
+}
+
 .menu-section { margin-bottom: 20px; }
-.section-title { font-size: 0.9rem; color: #888; margin-bottom: 10px; }
-.menu-item { padding: 15px 0; border-bottom: 1px solid #eee; cursor: pointer; }
+
+.section-title { 
+  font-size: 0.9rem; 
+  color: var(--muted-foreground); /* 테마 보조 텍스트 색상 */
+  margin-bottom: 10px; 
+}
+
+.menu-item { 
+  padding: 15px 0; 
+  border-bottom: 1px solid var(--border); /* 테마 테두리 적용[cite: 5] */
+  cursor: pointer; 
+  color: var(--foreground);
+}
+
 .footer-actions { margin-top: 40px; display: flex; flex-direction: column; gap: 10px; }
-.logout-btn { padding: 15px; border: 1px solid #ddd; background: white; border-radius: 8px; }
-.withdraw-btn { color: red; font-size: 0.8rem; border: none; background: none; }
+
+.logout-btn { 
+  padding: 15px; 
+  border: 1px solid var(--border); 
+  background: var(--card); 
+  border-radius: var(--radius-md); 
+  color: var(--foreground);
+}
+
+.withdraw-btn { 
+  color: var(--destructive); /* 테마 경고/삭제 색상[cite: 5] */
+  font-size: 0.8rem; 
+  border: none; 
+  background: none; 
+}
 </style>

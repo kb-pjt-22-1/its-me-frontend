@@ -94,46 +94,54 @@ const goToTransactions = () => {
 <style scoped>
 .pay-link {
   text-decoration: none; 
-  color: yellow;           
-  font-weight: bold;    
+  color: var(--primary);          /* 테마의 강조 색상 적용 */
+  font-weight: var(--font-weight-medium); 
   cursor: pointer;
   display: inline-block; 
 }
 
-/* 카드 박스 (전체 너비 100%) */
+/* 카드 박스 */
 .card-box {
   width: 100%;
   padding: 20px;
-  border-radius: 16px;
-  background-color: #f5f5f5;
-  border: 1px solid #e0e0e0;
-  box-sizing: border-box; /* 패딩 포함 너비 계산 */
-}
-
-/* 하단 2개 박스 래퍼 (가로로 배치) */
-.bottom-container {
-  display: flex;
-  gap: 15px; /* 박스 사이 간격 */
-  width: 100%;
-}
-
-/* 아래 두 박스는 각각 1씩 차지 (flex: 1) */
-.info-box {
-  flex: 1; 
-  padding: 20px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
+  background-color: var(--background); /* 테마의 배경색 */
+  border: 1px solid var(--border);     /* 테마의 테두리 색상 */
   box-sizing: border-box;
 }
 
-.payment-box { background-color: #333; color: white; }
-.benefit-box { background-color: white; border: 2px solid #333; color: #333; }
+/* 하단 2개 박스 래퍼 */
+.bottom-container {
+  display: flex;
+  gap: 15px;
+  width: 100%;
+}
+
+.info-box {
+  flex: 1; 
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  box-sizing: border-box;
+}
+
+/* 결제 박스 (Primary 테마 적용) */
+.payment-box { 
+  background-color: var(--primary); 
+  color: var(--primary-foreground); 
+}
+
+/* 혜택 박스 (Card 테마 적용) */
+.benefit-box { 
+  background-color: var(--card); 
+  border: 2px solid var(--primary); 
+  color: var(--card-foreground); 
+}
 
 /* 섹션 레이아웃 */
 .transaction-section {
   margin-top: 30px;
 }
 
-/* 제목과 '전체보기'를 가로로 배치 */
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -143,14 +151,14 @@ const goToTransactions = () => {
 
 .view-all {
   font-size: 0.9rem;
-  color: #888;
+  color: var(--muted-foreground); /* 테마의 보조 텍스트 색상 */
   cursor: pointer;
 }
 
 /* 개별 결제 아이템 스타일 */
 .transaction-item {
   padding: 15px 0;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border);
 }
 
 .item-info {
@@ -158,10 +166,11 @@ const goToTransactions = () => {
   justify-content: space-between;
   font-size: 1rem;
   margin-bottom: 5px;
+  color: var(--foreground);
 }
 
 .item-date {
   font-size: 0.85rem;
-  color: #666;
+  color: var(--muted-foreground);
 }
 </style>

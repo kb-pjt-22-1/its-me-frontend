@@ -26,37 +26,41 @@ const goToBookmarks = () => {
 
 <style scoped>
 .app-header {
-  position: sticky; /* 상단 고정 */
+  position: sticky;
   top: 0;
   width: 100%;
-  height: 60px;
-  background-color: white;
+  max-width: 300px; /* Footer와 동일하게 설정 */
+  margin: 0 auto;   /* 중앙 정렬 */
+  height: 60px;     /* 또는 var(--nav-height) */
+  background-color: var(--background);
   display: flex;
-  justify-content: space-between; /* 로고와 아이콘 양끝 배치 */
+  justify-content: space-between;
   align-items: center;
   padding: 0 20px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border);
   z-index: 1000;
 }
+
 
 .logo-link {
   display: flex;
   align-items: center;
-  text-decoration: none; /* 밑줄 제거 */
-  color: #333;
+  text-decoration: none;
+  color: var(--foreground);
 }
 
 .logo-icon {
-  width: 40px;      /* 높이에 맞춰 아이콘 크기 조절 */
+  width: 40px;
   height: 40px;
-  margin-right: 8px; /* 글자와의 간격 */
-  border-radius: 8px; /* 살짝 둥글게 하면 더 예쁩니다 */
+  margin-right: 8px;
+  border-radius: var(--radius-md); /* 테마 둥글기 */
+  background-color: var(--muted);
 }
 
 .logo-text {
   font-size: 1.4rem;
   font-weight: 900;
-  color: #1a1a1a;
+  color: var(--foreground);
   letter-spacing: -1px;
 }
 
@@ -64,5 +68,6 @@ const goToBookmarks = () => {
   font-size: 1.5rem;
   margin-left: 15px;
   cursor: pointer;
+  color: var(--foreground);
 }
 </style>
