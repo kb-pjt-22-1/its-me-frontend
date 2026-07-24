@@ -11,7 +11,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', name: 'login', component: Login },
-    { path: '/signup', name: 'signup', component: () => ('@/pages/auth/Signup.vue') },
+    { path: '/signup', name: 'signup', component: Signup },
     {
       path: '/',
       redirect: '/login',
@@ -20,7 +20,8 @@ const router = createRouter({
         { path: '', name: 'home', component: Home },
         { path: 'map', name: 'map', component: Map },
         { path: 'pay', name: 'pay', component: Payments },  
-        { path: 'cards', name: 'cards', component: Cards }
+        { path: 'cards', name: 'cards', component: Cards },
+        { path: 'bookmarks', name: 'bookmarks', component: () => import('@/pages/Bookmarks.vue') }
       ]
     },
 {

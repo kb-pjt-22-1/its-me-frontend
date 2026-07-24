@@ -6,15 +6,22 @@
     </router-link>
     <div class="header-right">
       <span class="icon" @click="goToNotification">🔔</span>
+      <span class="icon" @click="goToBookmarks">🔖</span>
       <span class="icon" @click="toggleMenu">☰</span>
     </div>
   </header>
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router';
 import { toggleMenu } from '@/composables/useMenu';
 
+const router = useRouter();
+
 const goToNotification = () => alert('알림 페이지로 이동');
+const goToBookmarks = () => {
+  router.push('/bookmarks');
+};
 </script>
 
 <style scoped>
