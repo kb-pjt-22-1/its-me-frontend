@@ -22,8 +22,8 @@
   max-width: 400px;
   
   height: 60px;
-  background-color: white;
-  border-top: 1px solid #eee;
+  background-color: var(--background); /* 테마 배경색 적용 */
+  border-top: 1px solid var(--border); /* 테마 경계선 적용 */
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -32,8 +32,13 @@
 
 .nav-item {
   text-decoration: none;
-  color: #333;
-  font-weight: bold;
+  color: var(--foreground); /* 테마 글자색 적용 */
+  font-weight: var(--font-weight-medium); /* 테마 폰트 두께 */
   font-size: 0.9rem;
+}
+
+/* 선택된 아이템의 경우 primary 색상을 보여주고 싶다면 아래 클래스 추가 */
+.nav-item.router-link-active {
+  color: var(--primary);
 }
 </style>

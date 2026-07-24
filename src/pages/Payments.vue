@@ -76,17 +76,28 @@ const completePayment = () => {
 </script>
 
 <style scoped>
-.pin-input-box { display: flex; flex-direction: column; align-items: center; }
+.pin-input-box { 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+}
+
 .pin-input {
   width: 200px;
   height: 50px;
   font-size: 2rem;
   text-align: center;
   letter-spacing: 15px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  margin: 20px 0;
+  
+  /* 테마 변수 적용 */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--input-background);
+  color: var(--foreground);
 }
-.hint { color: #888; font-size: 0.9rem; }
-/* ...나머지 스타일은 동일... */
+
+.hint { 
+  color: var(--muted-foreground); 
+  font-size: 0.9rem; 
+}
 </style>
