@@ -1,277 +1,128 @@
 <template>
-  <PageContainer>
-    <div class="login-page">
-      <div class="brand">
-        <div class="brand-badge">
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="5" width="20" height="14" rx="3"></rect>
-            <line x1="2" y1="10" x2="22" y2="10"></line>
-          </svg>
-        </div>
-        <h1 class="brand-name">BenePay</h1>
-        <p class="brand-tagline">KB국민카드 간편결제 서비스</p>
-      </div>
+  <!-- 테마 배경색(bg-background)과 글자색(text-foreground) 적용 -->
+  <div class="min-h-screen bg-background text-foreground flex items-center justify-center p-4 font-sans antialiased">
+    
+    <!-- 전체 로그인 컨테이너 -->
+    <div class="w-full max-w-md space-y-10">
 
-      <form class="login-form" @submit.prevent="handleLogin">
-        <div class="input-box">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="8" r="4"></circle>
-            <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"></path>
-          </svg>
-          <input type="text" v-model="userId" placeholder="아이디" autocapitalize="none" @keydown.enter="canSubmit && handleLogin()" />
+      <!-- 입력 폼 섹션 -->
+      <form class="space-y-5" @submit.prevent="handleLogin">
+        
+        <!-- 아이디 -->
+        <div class="relative">
+          <input 
+            type="text" 
+            v-model="userId"
+            placeholder="아이디"
+            class="w-full pl-4 pr-4 py-4 border border-border bg-input-background rounded-[var(--radius-lg)] focus:ring-2 focus:ring-primary focus:border-primary transition duration-150"
+          />
         </div>
 
-        <div class="input-box">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="4" y="10" width="16" height="10" rx="2"></rect>
-            <path d="M7 10V7a5 5 0 0 1 10 0v3"></path>
-          </svg>
-          <input
+        <!-- 비밀번호 -->
+        <div class="relative">
+          <input 
             :type="showPassword ? 'text' : 'password'"
             v-model="password"
             placeholder="비밀번호"
-            @keydown.enter="canSubmit && handleLogin()"
+            class="w-full pl-4 pr-12 py-4 border border-border bg-input-background rounded-[var(--radius-lg)] focus:ring-2 focus:ring-primary focus:border-primary transition duration-150"
           />
-          <button type="button" class="input-action" @click="showPassword = !showPassword" aria-label="비밀번호 표시">
-            <svg v-if="!showPassword" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="4" y="10" width="16" height="10" rx="2"></rect>
-              <path d="M7 10V7a5 5 0 0 1 10 0v3"></path>
-            </svg>
-            <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="4" y="10" width="16" height="10" rx="2"></rect>
-              <path d="M7 10V7a5 5 0 0 1 9.5-2"></path>
-            </svg>
-          </button>
         </div>
 
-        <p v-if="signupSuccessMessage" class="success-text">{{ signupSuccessMessage }}</p>
-        <p v-if="authStore.errorMessage" class="error-text">{{ authStore.errorMessage }}</p>
+        <!-- 실패 문구: 테마의 destructive 색상 적용 -->
+        <p v-if="errorMessage" class="text-destructive text-sm text-center font-medium animate-pulse">
+          {{ errorMessage }}
+        </p>
 
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          full-width
-          :disabled="!canSubmit || authStore.isLoading"
-        >
-          {{ authStore.isLoading ? '로그인 중...' : '로그인' }}
-        </Button>
+        <!-- 로그인 버튼: 테마의 primary 색상 적용 -->
+        <button type="submit" class="w-full py-4 bg-primary text-primary-foreground font-bold rounded-[var(--radius-lg)] hover:opacity-90 transition">
+          로그인
+        </button>
       </form>
 
-      <p class="signup-copy">
-        아직 계정이 없으신가요?
-        <router-link to="/signup" class="signup-link">회원가입</router-link>
-      </p>
-
-      <!--
-        팀 결정: 개발자 로그인 버튼은 항상 노출한다(별도 프론트 플래그로 숨기지 않음).
-        실제 안전장치는 백엔드의 dev-login.enabled(기본 false)이며, 꺼져 있으면 이 버튼을
-        눌러도 404로 실패할 뿐이다.
-      -->
-      <div class="dev-login">
-        <div class="dev-divider"><span>또는</span></div>
-        <Button
-          type="button"
-          variant="outline"
-          size="md"
-          full-width
-          :disabled="authStore.isLoading"
-          @click="handleDevLogin"
-        >
-          {{ authStore.isLoading ? '처리 중...' : '개발자 로그인' }}
-        </Button>
-        <p class="dev-slot-hint">slot {{ devLoginSlot }} · 이 브라우저 전용, 컴퓨터마다 다른 slot이 자동 배정됩니다</p>
+      <!-- 회원가입 링크 -->
+      <div class="text-center text-sm font-medium text-muted-foreground pt-2">
+        아직 계정이 없으신가요? 
+        <button type="submit" class="w-full py-4 bg-primary text-primary-foreground font-bold rounded-[var(--radius-lg)] hover:opacity-90 transition">
+        <router-link to="/signup">
+          회원가입
+        </router-link>
+      </button>
       </div>
+
     </div>
-  </PageContainer>
+  </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import PageContainer from '@/components/common/PageContainer.vue';
-import Button from '@/components/common/Button.vue';
-import { useAuthStore } from '@/stores/auth';
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 
-const route = useRoute();
-const router = useRouter();
-const authStore = useAuthStore();
-
-// 회원가입 완료 후 /login?signup=success&loginId=... 로 넘어온 경우, 방금 만든 아이디를
-// 채워두고 안내 문구를 보여준다. 가입 자체는 토큰을 안 주므로 자동 로그인은 안 된다.
-const userId = ref(route.query.signup === 'success' ? String(route.query.loginId ?? '') : '');
+const userId = ref('');
 const password = ref('');
 const showPassword = ref(false);
-const signupSuccessMessage = ref(
-  route.query.signup === 'success' ? '회원가입이 완료됐어요. 로그인해주세요.' : ''
-);
+const errorMessage = ref(''); // 에러 메시지 상태 관리
+const router = useRouter();
 
-const canSubmit = computed(() => userId.value.length > 0 && password.value.length > 0);
-
-async function handleLogin() {
-  if (!canSubmit.value) return;
-  const success = await authStore.login(userId.value, password.value);
-  if (success) {
+function handleLogin() {
+  // 간단한 테스트용 로그인 로직 (실제로는 API 연동)
+  if (userId.value === 'admin' && password.value === '1234') {
+    errorMessage.value = ''; // 성공 시 에러 메시지 초기화
     router.push('/');
-  }
-}
-
-// 컴퓨터(브라우저)마다 다른 slot을 써야 하는 이유는 백엔드 DevLoginRequestDto와 동일하다:
-// refresh 세션이 userId 하나당 하나뿐이라, 여러 대가 같은 dev 계정으로 로그인하면 나중에
-// 로그인한 쪽이 세션을 덮어써서 먼저 들어온 쪽이 토큰을 갱신할 때 탈취로 오인돼 로그아웃된다.
-// 최초 클릭 시 무작위로 slot을 배정해 localStorage에 고정해두고 이후에는 계속 재사용한다.
-const DEV_LOGIN_MAX_SLOT = 10; // 백엔드 dev-login.account-count 기본값과 맞춘다
-const DEV_LOGIN_SLOT_STORAGE_KEY = 'devLoginSlot';
-
-function getOrAssignDevLoginSlot() {
-  const stored = localStorage.getItem(DEV_LOGIN_SLOT_STORAGE_KEY);
-  if (stored) return Number(stored);
-  const assigned = Math.floor(Math.random() * DEV_LOGIN_MAX_SLOT) + 1;
-  localStorage.setItem(DEV_LOGIN_SLOT_STORAGE_KEY, String(assigned));
-  return assigned;
-}
-
-const devLoginSlot = ref(getOrAssignDevLoginSlot());
-
-async function handleDevLogin() {
-  const success = await authStore.devLogin(devLoginSlot.value);
-  if (success) {
-    router.push('/');
+  } else {
+    // 실패 시 에러 메시지 설정
+    errorMessage.value = '아이디 또는 비밀번호가 잘못되었습니다.';
   }
 }
 </script>
 
 <style scoped>
-.login-page {
+/* 화면 전체 배경 및 중앙 정렬 */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   min-height: 100vh;
-  padding: 0 24px 40px;
-  position: relative;
-  box-sizing: border-box;
+  background-color: var(--background); /* 전체 배경색 */
+  padding: 20px;
 }
 
-.brand {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 64px;
+/* 로그인 입력창 카드 박스 */
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 30px;
+  background: var(--card); /* 카드 배경색[cite: 5] */
+  border-radius: var(--radius-lg); /* 둥근 모서리[cite: 5] */
+  border: 1px solid var(--border); /* 카드 테두리[cite: 5] */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-.brand-badge {
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  background: var(--orange, #ffbc00);
-  color: var(--charcoal, #24211d);
-  display: grid;
-  place-items: center;
-  box-shadow: 0 8px 24px rgba(255, 188, 0, 0.35);
-  margin-bottom: 14px;
+.title {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--foreground);
+  margin-bottom: 20px;
+  text-align: center;
 }
 
-.brand-name {
-  font-size: 24px;
-  font-weight: 800;
-  color: var(--charcoal, #24211d);
-  letter-spacing: -0.02em;
-  margin: 0 0 4px;
+.login-input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 15px;
+  border: 1px solid var(--border); /* 입력창 테두리[cite: 5] */
+  border-radius: var(--radius-md);
+  background-color: var(--input-background);
+  color: var(--foreground);
 }
 
-.brand-tagline {
-  font-size: 13px;
-  color: var(--muted, #8f897f);
-  margin: 0 0 40px;
-}
-
-.login-form {
-  display: grid;
-  gap: 12px;
-}
-
-.input-box {
-  height: 55px;
-  border: 1px solid var(--line, #e9e5df);
-  border-radius: 13px;
-  background: var(--surface, #ffffff);
-  padding: 0 13px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--muted, #918a81);
-}
-
-.input-box input {
-  flex: 1;
-  border: 0;
-  outline: 0;
-  font-size: 15px;
-  color: var(--charcoal, #2c2b27);
-  min-width: 0;
-  background: transparent;
-}
-.input-box input::placeholder { color: var(--muted, #a79f97); }
-
-.input-action {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  color: var(--muted, #999288);
-  background: transparent;
+.login-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--primary); /* 메인 버튼 색상[cite: 5] */
+  color: var(--primary-foreground);
   border: none;
-  padding: 0;
-}
-
-.error-text {
-  color: var(--danger, #f05e58);
-  font-size: 0.85rem;
-  text-align: center;
-  margin: 0;
-}
-
-.success-text {
-  color: #00a878;
-  font-size: 0.85rem;
-  text-align: center;
-  margin: 0;
-}
-
-.signup-copy {
-  text-align: center;
-  color: var(--muted, #a0958d);
-  font-size: 13px;
-  margin-top: 25px;
-}
-
-.signup-link {
-  font-weight: 800;
-  color: var(--charcoal, #171717);
-  text-decoration: none;
-}
-
-.dev-login {
-  margin-top: 28px;
-}
-
-.dev-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted, #a79f97);
-  font-size: 12px;
-  margin-bottom: 14px;
-}
-.dev-divider::before,
-.dev-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--line, #e9e5df);
-}
-
-.dev-slot-hint {
-  text-align: center;
-  font-size: 11px;
-  color: var(--muted, #a79f97);
-  margin: 8px 0 0;
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
 }
 </style>

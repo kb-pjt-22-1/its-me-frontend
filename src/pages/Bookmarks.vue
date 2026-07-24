@@ -40,26 +40,93 @@ const bookmarks = ref([
 </script>
 
 <style scoped>
-.page-container { background-color: #f7f7f7; min-height: 100vh; padding: 20px; }
+.page-container { 
+  background-color: var(--background); 
+  min-height: 100vh; 
+  padding: 20px; 
+}
 
 /* 헤더 */
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.back-btn { border: none; background: none; font-size: 1.5rem; cursor: pointer; }
-.view-toggle { border: 1px solid #ddd; background: white; padding: 5px; border-radius: 8px; cursor: pointer; }
+.header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  margin-bottom: 20px; 
+}
+
+.back-btn { 
+  border: none; 
+  background: none; 
+  font-size: 1.5rem; 
+  cursor: pointer; 
+  color: var(--foreground);
+}
+
+.view-toggle { 
+  border: 1px solid var(--border); 
+  background: var(--card); 
+  padding: 5px; 
+  border-radius: var(--radius-md); 
+  cursor: pointer; 
+}
 
 /* 리스트 */
-.store-count { font-weight: bold; color: #666; margin-bottom: 15px; }
+.store-count { 
+  font-weight: var(--font-weight-medium); 
+  color: var(--muted-foreground); 
+  margin-bottom: 15px; 
+}
 
 .store-card { 
-  background: white; border-radius: 16px; padding: 15px; display: flex; 
-  align-items: center; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  background: var(--card); 
+  border-radius: var(--radius-lg); 
+  padding: 15px; 
+  display: flex; 
+  align-items: center; 
+  margin-bottom: 15px; 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 /* 카드 내부 배치 */
-.store-icon { width: 50px; height: 50px; background: #f0f0f0; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
-.card-center { flex: 1; margin-left: 15px; }
-.card-center h3 { margin: 0 0 5px 0; font-size: 1.1rem; }
-.details { color: #888; font-size: 0.9rem; margin: 0 0 8px 0; }
-.badge { background: #fff8e1; color: #ffb300; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; }
-.bookmark-icon { font-size: 1.5rem; color: #ffcc00; }
+.store-icon { 
+  width: 50px; 
+  height: 50px; 
+  background: var(--muted); 
+  border-radius: var(--radius-md); 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  font-size: 1.5rem; 
+}
+
+.card-center { 
+  flex: 1; 
+  margin-left: 15px; 
+}
+
+.card-center h3 { 
+  margin: 0 0 5px 0; 
+  font-size: 1.1rem; 
+  color: var(--foreground);
+}
+
+.details { 
+  color: var(--muted-foreground); 
+  font-size: 0.9rem; 
+  margin: 0 0 8px 0; 
+}
+
+.badge { 
+  background: var(--secondary); 
+  color: var(--primary); 
+  padding: 4px 8px; 
+  border-radius: var(--radius-sm); 
+  font-size: 0.8rem; 
+  font-weight: var(--font-weight-medium); 
+}
+
+.bookmark-icon { 
+  font-size: 1.5rem; 
+  color: var(--primary); 
+}
 </style>

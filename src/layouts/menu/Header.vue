@@ -29,37 +29,38 @@ const goToBookmarks = () => {
   position: sticky;
   top: 0;
   width: 100%;
-  max-width: 440px;  /* main.css의 .page-container와 동일 */
-  margin: 0 auto;
-  height: 60px;
-  background-color: var(--page, #faf9f6);
+  max-width: 300px; /* Footer와 동일하게 설정 */
+  margin: 0 auto;   /* 중앙 정렬 */
+  height: 60px;     /* 또는 var(--nav-height) */
+  background-color: var(--background);
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 20px;
-  border-bottom: 1px solid var(--line, #e9e5df);
+  border-bottom: 1px solid var(--border);
   z-index: 1000;
 }
+
 
 .logo-link {
   display: flex;
   align-items: center;
   text-decoration: none;
-  color: var(--charcoal, #59554a);
+  color: var(--foreground);
 }
 
 .logo-icon {
   width: 40px;
   height: 40px;
   margin-right: 8px;
-  border-radius: 10px;
-  background-color: var(--muted, #918a81);
+  border-radius: var(--radius-md); /* 테마 둥글기 */
+  background-color: var(--muted);
 }
 
 .logo-text {
   font-size: 1.4rem;
   font-weight: 900;
-  color: var(--charcoal, #59554a);
+  color: var(--foreground);
   letter-spacing: -1px;
 }
 
@@ -67,6 +68,6 @@ const goToBookmarks = () => {
   font-size: 1.5rem;
   margin-left: 15px;
   cursor: pointer;
-  color: var(--charcoal, #59554a);
+  color: var(--foreground);
 }
 </style>

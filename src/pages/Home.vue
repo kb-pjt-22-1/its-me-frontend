@@ -3,55 +3,35 @@
   <div class="layout-container">
     <!-- 1. 헤더 (인사말) -->
     <header>
-      <h1>안녕하세요, {{ userName }}님!</h1>
+      <!-- {{ userName }} 변수를 직접 바인딩합니다 -->
+      <h1>안녕하세요, {{ userName }}님!</h1> 
       <p>오늘도 스마트한 소비를 시작해보세요.</p>
     </header>
 
     <div class="home-container">
     <!-- 1. 주 사용 카드 박스 (전체 너비) -->
-    <Button variant="box-outline" class="card-box" @click="goToCardDetail(primaryCard.userCardId)">
-      <div class="card-top-row">
-        <div>
-          <span class="badge">주 사용 카드</span>
-          <h3>{{ primaryCard.cardName }}</h3>
-        </div>
-        <span class="card-glyph">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <rect x="2" y="5" width="20" height="14" rx="3"></rect>
-            <line x1="2" y1="10" x2="22" y2="10"></line>
-          </svg>
-        </span>
-      </div>
-
-      <div class="status-row">
-        <span class="danger-text">{{ primaryCard.statusLabel }}</span>
-        <span class="status-muted">실적 충족까지 {{ remainingAmount.toLocaleString() }}원</span>
-      </div>
-
+    <div class="card-box" @click="goToCardDetail(card.id)">
+      <span class="badge">주 사용 카드</span>
+      <h3>{{ card.name }}</h3>
+      <p>본인 • {{ card.number }}</p>
       <div class="progress-container">
         <div class="progress-bar" :style="{ width: progressPercentage + '%' }"></div>
       </div>
-      <p class="progress-target">목표 {{ primaryCard.targetAmount.toLocaleString() }}원</p>
-    </Button>
+      <p>실적 충족까지 {{ remainingAmount.toLocaleString() }}원</p>
+    </div>
 
-    <!-- 2. 하단 두 박스 -->
+    <!-- 2. 하단 두 박스 (각각 1씩 차지해서, 합치면 위 박스랑 너비가 같음) -->
     <div class="bottom-container">
-      <Button variant="box" @click="router.push('/pay')">
+      <div class="info-box payment-box">
         <h3>간편 결제</h3>
-        <p v-if="recentSavedStore" class="recent-store-text">최근 저장: {{ recentSavedStore }}</p>
-        <span class="pay-link-text">지금 결제 →</span>
-      </Button>
-      <Button tag="div" variant="box-outline">
+        <router-link to="/pay" class="pay-link">
+  지금 결제 →
+</router-link>
+      </div>
+      <div class="info-box benefit-box">
         <h3>이번 달 혜택</h3>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--orange, #ffb800)" stroke-width="1.8" class="gift-icon">
-          <rect x="3" y="8" width="18" height="4"></rect>
-          <path d="M12 8v13"></path>
-          <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path>
-          <path d="M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5"></path>
-        </svg>
-        <p class="benefit-amount">{{ monthlyBenefitTotal.toLocaleString() }}원</p>
-        <small class="benefit-caption">할인 및 적립 포함</small>
-      </Button>
+        <p>{{ benefits.toLocaleString() }}원</p>
+      </div>
     </div>
   </div>
 
@@ -59,236 +39,105 @@
     <section class="transaction-section">
       <div class="section-header">
         <h3>최근 결제 내역</h3>
-        <Button variant="link-muted" size="sm" @click="router.push('/payments')">전체보기</Button>
+        <!-- 클릭 시 페이지 이동 -->
+        <router-link to="/payments" class="view-all">전체보기</router-link>
       </div>
 
-      <Button tag="div" variant="box-outline" style="min-height: auto;">
-        <div
-          v-for="item in recentTransactions"
-          :key="item.paymentId"
-          class="transaction-item"
-        >
-          <div class="item-info">
-            <strong>{{ item.merchantName }}</strong>
-            <span class="amount">{{ item.finalAmount.toLocaleString() }}원</span>
-          </div>
-          <p class="item-date">{{ item.paymentTime }} | {{ item.cardName }}</p>
+      <div v-for="item in recentTransactions" :key="item.id" class="transaction-item">
+        <div class="item-info">
+          <strong>{{ item.store }}</strong>
+          <span class="amount">{{ item.amount.toLocaleString() }}원</span>
         </div>
-      </Button>
+        <p class="item-date">{{ item.date }} | {{ item.cardName }}</p>
+      </div>
     </section>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
+import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import Button from '@/components/common/Button.vue';
-import { useAuthStore } from '@/stores/auth';
 
-const router = useRouter();
-const authStore = useAuthStore();
-
-// ---------------------------------------------------------
-// 아래 값들은 실제로는 API에서 받아옵니다.
-// 지금은 목데이터_추가_버전.sql의 user_id=1(홍길동) 데이터를 그대로 계산해서 넣었습니다.
-// ---------------------------------------------------------
-
-const userName = computed(() => authStore.userName);
-
-// cards + user_cards 조인 (user_id=1, is_primary=TRUE인 카드)
-// card_id=1 'KB국민 노리카드', min_benefit_amount=300000
-// user_card_id=1, pan_last4='1234'
-// card_monthly_status: target_year_month='202607', total_spending_amount=105400
-const primaryCard = ref({
-  userCardId: 1,
-  cardName: 'KB국민 노리카드',
-  panLast4: '1234',
-  targetAmount: 300000,
-  currentAmount: 105400,
-  statusLabel: '전월 실적 미달',
+onMounted(async () => {
+  // 예시: 서버에서 유저 이름 불러오기
+  // const response = await api.getUserProfile();
+  // userName.value = response.data.name;
 });
 
-const remainingAmount = computed(() =>
-  Math.max(primaryCard.value.targetAmount - primaryCard.value.currentAmount, 0)
-);
-const progressPercentage = computed(() =>
-  Math.min((primaryCard.value.currentAmount / primaryCard.value.targetAmount) * 100, 100)
-);
+const router = useRouter();
 
-// bookmarked_stores 중 user_id=1의 가장 최근 created_at 건
-// bm_0000000000000002 (2026-03-06) → merchant_id=3 '동네마트 역삼점'
-const recentSavedStore = ref('동네마트 역삼점');
+// 나중에 API를 통해 서버에서 받아올 이름입니다.
+const userName = ref('로그인한유저');
 
-// payments ⋈ merchants ⋈ user_cards ⋈ cards (user_id=1 소유 카드만, 최신순)
-// user_card_id 1,2가 홍길동 소유. payment_id=3은 user_card_id=3(다른 유저 소유)이라 제외.
+const card = ref({ id: 1, name: 'Deep Dream Platinum', number: '1234', target: 1500000, current: 1245000 });
+const benefits = ref(42500);
+
+const remainingAmount = computed(() => card.value.target - card.value.current);
+const progressPercentage = computed(() => (card.value.current / card.value.target) * 100);
+
+const goToCardDetail = (id) => alert('상세 이동');
+const goToQuickPay = () => alert('결제 이동');
+
+// 나중에 서버에서 데이터를 받아오면 이 배열만 갈아끼우면 됩니다!
 const recentTransactions = ref([
-  {
-    paymentId: 4,
-    merchantName: '스타벅스 강남점',
-    finalAmount: 4050,
-    paymentTime: '2026.07.10 15:05',
-    cardName: 'KB국민 노리카드',
-    status: 'PENDING',
-  },
-  {
-    paymentId: 2,
-    merchantName: 'GS25 역삼역점',
-    finalAmount: 11400,
-    paymentTime: '2026.07.02 19:30',
-    cardName: 'KB국민 탄탄대로 체크카드',
-    status: 'APPROVED',
-  },
-  {
-    paymentId: 1,
-    merchantName: '스타벅스 강남점',
-    finalAmount: 5400,
-    paymentTime: '2026.07.01 08:12',
-    cardName: 'KB국민 노리카드',
-    status: 'APPROVED',
-  },
+  { id: 1, store: '스타벅스 김포점', amount: 5400, date: '2024.05.20', cardName: 'Deep Dream Platinum' },
+  { id: 2, store: '이마트몰', amount: 42800, date: '2024.05.19', cardName: 'Shinhan The More' }
 ]);
 
-// 이번 달(202607) 승인된 결제의 discount_amount 합계 (payment_id 1, 2 — 4는 PENDING이라 제외, 3은 다른 유저)
-const monthlyBenefitTotal = computed(() => 600 + 600);
-
-const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
+const goToTransactions = () => {
+  router.push('/payments'); // 결제 내역 페이지 경로
+};
 </script>
 
 <style scoped>
-/* 다른 화면들(.layout-container)과 동일하게 좌우 18px 여백 통일 */
-.layout-container {
-  padding: 18px 18px 24px;
+.pay-link {
+  text-decoration: none; 
+  color: var(--primary);          /* 테마의 강조 색상 적용 */
+  font-weight: var(--font-weight-medium); 
+  cursor: pointer;
+  display: inline-block; 
 }
 
-.home-container {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
+/* 카드 박스 */
 .card-box {
-  text-align: left;
-}
-
-.card-top-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
   width: 100%;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background-color: var(--background); /* 테마의 배경색 */
+  border: 1px solid var(--border);     /* 테마의 테두리 색상 */
+  box-sizing: border-box;
 }
 
-.badge {
-  display: inline-flex;
-  border-radius: 7px;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-weight: 800;
-  color: #00a47a;
-  background: #ddf6ee;
-  margin-bottom: 8px;
-}
-
-.card-top-row h3 {
-  margin: 4px 0 4px;
-  font-size: 17px;
-}
-
-.card-top-row p {
-  margin: 0;
-  color: var(--muted, #918980);
-  font-size: 12px;
-}
-
-.card-glyph {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--charcoal, #47433d);
-  color: #ffffff;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-}
-
-.status-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  margin: 13px 0 8px;
-  font-size: 12px;
-}
-
-.danger-text {
-  color: var(--danger, #f05e58);
-  font-weight: 700;
-}
-
-.status-muted {
-  color: var(--muted, #989086);
-}
-
-.progress-container {
-  width: 100%;
-  height: 5px;
-  background: #ebe8e2;
-  border-radius: 99px;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #ffad00, #ffc830);
-}
-
-.progress-target {
-  width: 100%;
-  text-align: right;
-  margin: 7px 0 0;
-  color: var(--muted, #8d857b);
-  font-size: 11px;
-}
-
+/* 하단 2개 박스 래퍼 */
 .bottom-container {
   display: flex;
   gap: 15px;
   width: 100%;
 }
 
-.bottom-container > * {
-  flex: 1;
-  width: 0;
+.info-box {
+  flex: 1; 
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  box-sizing: border-box;
 }
 
-.pay-link-text {
-  color: var(--orange, #ffb800);
-  font-weight: 700;
-  margin-top: auto;
+/* 결제 박스 (Primary 테마 적용) */
+.payment-box { 
+  background-color: var(--primary); 
+  color: var(--primary-foreground); 
 }
 
-.recent-store-text {
-  margin: 0;
-  font-size: 11px;
-  color: rgba(255, 255, 255, .7);
+/* 혜택 박스 (Card 테마 적용) */
+.benefit-box { 
+  background-color: var(--card); 
+  border: 2px solid var(--primary); 
+  color: var(--card-foreground); 
 }
 
-.gift-icon {
-  margin: 4px 0 2px;
-}
-
-.benefit-amount {
-  margin: 0 0 2px;
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.benefit-caption {
-  color: var(--muted, #9c948a);
-  font-size: 11px;
-}
-
+/* 섹션 레이아웃 */
 .transaction-section {
   margin-top: 30px;
 }
@@ -300,34 +149,28 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
   margin-bottom: 15px;
 }
 
+.view-all {
+  font-size: 0.9rem;
+  color: var(--muted-foreground); /* 테마의 보조 텍스트 색상 */
+  cursor: pointer;
+}
+
+/* 개별 결제 아이템 스타일 */
 .transaction-item {
-  width: 100%;
-  padding: 12px 0;
-}
-
-.transaction-item:first-child {
-  padding-top: 0;
-}
-
-.transaction-item:last-child {
-  padding-bottom: 0;
-}
-
-.transaction-item + .transaction-item {
-  border-top: 1px solid var(--line, #e9e5df);
+  padding: 15px 0;
+  border-bottom: 1px solid var(--border);
 }
 
 .item-info {
   display: flex;
   justify-content: space-between;
-  width: 100%;
   font-size: 1rem;
   margin-bottom: 5px;
-  color: var(--charcoal, #151515);
+  color: var(--foreground);
 }
 
 .item-date {
   font-size: 0.85rem;
-  color: var(--muted, #9d958b);
+  color: var(--muted-foreground);
 }
 </style>
