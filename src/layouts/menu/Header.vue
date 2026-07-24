@@ -29,15 +29,18 @@ const goToBookmarks = () => {
   position: sticky;
   top: 0;
   width: 100%;
-  height: 60px;
-  background-color: var(--background); /* 테마 배경색 */
+  max-width: 300px; /* Footer와 동일하게 설정 */
+  margin: 0 auto;   /* 중앙 정렬 */
+  height: 60px;     /* 또는 var(--nav-height) */
+  background-color: var(--background);
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 20px;
-  border-bottom: 1px solid var(--border); /* 테마 테두리 */
+  border-bottom: 1px solid var(--border);
   z-index: 1000;
 }
+
 
 .logo-link {
   display: flex;

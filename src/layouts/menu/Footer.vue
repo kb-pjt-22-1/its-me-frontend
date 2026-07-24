@@ -9,21 +9,15 @@
 
 <style scoped>
 .bottom-nav {
-  /* 화면 하단에 고정 */
   position: fixed;
   bottom: 0;
-  
-  /* 화면 가로 중앙으로 정렬 */
   left: 50%;
   transform: translateX(-50%);
-  
-  /* 앱 컨테이너 너비와 동일하게 */
   width: 100%;
-  max-width: 400px;
-  
-  height: 60px;
-  background-color: var(--background); /* 테마 배경색 적용 */
-  border-top: 1px solid var(--border); /* 테마 경계선 적용 */
+  max-width: 400px; /* Header와 동일 */
+  height: 60px;     /* Header와 동일 */
+  background-color: var(--background);
+  border-top: 1px solid var(--border);
   display: flex;
   justify-content: space-around;
   align-items: center;
