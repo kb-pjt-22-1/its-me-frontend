@@ -1,9 +1,9 @@
 <template>
-  <div v-if="isMenuOpen" class="menu-overlay">
-    <div class="menu-content">
+  <div v-if="isMenuOpen" class="menu-backdrop" @click.self="toggleMenu">
+    <div class="menu-overlay">
       <!-- 닫기 버튼 -->
       <button class="close-btn" @click="toggleMenu">✕</button>
-      
+
       <!-- 상단 프로필 -->
       <div class="profile-card">
         <h3>김포인트님, 반가워요</h3>
@@ -13,17 +13,17 @@
       <!-- 리스트 섹션 -->
       <div class="menu-section">
         <p class="section-title">계정 및 보안</p>
-        <div class="menu-item">결제 내역 ></div>
-        <div class="menu-item">간편 비밀번호(PIN) 설정 ></div>
-        <div class="menu-item">개인정보 및 보안 ></div>
+        <div class="menu-item">결제 내역 &gt;</div>
+        <div class="menu-item">간편 비밀번호(PIN) 설정 &gt;</div>
+        <div class="menu-item">개인정보 및 보안 &gt;</div>
       </div>
 
       <div class="menu-section">
         <p class="section-title">서비스</p>
-        <div class="menu-item">고객센터 ></div>
-        <div class="menu-item">공지사항 ></div>
-        <div class="menu-item">이용약관 ></div>
-        <div class="menu-item">개인정보처리방침 ></div>
+        <div class="menu-item">고객센터 &gt;</div>
+        <div class="menu-item">공지사항 &gt;</div>
+        <div class="menu-item">이용약관 &gt;</div>
+        <div class="menu-item">개인정보처리방침 &gt;</div>
       </div>
 
       <div class="footer-actions">
@@ -41,67 +41,92 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 
 const handleLogout = () => {
-  // 3. 로그아웃 로직 (예시: 로컬 스토리지에 저장된 토큰 삭제)
-  localStorage.removeItem('accessToken'); // 실제 사용하는 토큰 키 이름으로 변경하세요
-  
-  // 4. 로그인 페이지로 이동 (router.push를 사용)
-  router.push('/login'); 
-  
-  // 5. 메뉴 닫기
+  localStorage.removeItem('accessToken');
+  router.push('/login');
   toggleMenu();
 };
 </script>
 
 <style scoped>
-.menu-overlay {
-  position: fixed; 
-  top: 0; 
-  left: 0; 
-  width: 100%; 
+/* 배경 딤 처리 - 브라우저 전체를 덮되, 실제 메뉴 패널은 안쪽에서 중앙 정렬 */
+.menu-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
   height: 100%;
-  background: var(--background); /* 테마 배경색 적용 */
-  z-index: 2000; 
-  padding: 20px; 
-  overflow-y: auto;
+  background: rgba(0, 0, 0, .35);
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
 }
 
-.profile-card { 
-  background: var(--primary); /* 테마 주 색상 적용 */
-  color: var(--primary-foreground); 
-  padding: 20px; 
-  border-radius: var(--radius-lg); /* 테마 둥글기 적용 */
-  margin-bottom: 20px; 
+/* 실제 메뉴 패널 - 앱 전체가 쓰는 440px 기준폭과 동일하게, 화면 중앙에 위치 */
+.menu-overlay {
+  width: 100%;
+  max-width: 440px;
+  height: 100%;
+  background: var(--page, #faf9f6);
+  padding: 20px;
+  overflow-y: auto;
+  box-shadow: 0 0 30px rgba(0, 0, 0, .15);
 }
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line, #e9e5df);
+  border-radius: 8px;
+  background: var(--surface, #ffffff);
+  font-size: 14px;
+}
+
+.profile-card {
+  background: var(--charcoal, #59554a);
+  color: #ffffff;
+  padding: 20px;
+  border-radius: 17px;
+  margin: 20px 0;
+}
+.profile-card h3 { margin: 0 0 6px; font-size: 16px; }
+.profile-card p { margin: 0; font-size: 13px; color: var(--orange, #ffb800); }
 
 .menu-section { margin-bottom: 20px; }
 
-.section-title { 
-  font-size: 0.9rem; 
-  color: var(--muted-foreground); /* 테마 보조 텍스트 색상 */
-  margin-bottom: 10px; 
+.section-title {
+  font-size: 0.9rem;
+  color: var(--muted, #918a81);
+  margin-bottom: 10px;
 }
 
-.menu-item { 
-  padding: 15px 0; 
-  border-bottom: 1px solid var(--border); /* 테마 테두리 적용[cite: 5] */
-  cursor: pointer; 
-  color: var(--foreground);
+.menu-item {
+  padding: 15px 0;
+  border-bottom: 1px solid var(--line, #e9e5df);
+  cursor: pointer;
+  color: var(--charcoal, #59554a);
 }
 
-.footer-actions { margin-top: 40px; display: flex; flex-direction: column; gap: 10px; }
-
-.logout-btn { 
-  padding: 15px; 
-  border: 1px solid var(--border); 
-  background: var(--card); 
-  border-radius: var(--radius-md); 
-  color: var(--foreground);
+.footer-actions {
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
 }
 
-.withdraw-btn { 
-  color: var(--destructive); /* 테마 경고/삭제 색상[cite: 5] */
-  font-size: 0.8rem; 
-  border: none; 
-  background: none; 
+.logout-btn {
+  width: 100%;
+  padding: 15px;
+  border: 1px solid var(--line, #e9e5df);
+  background: var(--surface, #ffffff);
+  border-radius: 12px;
+  color: var(--charcoal, #59554a);
+}
+
+.withdraw-btn {
+  color: var(--danger, #f05e58);
+  font-size: 0.8rem;
+  border: none;
+  background: none;
 }
 </style>

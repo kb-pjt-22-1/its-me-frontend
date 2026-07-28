@@ -5,3 +5,7 @@
     <!-- 이제 여기에 뭘 넣어도 홈 화면이랑 똑같은 위치/크기로 나옵니다 -->
   </div>
 </template>
+
+<script setup>
+import PageContainer from '@/components/common/PageContainer.vue'
+</script>
