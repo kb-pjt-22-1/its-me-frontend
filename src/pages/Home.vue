@@ -4,13 +4,13 @@
     <!-- 1. 헤더 (인사말) -->
     <header>
       <!-- {{ userName }} 변수를 직접 바인딩합니다 -->
-      <h1>안녕하세요, {{ userName }}님!</h1> 
+      <h1>안녕하세요, {{ userName }}님!</h1>
       <p>오늘도 스마트한 소비를 시작해보세요.</p>
     </header>
 
     <div class="home-container">
     <!-- 1. 주 사용 카드 박스 (전체 너비) -->
-    <div class="card-box" @click="goToCardDetail(card.id)">
+    <Button variant="box-outline" @click="goToCardDetail(card.id)">
       <span class="badge">주 사용 카드</span>
       <h3>{{ card.name }}</h3>
       <p>본인 • {{ card.number }}</p>
@@ -18,20 +18,18 @@
         <div class="progress-bar" :style="{ width: progressPercentage + '%' }"></div>
       </div>
       <p>실적 충족까지 {{ remainingAmount.toLocaleString() }}원</p>
-    </div>
+    </Button>
 
     <!-- 2. 하단 두 박스 (각각 1씩 차지해서, 합치면 위 박스랑 너비가 같음) -->
     <div class="bottom-container">
-      <div class="info-box payment-box">
+      <Button variant="box" @click="router.push('/pay')">
         <h3>간편 결제</h3>
-        <router-link to="/pay" class="pay-link">
-  지금 결제 →
-</router-link>
-      </div>
-      <div class="info-box benefit-box">
+        <span class="pay-link-text">지금 결제 →</span>
+      </Button>
+      <Button tag="div" variant="box-outline">
         <h3>이번 달 혜택</h3>
         <p>{{ benefits.toLocaleString() }}원</p>
-      </div>
+      </Button>
     </div>
   </div>
 
@@ -40,16 +38,22 @@
       <div class="section-header">
         <h3>최근 결제 내역</h3>
         <!-- 클릭 시 페이지 이동 -->
-        <router-link to="/payments" class="view-all">전체보기</router-link>
+        <Button variant="link-muted" size="sm" @click="router.push('/payments')">전체보기</Button>
       </div>
 
-      <div v-for="item in recentTransactions" :key="item.id" class="transaction-item">
-        <div class="item-info">
-          <strong>{{ item.store }}</strong>
-          <span class="amount">{{ item.amount.toLocaleString() }}원</span>
+      <Button tag="div" variant="box-outline" style="min-height: auto;">
+        <div
+          v-for="item in recentTransactions"
+          :key="item.id"
+          class="transaction-item"
+        >
+          <div class="item-info">
+            <strong>{{ item.store }}</strong>
+            <span class="amount">{{ item.amount.toLocaleString() }}원</span>
+          </div>
+          <p class="item-date">{{ item.date }} | {{ item.cardName }}</p>
         </div>
-        <p class="item-date">{{ item.date }} | {{ item.cardName }}</p>
-      </div>
+      </Button>
     </section>
     </div>
   </div>
@@ -59,6 +63,7 @@
 import { ref, computed } from 'vue';
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import Button from '@/components/common/Button.vue';
 
 onMounted(async () => {
   // 예시: 서버에서 유저 이름 불러오기
@@ -92,23 +97,9 @@ const goToTransactions = () => {
 </script>
 
 <style scoped>
-.pay-link {
-  text-decoration: none; 
-  color: var(--primary);          /* 테마의 강조 색상 적용 */
-  font-weight: var(--font-weight-medium); 
-  cursor: pointer;
-  display: inline-block; 
-}
+/* .pay-link, .view-all 클래스는 Button 컴포넌트가 대신하므로 제거했습니다 */
 
-/* 카드 박스 */
-.card-box {
-  width: 100%;
-  padding: 20px;
-  border-radius: var(--radius-lg);
-  background-color: var(--background); /* 테마의 배경색 */
-  border: 1px solid var(--border);     /* 테마의 테두리 색상 */
-  box-sizing: border-box;
-}
+/* .card-box 스타일은 이제 Button.vue의 box-outline variant가 담당합니다 */
 
 /* 하단 2개 박스 래퍼 */
 .bottom-container {
@@ -117,24 +108,16 @@ const goToTransactions = () => {
   width: 100%;
 }
 
-.info-box {
-  flex: 1; 
-  padding: 20px;
-  border-radius: var(--radius-lg);
-  box-sizing: border-box;
+.bottom-container > * {
+  flex: 1;
+  width: 0; /* flex item이 내용물 너비만큼 늘어나지 않고 flex:1 비율을 따르도록 */
 }
 
-/* 결제 박스 (Primary 테마 적용) */
-.payment-box { 
-  background-color: var(--primary); 
-  color: var(--primary-foreground); 
-}
-
-/* 혜택 박스 (Card 테마 적용) */
-.benefit-box { 
-  background-color: var(--card); 
-  border: 2px solid var(--primary); 
-  color: var(--card-foreground); 
+/* .payment-box, .benefit-box, .info-box, .pay-link-text 스타일은
+   이제 Button.vue의 box / box-outline variant가 담당합니다 */
+.pay-link-text {
+  color: var(--orange, #ffb800);
+  font-weight: 700;
 }
 
 /* 섹션 레이아웃 */
@@ -149,21 +132,28 @@ const goToTransactions = () => {
   margin-bottom: 15px;
 }
 
-.view-all {
-  font-size: 0.9rem;
-  color: var(--muted-foreground); /* 테마의 보조 텍스트 색상 */
-  cursor: pointer;
+/* 개별 결제 아이템 - 하나의 box-outline 박스 안에서 구분선으로 나뉩니다 */
+.transaction-item {
+  width: 100%;
+  padding: 12px 0;
 }
 
-/* 개별 결제 아이템 스타일 */
-.transaction-item {
-  padding: 15px 0;
-  border-bottom: 1px solid var(--border);
+.transaction-item:first-child {
+  padding-top: 0;
+}
+
+.transaction-item:last-child {
+  padding-bottom: 0;
+}
+
+.transaction-item + .transaction-item {
+  border-top: 1px solid var(--border, #e9e5df);
 }
 
 .item-info {
   display: flex;
   justify-content: space-between;
+  width: 100%;
   font-size: 1rem;
   margin-bottom: 5px;
   color: var(--foreground);

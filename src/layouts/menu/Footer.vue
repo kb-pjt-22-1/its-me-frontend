@@ -14,10 +14,10 @@
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 400px; /* Header와 동일 */
-  height: 60px;     /* Header와 동일 */
-  background-color: var(--background);
-  border-top: 1px solid var(--border);
+  max-width: 440px;  /* main.css의 .page-container, Header와 동일 */
+  height: 60px;
+  background-color: var(--page, #faf9f6);
+  border-top: 1px solid var(--line, #e9e5df);
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -26,13 +26,12 @@
 
 .nav-item {
   text-decoration: none;
-  color: var(--foreground); /* 테마 글자색 적용 */
-  font-weight: var(--font-weight-medium); /* 테마 폰트 두께 */
+  color: var(--charcoal, #59554a);
+  font-weight: 700;
   font-size: 0.9rem;
 }
 
-/* 선택된 아이템의 경우 primary 색상을 보여주고 싶다면 아래 클래스 추가 */
 .nav-item.router-link-active {
-  color: var(--primary);
+  color: var(--orange, #ffb800);
 }
 </style>
