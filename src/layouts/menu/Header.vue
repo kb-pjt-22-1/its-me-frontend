@@ -39,6 +39,7 @@ const goToBookmarks = () => {
   z-index: 1000;
 }
 
+
 .logo-link {
   display: flex;
   align-items: center;

@@ -9,15 +9,10 @@
 
 <style scoped>
 .bottom-nav {
-  /* 화면 하단에 고정 */
   position: fixed;
   bottom: 0;
-  
-  /* 화면 가로 중앙으로 정렬 */
   left: 50%;
   transform: translateX(-50%);
-  
-  /* 앱 컨테이너 너비와 동일하게 */
   width: 100%;
   max-width: 400px;
   
