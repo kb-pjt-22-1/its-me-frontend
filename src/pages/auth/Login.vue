@@ -1,128 +1,178 @@
 <template>
-  <!-- 테마 배경색(bg-background)과 글자색(text-foreground) 적용 -->
-  <div class="min-h-screen bg-background text-foreground flex items-center justify-center p-4 font-sans antialiased">
-    
-    <!-- 전체 로그인 컨테이너 -->
-    <div class="w-full max-w-md space-y-10">
-
-      <!-- 입력 폼 섹션 -->
-      <form class="space-y-5" @submit.prevent="handleLogin">
-        
-        <!-- 아이디 -->
-        <div class="relative">
-          <input 
-            type="text" 
-            v-model="userId"
-            placeholder="아이디"
-            class="w-full pl-4 pr-4 py-4 border border-border bg-input-background rounded-[var(--radius-lg)] focus:ring-2 focus:ring-primary focus:border-primary transition duration-150"
-          />
+  <PageContainer>
+    <div class="login-page">
+      <form class="login-form" @submit.prevent="handleLogin">
+        <div class="input-box">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="8" r="4"></circle>
+            <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"></path>
+          </svg>
+          <input type="text" v-model="userId" placeholder="아이디" />
         </div>
 
-        <!-- 비밀번호 -->
-        <div class="relative">
-          <input 
-            :type="showPassword ? 'text' : 'password'"
-            v-model="password"
-            placeholder="비밀번호"
-            class="w-full pl-4 pr-12 py-4 border border-border bg-input-background rounded-[var(--radius-lg)] focus:ring-2 focus:ring-primary focus:border-primary transition duration-150"
-          />
+        <div class="input-box">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="10" width="16" height="10" rx="2"></rect>
+            <path d="M7 10V7a5 5 0 0 1 10 0v3"></path>
+          </svg>
+          <input :type="showPassword ? 'text' : 'password'" v-model="password" placeholder="비밀번호" />
+          <button type="button" class="input-action" @click="showPassword = !showPassword" aria-label="비밀번호 표시">
+            <svg v-if="!showPassword" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="4" y="10" width="16" height="10" rx="2"></rect>
+              <path d="M7 10V7a5 5 0 0 1 10 0v3"></path>
+            </svg>
+            <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="4" y="10" width="16" height="10" rx="2"></rect>
+              <path d="M7 10V7a5 5 0 0 1 9.5-2"></path>
+            </svg>
+          </button>
         </div>
 
-        <!-- 실패 문구: 테마의 destructive 색상 적용 -->
-        <p v-if="errorMessage" class="text-destructive text-sm text-center font-medium animate-pulse">
-          {{ errorMessage }}
-        </p>
+        <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
 
-        <!-- 로그인 버튼: 테마의 primary 색상 적용 -->
-        <button type="submit" class="w-full py-4 bg-primary text-primary-foreground font-bold rounded-[var(--radius-lg)] hover:opacity-90 transition">
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          full-width
+          :disabled="!canSubmit"
+        >
           로그인
-        </button>
+        </Button>
       </form>
 
-      <!-- 회원가입 링크 -->
-      <div class="text-center text-sm font-medium text-muted-foreground pt-2">
-        아직 계정이 없으신가요? 
-        <button type="submit" class="w-full py-4 bg-primary text-primary-foreground font-bold rounded-[var(--radius-lg)] hover:opacity-90 transition">
-        <router-link to="/signup">
-          회원가입
-        </router-link>
-      </button>
-      </div>
-
+      <p class="signup-copy">
+        아직 계정이 없으신가요?
+        <router-link to="/signup" class="signup-link">회원가입</router-link>
+      </p>
     </div>
-  </div>
+  </PageContainer>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import PageContainer from '@/components/common/PageContainer.vue';
+import Button from '@/components/common/Button.vue';
 
 const userId = ref('');
 const password = ref('');
 const showPassword = ref(false);
-const errorMessage = ref(''); // 에러 메시지 상태 관리
+const errorMessage = ref('');
 const router = useRouter();
 
+const canSubmit = computed(() => userId.value.length > 0 && password.value.length > 0);
+
 function handleLogin() {
-  // 간단한 테스트용 로그인 로직 (실제로는 API 연동)
   if (userId.value === 'admin' && password.value === '1234') {
-    errorMessage.value = ''; // 성공 시 에러 메시지 초기화
+    errorMessage.value = '';
     router.push('/');
   } else {
-    // 실패 시 에러 메시지 설정
     errorMessage.value = '아이디 또는 비밀번호가 잘못되었습니다.';
   }
 }
 </script>
 
 <style scoped>
-/* 화면 전체 배경 및 중앙 정렬 */
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.login-page {
   min-height: 100vh;
-  background-color: var(--background); /* 전체 배경색 */
-  padding: 20px;
+  padding: 16px 24px 40px;
+  position: relative;
+  box-sizing: border-box;
 }
 
-/* 로그인 입력창 카드 박스 */
-.login-card {
-  width: 100%;
-  max-width: 400px;
-  padding: 30px;
-  background: var(--card); /* 카드 배경색[cite: 5] */
-  border-radius: var(--radius-lg); /* 둥근 모서리[cite: 5] */
-  border: 1px solid var(--border); /* 카드 테두리[cite: 5] */
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+.menu-fab {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--surface, #ffffff);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .11);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px;
+  place-items: center;
+  padding: 8px;
+}
+.menu-fab span {
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: var(--muted, #918a81);
 }
 
-.title {
-  font-size: 1.5rem;
-  font-weight: var(--font-weight-medium);
-  color: var(--foreground);
-  margin-bottom: 20px;
+.login-brand {
+  padding-top: 60px;
   text-align: center;
 }
 
-.login-input {
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 15px;
-  border: 1px solid var(--border); /* 입력창 테두리[cite: 5] */
-  border-radius: var(--radius-md);
-  background-color: var(--input-background);
-  color: var(--foreground);
+.brand-logo {
+  width: 140px;
+  height: 140px;
+  border-radius: 32px;
+  object-fit: cover;
+  box-shadow: 0 16px 30px rgba(255, 184, 0, .25);
 }
 
-.login-btn {
-  width: 100%;
-  padding: 12px;
-  background-color: var(--primary); /* 메인 버튼 색상[cite: 5] */
-  color: var(--primary-foreground);
+.login-form {
+  margin-top: 43px;
+  display: grid;
+  gap: 12px;
+}
+
+.input-box {
+  height: 55px;
+  border: 1px solid var(--line, #e9e5df);
+  border-radius: 13px;
+  background: var(--surface, #ffffff);
+  padding: 0 13px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted, #918a81);
+}
+
+.input-box input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  font-size: 15px;
+  color: var(--charcoal, #2c2b27);
+  min-width: 0;
+  background: transparent;
+}
+.input-box input::placeholder { color: var(--muted, #a79f97); }
+
+.input-action {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--muted, #999288);
+  background: transparent;
   border: none;
-  border-radius: var(--radius-md);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
+  padding: 0;
+}
+
+.error-text {
+  color: var(--danger, #f05e58);
+  font-size: 0.85rem;
+  text-align: center;
+  margin: 0;
+}
+
+.signup-copy {
+  text-align: center;
+  color: var(--muted, #a0958d);
+  font-size: 13px;
+  margin-top: 25px;
+}
+
+.signup-link {
+  font-weight: 800;
+  color: var(--charcoal, #171717);
+  text-decoration: none;
 }
 </style>

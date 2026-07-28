@@ -1,5 +1,4 @@
-@import './theme.css';
-/* @import './base.css'; */
+@import './base.css';
 
 .desktop-stage {
   min-height: 100vh;
