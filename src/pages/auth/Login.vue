@@ -28,16 +28,16 @@
           </button>
         </div>
 
-        <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
+        <p v-if="authStore.errorMessage" class="error-text">{{ authStore.errorMessage }}</p>
 
         <Button
           type="submit"
           variant="primary"
           size="lg"
           full-width
-          :disabled="!canSubmit"
+          :disabled="!canSubmit || authStore.isLoading"
         >
-          로그인
+          {{ authStore.isLoading ? '로그인 중...' : '로그인' }}
         </Button>
       </form>
 
@@ -54,21 +54,20 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import PageContainer from '@/components/common/PageContainer.vue';
 import Button from '@/components/common/Button.vue';
+import { useAuthStore } from '@/stores/auth';
 
 const userId = ref('');
 const password = ref('');
 const showPassword = ref(false);
-const errorMessage = ref('');
 const router = useRouter();
+const authStore = useAuthStore();
 
 const canSubmit = computed(() => userId.value.length > 0 && password.value.length > 0);
 
-function handleLogin() {
-  if (userId.value === 'admin' && password.value === '1234') {
-    errorMessage.value = '';
+async function handleLogin() {
+  const success = await authStore.login(userId.value, password.value);
+  if (success) {
     router.push('/');
-  } else {
-    errorMessage.value = '아이디 또는 비밀번호가 잘못되었습니다.';
   }
 }
 </script>
@@ -79,41 +78,6 @@ function handleLogin() {
   padding: 16px 24px 40px;
   position: relative;
   box-sizing: border-box;
-}
-
-.menu-fab {
-  position: absolute;
-  right: 16px;
-  top: 16px;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--surface, #ffffff);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, .11);
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 3px;
-  place-items: center;
-  padding: 8px;
-}
-.menu-fab span {
-  width: 5px;
-  height: 5px;
-  border-radius: 1px;
-  background: var(--muted, #918a81);
-}
-
-.login-brand {
-  padding-top: 60px;
-  text-align: center;
-}
-
-.brand-logo {
-  width: 140px;
-  height: 140px;
-  border-radius: 32px;
-  object-fit: cover;
-  box-shadow: 0 16px 30px rgba(255, 184, 0, .25);
 }
 
 .login-form {
