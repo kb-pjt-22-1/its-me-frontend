@@ -5,7 +5,7 @@
     v-bind="$attrs"
     :to="to"
     class="btn"
-    :class="[variantClass, sizeClass, { 'btn--static': tag === 'div' }]"
+    :class="[variantClass, sizeClass, { 'btn--static': tag === 'div', 'btn--full-width': fullWidth }]"
     :disabled="!to && !tag ? disabled : undefined"
   >
     <slot />
@@ -24,7 +24,9 @@ const props = defineProps({
   // 라우터 이동이 필요하면 경로를 넘기세요 (router-link로 렌더링)
   to: { type: [String, Object], default: undefined },
   // 클릭 동작이 없는 정적 박스로 쓸 때 (예: 혜택 박스) tag="div"로 강제 지정
-  tag: { type: String, default: undefined }
+  tag: { type: String, default: undefined },
+  // 참고: box/box-outline 변형은 이 prop과 무관하게 항상 width:100%다
+  fullWidth: { type: Boolean, default: false }
 })
 
 const variantClass = computed(() => `btn--${props.variant}`)
@@ -120,6 +122,15 @@ const sizeClass = computed(() => `btn--${props.size}`)
 /* tag="div"로 쓸 때(클릭 동작 없는 정적 박스)만 cursor를 기본값으로 되돌림 */
 .btn--static {
   cursor: default;
+}
+
+/*
+  full-width prop이 실제로 적용하는 규칙. 예전에는 prop만 선언 안 된 채 템플릿에서
+  받아 $attrs로 DOM에 얹히기만 하고 아무 CSS도 반응하지 않아서, 이 속성을 쓴 버튼(로그인
+  화면의 제출 버튼 등)이 실제로는 폭이 안 늘어나고 있었다.
+*/
+.btn--full-width {
+  width: 100%;
 }
 
 /* size - link 계열, box 계열은 padding이 아래 값 대신 자체 값을 씁니다 */

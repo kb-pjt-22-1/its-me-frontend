@@ -3,19 +3,17 @@
   <div class="layout-container">
     <!-- 1. 헤더 (인사말) -->
     <header>
-      <!-- {{ userName }} 변수를 직접 바인딩합니다 -->
       <h1>안녕하세요, {{ userName }}님!</h1>
       <p>오늘도 스마트한 소비를 시작해보세요.</p>
     </header>
 
     <div class="home-container">
     <!-- 1. 주 사용 카드 박스 (전체 너비) -->
-    <Button variant="box-outline" class="card-box" @click="goToCardDetail(card.id)">
+    <Button variant="box-outline" class="card-box" @click="goToCardDetail(primaryCard.userCardId)">
       <div class="card-top-row">
         <div>
           <span class="badge">주 사용 카드</span>
-          <h3>{{ card.name }}</h3>
-          <p>본인 • {{ card.number }}</p>
+          <h3>{{ primaryCard.cardName }}</h3>
         </div>
         <span class="card-glyph">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -26,17 +24,17 @@
       </div>
 
       <div class="status-row">
-        <span class="danger-text">{{ card.status }}</span>
+        <span class="danger-text">{{ primaryCard.statusLabel }}</span>
         <span class="status-muted">실적 충족까지 {{ remainingAmount.toLocaleString() }}원</span>
       </div>
 
       <div class="progress-container">
         <div class="progress-bar" :style="{ width: progressPercentage + '%' }"></div>
       </div>
-      <p class="progress-target">목표 {{ card.target.toLocaleString() }}원</p>
+      <p class="progress-target">목표 {{ primaryCard.targetAmount.toLocaleString() }}원</p>
     </Button>
 
-    <!-- 2. 하단 두 박스 (각각 1씩 차지해서, 합치면 위 박스랑 너비가 같음) -->
+    <!-- 2. 하단 두 박스 -->
     <div class="bottom-container">
       <Button variant="box" @click="router.push('/pay')">
         <h3>간편 결제</h3>
@@ -51,7 +49,7 @@
           <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path>
           <path d="M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5"></path>
         </svg>
-        <p class="benefit-amount">{{ benefits.toLocaleString() }}원</p>
+        <p class="benefit-amount">{{ monthlyBenefitTotal.toLocaleString() }}원</p>
         <small class="benefit-caption">할인 및 적립 포함</small>
       </Button>
     </div>
@@ -61,21 +59,20 @@
     <section class="transaction-section">
       <div class="section-header">
         <h3>최근 결제 내역</h3>
-        <!-- 클릭 시 페이지 이동 -->
         <Button variant="link-muted" size="sm" @click="router.push('/payments')">전체보기</Button>
       </div>
 
       <Button tag="div" variant="box-outline" style="min-height: auto;">
         <div
           v-for="item in recentTransactions"
-          :key="item.id"
+          :key="item.paymentId"
           class="transaction-item"
         >
           <div class="item-info">
-            <strong>{{ item.store }}</strong>
-            <span class="amount">{{ item.amount.toLocaleString() }}원</span>
+            <strong>{{ item.merchantName }}</strong>
+            <span class="amount">{{ item.finalAmount.toLocaleString() }}원</span>
           </div>
-          <p class="item-date">{{ item.date }} | {{ item.cardName }}</p>
+          <p class="item-date">{{ item.paymentTime }} | {{ item.cardName }}</p>
         </div>
       </Button>
     </section>
@@ -84,64 +81,92 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import { onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Button from '@/components/common/Button.vue';
-
-onMounted(async () => {
-  // 예시: 서버에서 유저 이름 불러오기
-  // const response = await api.getUserProfile();
-  // userName.value = response.data.name;
-});
+import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
+const authStore = useAuthStore();
 
-// 나중에 API를 통해 서버에서 받아올 이름입니다.
-const userName = ref('로그인한유저');
+// ---------------------------------------------------------
+// 아래 값들은 실제로는 API에서 받아옵니다.
+// 지금은 목데이터_추가_버전.sql의 user_id=1(홍길동) 데이터를 그대로 계산해서 넣었습니다.
+// ---------------------------------------------------------
 
-const card = ref({
-  id: 1,
-  name: 'Deep Dream Platinum',
-  number: '1234',
-  target: 1500000,
-  current: 1245000,
-  status: '전월 실적 미달',
+const userName = computed(() => authStore.userName);
+
+// cards + user_cards 조인 (user_id=1, is_primary=TRUE인 카드)
+// card_id=1 'KB국민 노리카드', min_benefit_amount=300000
+// user_card_id=1, pan_last4='1234'
+// card_monthly_status: target_year_month='202607', total_spending_amount=105400
+const primaryCard = ref({
+  userCardId: 1,
+  cardName: 'KB국민 노리카드',
+  panLast4: '1234',
+  targetAmount: 300000,
+  currentAmount: 105400,
+  statusLabel: '전월 실적 미달',
 });
-const benefits = ref(42500);
 
-// 북마크 페이지에서 최근 저장한 매장 (예시로 하드코딩, 실제로는 store/API에서 받아오면 됩니다)
-const recentSavedStore = ref('소소한 식탁');
+const remainingAmount = computed(() =>
+  Math.max(primaryCard.value.targetAmount - primaryCard.value.currentAmount, 0)
+);
+const progressPercentage = computed(() =>
+  Math.min((primaryCard.value.currentAmount / primaryCard.value.targetAmount) * 100, 100)
+);
 
-const remainingAmount = computed(() => card.value.target - card.value.current);
-const progressPercentage = computed(() => (card.value.current / card.value.target) * 100);
+// bookmarked_stores 중 user_id=1의 가장 최근 created_at 건
+// bm_0000000000000002 (2026-03-06) → merchant_id=3 '동네마트 역삼점'
+const recentSavedStore = ref('동네마트 역삼점');
 
-const goToCardDetail = (id) => alert('상세 이동');
-const goToQuickPay = () => alert('결제 이동');
-
-// 나중에 서버에서 데이터를 받아오면 이 배열만 갈아끼우면 됩니다!
+// payments ⋈ merchants ⋈ user_cards ⋈ cards (user_id=1 소유 카드만, 최신순)
+// user_card_id 1,2가 홍길동 소유. payment_id=3은 user_card_id=3(다른 유저 소유)이라 제외.
 const recentTransactions = ref([
-  { id: 1, store: '스타벅스 김포점', amount: 5400, date: '2024.05.20 14:30', cardName: 'Deep Dream Platinum' },
-  { id: 2, store: '이마트몰', amount: 42800, date: '2024.05.19 18:15', cardName: 'Shinhan The More' }
+  {
+    paymentId: 4,
+    merchantName: '스타벅스 강남점',
+    finalAmount: 4050,
+    paymentTime: '2026.07.10 15:05',
+    cardName: 'KB국민 노리카드',
+    status: 'PENDING',
+  },
+  {
+    paymentId: 2,
+    merchantName: 'GS25 역삼역점',
+    finalAmount: 11400,
+    paymentTime: '2026.07.02 19:30',
+    cardName: 'KB국민 탄탄대로 체크카드',
+    status: 'APPROVED',
+  },
+  {
+    paymentId: 1,
+    merchantName: '스타벅스 강남점',
+    finalAmount: 5400,
+    paymentTime: '2026.07.01 08:12',
+    cardName: 'KB국민 노리카드',
+    status: 'APPROVED',
+  },
 ]);
 
-const goToTransactions = () => {
-  router.push('/payments'); // 결제 내역 페이지 경로
-};
+// 이번 달(202607) 승인된 결제의 discount_amount 합계 (payment_id 1, 2 — 4는 PENDING이라 제외, 3은 다른 유저)
+const monthlyBenefitTotal = computed(() => 600 + 600);
+
+const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
 </script>
 
 <style scoped>
-/* .pay-link, .view-all 클래스는 Button 컴포넌트가 대신하므로 제거했습니다 */
+/* 다른 화면들(.layout-container)과 동일하게 좌우 18px 여백 통일 */
+.layout-container {
+  padding: 18px 18px 24px;
+}
 
-/* card-box, bottom-container 사이 세로 간격을 bottom-container 내부 가로 간격(15px)과
-   동일하게 맞춰서 T자 모양 간격이 일정하게 나오도록 함 */
 .home-container {
   display: flex;
   flex-direction: column;
   gap: 15px;
 }
 
-/* card-box 내부 배치 - 배경/테두리/radius는 Button.vue의 box-outline이 담당 */
 .card-box {
   text-align: left;
 }
@@ -226,7 +251,6 @@ const goToTransactions = () => {
   font-size: 11px;
 }
 
-/* 하단 2개 박스 래퍼 */
 .bottom-container {
   display: flex;
   gap: 15px;
@@ -235,11 +259,9 @@ const goToTransactions = () => {
 
 .bottom-container > * {
   flex: 1;
-  width: 0; /* flex item이 내용물 너비만큼 늘어나지 않고 flex:1 비율을 따르도록 */
+  width: 0;
 }
 
-/* .payment-box, .benefit-box, .info-box, .pay-link-text 스타일은
-   이제 Button.vue의 box / box-outline variant가 담당합니다 */
 .pay-link-text {
   color: var(--orange, #ffb800);
   font-weight: 700;
@@ -267,7 +289,6 @@ const goToTransactions = () => {
   font-size: 11px;
 }
 
-/* 섹션 레이아웃 */
 .transaction-section {
   margin-top: 30px;
 }
@@ -279,7 +300,6 @@ const goToTransactions = () => {
   margin-bottom: 15px;
 }
 
-/* 개별 결제 아이템 - 하나의 box-outline 박스 안에서 구분선으로 나뉩니다 */
 .transaction-item {
   width: 100%;
   padding: 12px 0;

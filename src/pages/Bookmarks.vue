@@ -1,36 +1,26 @@
 <template>
   <div class="page-container">
-    <!-- 헤더 영역 -->
-    <header class="header">
-      <button class="back-btn" @click="$router.back()" aria-label="뒤로가기">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-      </button>
-    </header>
 
-    <!-- 매장 개수 표시 -->
     <div class="store-count">저장한 매장 {{ bookmarks.length }}곳</div>
 
-    <!-- 매장 리스트 - Button.vue의 box-outline variant를 가로 배치로 활용 -->
     <div class="bookmark-list">
       <Button
         v-for="shop in bookmarks"
-        :key="shop.id"
+        :key="shop.bookmarkId"
         variant="box-outline"
         class="store-card"
         style="flex-direction: row; align-items: center; min-height: auto; gap: 15px;"
-        @click="goToStore(shop.id)"
+        @click="goToStore(shop.merchantId)"
       >
         <div class="store-icon">{{ shop.icon }}</div>
 
         <div class="card-center">
           <h3>{{ shop.name }}</h3>
-          <p class="details">{{ shop.category }} · {{ shop.distance }}m · ★{{ shop.rating }}</p>
-          <span class="discount-badge">등록 {{ shop.discount }}% 할인</span>
+          <p class="details">{{ shop.category }} · {{ shop.address }}</p>
+          <span v-if="shop.discountLabel" class="discount-badge">{{ shop.discountLabel }}</span>
         </div>
 
-        <span class="bookmark-badge" @click.stop="toggleBookmark(shop.id)">
+        <span class="bookmark-badge" @click.stop="removeBookmark(shop.bookmarkId)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M6 2a2 2 0 0 0-2 2v18l8-5 8 5V4a2 2 0 0 0-2-2H6z"></path>
           </svg>
@@ -47,18 +37,39 @@ import Button from '@/components/common/Button.vue';
 
 const router = useRouter();
 
-// 디자인 맞춤형 샘플 데이터
+// bookmarked_stores ⋈ merchants ⋈ merchant_categories (user_id=1, is_deleted=FALSE)
+// discountLabel은 user_id=1이 보유한 카드들의 benefits_info.categories 중,
+// 매장 카테고리(category_code)와 일치하는 항목에서 가장 유리한 걸 찾아 표시했습니다.
+//   - KB국민 노리카드: CAFE 10%, CVS 5%
+//   - KB국민 탄탄대로 체크카드: GAS 8%, MART 3%
 const bookmarks = ref([
-  { id: 1, name: '오늘의 커피 로스터스', category: '카페', distance: 80, rating: 4.6, discount: 10, icon: '☕' },
-  { id: 2, name: '소소한 식탁', category: '한식', distance: 150, rating: 4.7, discount: 5, icon: '🍽️' }
+  {
+    bookmarkId: 'bm_0000000000000002',
+    merchantId: 3,
+    name: '동네마트 역삼점',
+    category: '마트',
+    address: '서울특별시 강남구 역삼동 789',
+    icon: '🛒',
+    discountLabel: '탄탄대로 체크카드 3% 할인', // MART 카테고리 매칭
+  },
+  {
+    bookmarkId: 'bm_0000000000000001',
+    merchantId: 1,
+    name: '스타벅스 강남점',
+    category: '카페',
+    address: '서울특별시 강남구 테헤란로 123',
+    icon: '☕',
+    discountLabel: '노리카드 10% 할인', // CAFE 카테고리 매칭
+  },
 ]);
 
-const goToStore = (id) => {
-  router.push(`/stores/${id}`);
+const goToStore = (merchantId) => {
+  router.push(`/stores/${merchantId}`);
 };
 
-const toggleBookmark = (id) => {
-  bookmarks.value = bookmarks.value.filter((shop) => shop.id !== id);
+const removeBookmark = (bookmarkId) => {
+  // 실제로는 bookmarked_stores.is_deleted = TRUE 로 소프트 삭제하는 API 호출
+  bookmarks.value = bookmarks.value.filter((shop) => shop.bookmarkId !== bookmarkId);
 };
 </script>
 
@@ -69,7 +80,6 @@ const toggleBookmark = (id) => {
   padding: 20px;
 }
 
-/* 헤더 */
 .header {
   display: flex;
   justify-content: space-between;
@@ -103,7 +113,6 @@ const toggleBookmark = (id) => {
   place-items: center;
 }
 
-/* 리스트 */
 .store-count {
   font-weight: 700;
   color: var(--muted, #918a81);
@@ -117,8 +126,6 @@ const toggleBookmark = (id) => {
   gap: 15px;
 }
 
-/* store-card는 Button.vue의 box-outline이 배경/테두리/radius를 담당하고,
-   여기서는 내부 배치만 다룹니다 */
 .store-card {
   padding: 15px;
   text-align: left;
@@ -149,7 +156,7 @@ const toggleBookmark = (id) => {
 
 .details {
   color: var(--muted, #918a81);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   margin: 0 0 8px 0;
 }
 
@@ -159,7 +166,7 @@ const toggleBookmark = (id) => {
   color: #b67a00;
   padding: 4px 8px;
   border-radius: 7px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 800;
 }
 

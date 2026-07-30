@@ -6,14 +6,16 @@
 
       <!-- 상단 프로필 -->
       <div class="profile-card">
-        <h3>김포인트님, 반가워요</h3>
-        <p>이번 달 혜택 42,500원</p>
+        <h3>{{ userName }}님, 반가워요</h3>
+        <p>이번 달 혜택 {{ monthlyBenefit.toLocaleString() }}원</p>
       </div>
 
       <!-- 리스트 섹션 -->
       <div class="menu-section">
         <p class="section-title">계정 및 보안</p>
-        <div class="menu-item">결제 내역 &gt;</div>
+        <router-link to="/payments" class="menu-item" @click="toggleMenu">
+          결제 내역 &gt;
+        </router-link>
         <div class="menu-item">간편 비밀번호(PIN) 설정 &gt;</div>
         <div class="menu-item">개인정보 및 보안 &gt;</div>
       </div>
@@ -35,13 +37,24 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { isMenuOpen, toggleMenu } from '@/composables/useMenu';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
+const authStore = useAuthStore();
 
-const handleLogout = () => {
-  localStorage.removeItem('accessToken');
+// users 테이블 정보는 이제 authStore(로그인 시 채워짐)에서 가져옵니다.
+// computed로 감싸야 authStore.user가 바뀔 때(로그인/로그아웃) 화면도 같이 갱신됩니다.
+const userName = computed(() => authStore.userName);
+
+// payments.discount_amount 합계 (이번 달, 승인건만) — Home.vue와 동일한 계산 기준
+// 카드/결제 데이터는 아직 별도 store가 없어서 임시로 하드코딩되어 있습니다.
+const monthlyBenefit = 1650;
+
+const handleLogout = async () => {
+  await authStore.logout();
   router.push('/login');
   toggleMenu();
 };
@@ -91,6 +104,16 @@ const handleLogout = () => {
 .profile-card h3 { margin: 0 0 6px; font-size: 16px; }
 .profile-card p { margin: 0; font-size: 13px; color: var(--orange, #ffb800); }
 
+.profile-card {
+  background: var(--charcoal, #59554a);
+  color: #ffffff;
+  padding: 20px;
+  border-radius: 17px;
+  margin: 20px 0;
+}
+.profile-card h3 { margin: 0 0 6px; font-size: 16px; }
+.profile-card p { margin: 0; font-size: 13px; color: var(--orange, #ffb800); }
+
 .menu-section { margin-bottom: 20px; }
 
 .section-title {
@@ -100,10 +123,12 @@ const handleLogout = () => {
 }
 
 .menu-item {
+  display: block;
   padding: 15px 0;
   border-bottom: 1px solid var(--line, #e9e5df);
   cursor: pointer;
   color: var(--charcoal, #59554a);
+  text-decoration: none;
 }
 
 .footer-actions {
