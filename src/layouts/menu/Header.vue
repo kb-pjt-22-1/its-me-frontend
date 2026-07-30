@@ -6,50 +6,60 @@
     </router-link>
     <div class="header-right">
       <span class="icon" @click="goToNotification">🔔</span>
+      <span class="icon" @click="goToBookmarks">🔖</span>
       <span class="icon" @click="toggleMenu">☰</span>
     </div>
   </header>
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router';
 import { toggleMenu } from '@/composables/useMenu';
 
+const router = useRouter();
+
 const goToNotification = () => alert('알림 페이지로 이동');
+const goToBookmarks = () => {
+  router.push('/bookmarks');
+};
 </script>
 
 <style scoped>
 .app-header {
-  position: sticky; /* 상단 고정 */
+  position: sticky;
   top: 0;
   width: 100%;
+  max-width: 440px;  /* main.css의 .page-container와 동일 */
+  margin: 0 auto;
   height: 60px;
-  background-color: white;
+  background-color: var(--page, #faf9f6);
   display: flex;
-  justify-content: space-between; /* 로고와 아이콘 양끝 배치 */
+  justify-content: space-between;
   align-items: center;
   padding: 0 20px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--line, #e9e5df);
   z-index: 1000;
 }
 
 .logo-link {
   display: flex;
   align-items: center;
-  text-decoration: none; /* 밑줄 제거 */
-  color: #333;
+  text-decoration: none;
+  color: var(--charcoal, #59554a);
 }
 
 .logo-icon {
-  width: 40px;      /* 높이에 맞춰 아이콘 크기 조절 */
+  width: 40px;
   height: 40px;
-  margin-right: 8px; /* 글자와의 간격 */
-  border-radius: 8px; /* 살짝 둥글게 하면 더 예쁩니다 */
+  margin-right: 8px;
+  border-radius: 10px;
+  background-color: var(--muted, #918a81);
 }
 
 .logo-text {
   font-size: 1.4rem;
   font-weight: 900;
-  color: #1a1a1a;
+  color: var(--charcoal, #59554a);
   letter-spacing: -1px;
 }
 
@@ -57,5 +67,6 @@ const goToNotification = () => alert('알림 페이지로 이동');
   font-size: 1.5rem;
   margin-left: 15px;
   cursor: pointer;
+  color: var(--charcoal, #59554a);
 }
 </style>

@@ -9,21 +9,15 @@
 
 <style scoped>
 .bottom-nav {
-  /* 화면 하단에 고정 */
   position: fixed;
   bottom: 0;
-  
-  /* 화면 가로 중앙으로 정렬 */
   left: 50%;
   transform: translateX(-50%);
-  
-  /* 앱 컨테이너 너비와 동일하게 */
   width: 100%;
-  max-width: 400px;
-  
+  max-width: 440px;  /* main.css의 .page-container, Header와 동일 */
   height: 60px;
-  background-color: white;
-  border-top: 1px solid #eee;
+  background-color: var(--page, #faf9f6);
+  border-top: 1px solid var(--line, #e9e5df);
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -32,8 +26,12 @@
 
 .nav-item {
   text-decoration: none;
-  color: #333;
-  font-weight: bold;
+  color: var(--charcoal, #59554a);
+  font-weight: 700;
   font-size: 0.9rem;
+}
+
+.nav-item.router-link-active {
+  color: var(--orange, #ffb800);
 }
 </style>

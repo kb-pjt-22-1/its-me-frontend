@@ -1,16 +1,27 @@
-<!-- App.vue -->
 <template>
   <div id="app">
     <Header />
     <SidebarMenu />
-    <main class="page-container">
-      <router-view /> <!-- 여기서 페이지들이 바뀜 -->
+    <main class="page-container app-page has-bottom-nav">
+      <router-view />
     </main>
+    <NavBar />
   </div>
 </template>
 
 <script setup>
+import { onMounted } from 'vue';
+// import Header from '@/layouts/menu/Header.vue';
+// import NavBar from '@/layouts/menu/NavBar.vue';
 import SidebarMenu from '@/components/SidebarMenu.vue';
+import { useAuthStore } from '@/stores/auth';
+
+const authStore = useAuthStore();
+
+// 새로고침해도 로그인 상태가 풀리지 않도록, localStorage에 남은 세션을 복원합니다.
+onMounted(() => {
+  authStore.restoreSession();
+});
 </script>
 
 <style>
@@ -25,7 +36,8 @@ body, html {
 
 #app {
   display: flex;
-  justify-content: center; 
+  flex-direction: column;
+  align-items: center;
   min-height: 100vh;
 }
 </style>
