@@ -1,6 +1,5 @@
 <template>
   <div class="layout-container">
-    <!-- 0. 헤더 -->
     <header class="page-header">
       <button class="back-btn" @click="$router.back()" aria-label="뒤로가기">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -9,14 +8,12 @@
       </button>
     </header>
 
-    <!-- 1. 날짜 탐색 영역 -->
     <div class="date-nav">
       <button class="date-arrow" @click="shiftMonth(-1)" aria-label="이전 달">&lt;</button>
       <h3>{{ currentMonthLabel }}</h3>
       <button class="date-arrow" @click="shiftMonth(1)" aria-label="다음 달">&gt;</button>
     </div>
 
-    <!-- 2. 요약 카드 - Button.vue의 box(어두운 박스) variant를 가로 배치로 재사용 -->
     <Button tag="div" variant="box" class="summary-card" style="flex-direction: row; justify-content: space-between; align-items: center; min-height: auto;">
       <div class="summary-text">
         <p>{{ monthShort }} 총 결제</p>
@@ -28,24 +25,23 @@
       </div>
     </Button>
 
-    <!-- 3. 결제 리스트 -->
     <div v-for="group in groupedHistory" :key="group.date" class="history-group">
       <h4>{{ group.label }}</h4>
 
       <button
         v-for="item in group.items"
-        :key="item.id"
+        :key="item.paymentId"
         class="history-item"
-        @click="goToDetail(item.id)"
+        @click="goToDetail(item.paymentId)"
       >
         <div class="item-icon">{{ item.icon }}</div>
         <div class="item-info">
-          <p class="name">{{ item.name }}</p>
+          <p class="name">{{ item.merchantName }}</p>
           <p class="desc">{{ item.time }} · {{ item.cardName }}</p>
         </div>
         <div class="item-price">
-          <p class="price">-{{ item.amount.toLocaleString() }}원</p>
-          <p class="benefit">{{ item.benefitLabel }} {{ item.benefit.toLocaleString() }}원</p>
+          <p class="price">-{{ item.finalAmount.toLocaleString() }}원</p>
+          <p class="benefit">할인 {{ item.discountAmount.toLocaleString() }}원</p>
         </div>
         <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="9 6 15 12 9 18"></polyline>
@@ -62,15 +58,35 @@ import Button from '@/components/common/Button.vue';
 
 const router = useRouter();
 
-const currentMonthLabel = ref('2025년 7월');
+const currentMonthLabel = ref('2026년 7월');
 const monthShort = ref('7월');
 
+// payments ⋈ merchants ⋈ merchant_categories ⋈ user_cards ⋈ cards
+// user_id=1(홍길동) 소유 카드의 결제만, payment_status='APPROVED'인 건만 표시
+// (payment_id=3은 다른 유저의 user_card라 제외, payment_id=4는 PENDING이라 제외)
 const history = ref([
-  { id: 1, date: '07-20', dateLabel: '7월 20일 (일)', name: '오늘의 커피 로스터스', icon: '☕', time: '09:12', cardName: '모두 톡톡 카드', amount: 12500, benefit: 1250, benefitLabel: '할인' },
-  { id: 2, date: '07-20', dateLabel: '7월 20일 (일)', name: 'GS25 역삼점', icon: '🏪', time: '08:40', cardName: '매일 캐시백 체크', amount: 3200, benefit: 160, benefitLabel: '적립' },
-  { id: 3, date: '07-19', dateLabel: '7월 19일 (토)', name: '소소한 식탁', icon: '🍽️', time: '12:31', cardName: '모두 톡톡 카드', amount: 9000, benefit: 450, benefitLabel: '할인' },
-  { id: 4, date: '07-19', dateLabel: '7월 19일 (토)', name: '지하철 2호선', icon: '🚇', time: '08:12', cardName: '모두 톡톡 카드', amount: 1550, benefit: 155, benefitLabel: '할인' },
-  { id: 5, date: '07-15', dateLabel: '7월 15일 (화)', name: '라 스토리아', icon: '🍽️', time: '19:30', cardName: '어디로든 트래블', amount: 45000, benefit: 4500, benefitLabel: '할인' },
+  {
+    paymentId: 1,
+    date: '07-01',
+    dateLabel: '7월 1일 (수)',
+    merchantName: '스타벅스 강남점',
+    icon: '☕', // merchant_categories.CAFE
+    time: '08:12',
+    cardName: 'KB국민 노리카드',
+    finalAmount: 5400,
+    discountAmount: 600,
+  },
+  {
+    paymentId: 2,
+    date: '07-02',
+    dateLabel: '7월 2일 (목)',
+    merchantName: 'GS25 역삼역점',
+    icon: '🏪', // merchant_categories.CVS
+    time: '19:30',
+    cardName: 'KB국민 탄탄대로 체크카드',
+    finalAmount: 11400,
+    discountAmount: 600,
+  },
 ]);
 
 const groupedHistory = computed(() => {
@@ -83,19 +99,19 @@ const groupedHistory = computed(() => {
     }
     group.items.push(item);
   }
-  return groups;
+  return groups.sort((a, b) => (a.date < b.date ? 1 : -1));
 });
 
-const totalPayment = computed(() => history.value.reduce((sum, item) => sum + item.amount, 0));
-const totalBenefit = computed(() => history.value.reduce((sum, item) => sum + item.benefit, 0));
+const totalPayment = computed(() => history.value.reduce((sum, item) => sum + item.finalAmount, 0));
+const totalBenefit = computed(() => history.value.reduce((sum, item) => sum + item.discountAmount, 0));
 
 const shiftMonth = (direction) => {
-  // 실제로는 여기서 API로 해당 월 데이터를 다시 불러오면 됩니다
+  // 실제로는 여기서 API로 해당 월(target_year_month) 데이터를 다시 불러오면 됩니다
   console.log('월 이동', direction);
 };
 
-const goToDetail = (id) => {
-  router.push(`/payments/${id}`);
+const goToDetail = (paymentId) => {
+  router.push(`/payments/${paymentId}`);
 };
 </script>
 
@@ -113,8 +129,11 @@ const goToDetail = (id) => {
 .page-header h2 { margin: 0; font-size: 18px; }
 
 .back-btn {
-  border: none;
-  background: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line, #e9e5df);
+  border-radius: 8px;
+  background: var(--surface, #ffffff);
   cursor: pointer;
   color: var(--charcoal, #59554a);
   display: grid;
