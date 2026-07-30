@@ -1,39 +1,14 @@
 import api from '@/api'
 
 /**
- * 로그인 요청.
- * 지금은 백엔드가 없어서 목데이터로 동작하지만, 이 함수의 내부 구현만 바꾸면
- * (mockLogin 호출 -> api.post 호출) Login.vue나 스토어는 전혀 안 건드려도 됩니다.
- * devLoginRequest가 실제 연동의 예시입니다.
+ * 로그인 요청. 실제 백엔드(POST /api/auth/login)를 호출한다.
+ * 응답(LoginResponseDto)에는 name이 없어 devLoginRequest와 동일하게 /users/me를
+ * 한 번 더 불러 프로필을 채운다.
  */
 export async function loginRequest(loginId, password) {
-  return mockLogin(loginId, password)
-}
-
-// ---------------------------------------------------------
-// 아래는 users 테이블(목데이터_추가_버전.sql) 기준 목 로그인입니다.
-// 실제 로그인은 서버에서 login_password_hash를 bcrypt로 검증하므로,
-// 여기서는 데모용으로 평문 비밀번호를 매핑해뒀습니다. 백엔드 연동 시 이 블록 전체를 지우면 됩니다.
-// ---------------------------------------------------------
-const MOCK_USERS = [
-  { userId: 1, loginId: 'hong123', password: '1234', name: '홍길동' },
-  { userId: 2, loginId: 'kim456', password: '1234', name: '김유나' },
-]
-
-function mockLogin(loginId, password) {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const found = MOCK_USERS.find((u) => u.loginId === loginId && u.password === password)
-      if (found) {
-        resolve({
-          accessToken: `mock_token_${found.userId}`,
-          user: { userId: found.userId, loginId: found.loginId, name: found.name },
-        })
-      } else {
-        reject(new Error('아이디 또는 비밀번호가 잘못되었습니다.'))
-      }
-    }, 300)
-  })
+  const { data } = await api.post('/auth/login', { loginId, password })
+  const user = await fetchProfileOrFallback(data.accessToken, data.userId, data.loginId)
+  return { accessToken: data.accessToken, refreshToken: data.refreshToken, user }
 }
 
 /**
@@ -59,6 +34,25 @@ async function fetchProfileOrFallback(accessToken, userId, loginId) {
   } catch {
     return { userId, loginId, name: loginId }
   }
+}
+
+/**
+ * PortOne 본인인증. 실제 PortOne 키가 없어 백엔드가 impUid를 시드로 CI/DI만 가짜로 만들고,
+ * name/phoneNumber/birthDate는 여기서 보낸 값을 그대로 믿는다(PortOneVerifyModal 참고).
+ * 성공하면 신원 정보는 서버에만 남고, 그걸 가리키는 1회용 verificationToken만 돌아온다.
+ */
+export async function verifyIdentityRequest({ impUid, name, phoneNumber, birthDate }) {
+  const { data } = await api.post('/auth/portone/verify', { impUid, name, phoneNumber, birthDate })
+  return data.verificationToken
+}
+
+/**
+ * 회원가입. name/phoneNumber/birthDate는 여기로 보내지 않는다 - verifyIdentityRequest가
+ * 발급한 토큰 뒤에 서버(Redis)가 들고 있고, signUp이 그 토큰으로 꺼내 쓴다.
+ */
+export async function signUpRequest({ loginId, password, verificationToken, fcmToken }) {
+  const { data } = await api.post('/auth/signup', { loginId, password, verificationToken, fcmToken })
+  return data
 }
 
 export async function logoutRequest() {
