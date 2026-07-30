@@ -44,6 +44,7 @@
           </button>
         </div>
 
+        <p v-if="signupSuccessMessage" class="success-text">{{ signupSuccessMessage }}</p>
         <p v-if="authStore.errorMessage" class="error-text">{{ authStore.errorMessage }}</p>
 
         <Button
@@ -87,16 +88,23 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import PageContainer from '@/components/common/PageContainer.vue';
 import Button from '@/components/common/Button.vue';
 import { useAuthStore } from '@/stores/auth';
 
-const userId = ref('');
-const password = ref('');
-const showPassword = ref(false);
+const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+
+// 회원가입 완료 후 /login?signup=success&loginId=... 로 넘어온 경우, 방금 만든 아이디를
+// 채워두고 안내 문구를 보여준다. 가입 자체는 토큰을 안 주므로 자동 로그인은 안 된다.
+const userId = ref(route.query.signup === 'success' ? String(route.query.loginId ?? '') : '');
+const password = ref('');
+const showPassword = ref(false);
+const signupSuccessMessage = ref(
+  route.query.signup === 'success' ? '회원가입이 완료됐어요. 로그인해주세요.' : ''
+);
 
 const canSubmit = computed(() => userId.value.length > 0 && password.value.length > 0);
 
@@ -215,6 +223,13 @@ async function handleDevLogin() {
 
 .error-text {
   color: var(--danger, #f05e58);
+  font-size: 0.85rem;
+  text-align: center;
+  margin: 0;
+}
+
+.success-text {
+  color: #00a878;
   font-size: 0.85rem;
   text-align: center;
   margin: 0;

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { loginRequest, logoutRequest, devLoginRequest } from '@/services/authService'
+import { loginRequest, logoutRequest, devLoginRequest, signUpRequest } from '@/services/authService'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -29,14 +29,17 @@ export const useAuthStore = defineStore('auth', {
       this.isLoading = true
       this.errorMessage = ''
       try {
-        const { accessToken, user } = await loginRequest(loginId, password)
+        const { accessToken, refreshToken, user } = await loginRequest(loginId, password)
         this.accessToken = accessToken
         this.user = user
         localStorage.setItem('accessToken', accessToken)
         localStorage.setItem('authUser', JSON.stringify(user))
+        if (refreshToken) {
+          localStorage.setItem('refreshToken', refreshToken)
+        }
         return true
       } catch (err) {
-        this.errorMessage = err.message || '로그인에 실패했습니다.'
+        this.errorMessage = err.response?.data?.message || err.message || '로그인에 실패했습니다.'
         return false
       } finally {
         this.isLoading = false
@@ -60,6 +63,22 @@ export const useAuthStore = defineStore('auth', {
         return true
       } catch (err) {
         this.errorMessage = err.response?.data?.message || err.message || '개발자 로그인에 실패했습니다.'
+        return false
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    // 회원가입은 UserResponseDto만 돌아오고 토큰이 없다 - 가입 후 자동 로그인은 안 되고,
+    // 방금 만든 아이디/비밀번호로 다시 /login을 호출해야 한다.
+    async signUp({ loginId, password, verificationToken, fcmToken }) {
+      this.isLoading = true
+      this.errorMessage = ''
+      try {
+        await signUpRequest({ loginId, password, verificationToken, fcmToken })
+        return true
+      } catch (err) {
+        this.errorMessage = err.response?.data?.message || err.message || '회원가입에 실패했습니다.'
         return false
       } finally {
         this.isLoading = false
