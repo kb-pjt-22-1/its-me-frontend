@@ -104,6 +104,16 @@ const handleLogout = async () => {
 .profile-card h3 { margin: 0 0 6px; font-size: 16px; }
 .profile-card p { margin: 0; font-size: 13px; color: var(--orange, #ffb800); }
 
+.profile-card {
+  background: var(--charcoal, #59554a);
+  color: #ffffff;
+  padding: 20px;
+  border-radius: 17px;
+  margin: 20px 0;
+}
+.profile-card h3 { margin: 0 0 6px; font-size: 16px; }
+.profile-card p { margin: 0; font-size: 13px; color: var(--orange, #ffb800); }
+
 .menu-section { margin-bottom: 20px; }
 
 .section-title {
