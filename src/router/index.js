@@ -12,6 +12,8 @@ const router = createRouter({
   routes: [
     { path: '/login', name: 'login', component: Login },
     { path: '/signup', name: 'signup', component: Signup },
+    // 햄버거 메뉴 '개인정보 및 보안'에서 진입 (SidebarMenu.vue)
+    { path: '/member-profile', name: 'member-profile', component: () => import('@/pages/auth/MemberProfile.vue') },
     {
       // redirect: '/login'을 두면 vue-router가 '/'에서 이 라우트의 component/children을
       // 무시하고 무조건 /login으로 보낸다. 그러면 로그인 성공 후 router.push('/')를 해도
