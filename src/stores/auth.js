@@ -1,5 +1,12 @@
 import { defineStore } from 'pinia'
-import { loginRequest, logoutRequest, devLoginRequest, signUpRequest } from '@/services/authService'
+import {
+  loginRequest,
+  logoutRequest,
+  devLoginRequest,
+  signUpRequest,
+  registerPin,
+  updatePin,
+} from '@/services/authService'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -92,6 +99,18 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('authUser')
       localStorage.removeItem('refreshToken')
+    },
+
+    // ---------------------------------------------------------
+    // 아래 두 개는 PinSetting.vue를 위해 새로 추가한 액션입니다.
+    // 위쪽 로그인/회원가입/로그아웃 로직은 전혀 안 건드렸습니다.
+    // ---------------------------------------------------------
+    async registerPin(pin) {
+      return registerPin(pin)
+    },
+
+    async updatePin(pin) {
+      return updatePin(pin)
     },
   },
 })

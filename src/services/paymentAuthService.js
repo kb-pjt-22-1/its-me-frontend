@@ -1,31 +1,25 @@
-import axios from 'axios'
+import api from '@/api'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
+// 백엔드에 PIN 검증 엔드포인트가 생기면 false로 바꾸세요.
+const BACKEND_READY = false
 
 /**
- * 간편 비밀번호(PIN) 검증 요청.
- * 실제로는 서버가 users.pin_hash와 bcrypt로 비교합니다.
- * 지금은 백엔드가 없어서 목데이터로 동작하고, verifyPin 내부 구현만 바꾸면
- * PaymentView.vue는 전혀 안 건드려도 됩니다.
- *
- * 실제 연동 시:
- *   const { data } = await axios.post(`${API_BASE}/auth/verify-pin`, { pin })
- *   return data // { verified: boolean }
+ * 간편 비밀번호(PIN) 검증
+ * ⚠ 백엔드에 아직 이 엔드포인트가 없습니다. 생기면 BACKEND_READY = true로 바꾸고
+ *   아래 경로를 실제 경로로 맞추면 됩니다.
  */
 export async function verifyPin(pin) {
-  return mockVerifyPin(pin)
+  if (!BACKEND_READY) return mockVerifyPin(pin)
+
+  const { data } = await api.post('/auth/verify-pin', { pin })
+  return data
 }
 
-// ---------------------------------------------------------
-// 데모용 목 PIN입니다. 실제로는 서버가 pin_hash를 검증해야 하므로
-// 정답을 프론트엔드 코드에 두면 안 됩니다. 백엔드 연동 시 이 블록은 지우세요.
-// ---------------------------------------------------------
+// 데모용 목 PIN입니다. BACKEND_READY가 true가 되면 호출되지 않습니다.
 const MOCK_CORRECT_PIN = '123456'
 
 function mockVerifyPin(pin) {
   return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({ verified: pin === MOCK_CORRECT_PIN })
-    }, 300)
+    setTimeout(() => resolve({ verified: pin === MOCK_CORRECT_PIN }), 300)
   })
 }

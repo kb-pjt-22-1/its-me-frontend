@@ -1,27 +1,24 @@
 <template>
   <div id="app">
-    <Header />
-    <SidebarMenu />
-    <main class="page-container app-page has-bottom-nav">
+    <Header v-if="showChrome" />
+    <SidebarMenu v-if="showChrome" />
+    <main :class="showChrome ? 'page-container app-page has-bottom-nav' : 'page-container'">
       <router-view />
     </main>
-    <NavBar />
+    <NavBar v-if="showChrome" />
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
-// import Header from '@/layouts/menu/Header.vue';
-// import NavBar from '@/layouts/menu/NavBar.vue';
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
+import Header from '@/layouts/menu/Header.vue';
+import NavBar from '@/layouts/menu/NavBar.vue';
 import SidebarMenu from '@/components/SidebarMenu.vue';
-import { useAuthStore } from '@/stores/auth';
 
-const authStore = useAuthStore();
-
-// 새로고침해도 로그인 상태가 풀리지 않도록, localStorage에 남은 세션을 복원합니다.
-onMounted(() => {
-  authStore.restoreSession();
-});
+const route = useRoute();
+// 로그인/회원가입처럼 route.meta.hideChrome가 true인 화면은 헤더/사이드바/하단바 없이 뜹니다.
+const showChrome = computed(() => !route.meta.hideChrome);
 </script>
 
 <style>
@@ -31,7 +28,7 @@ body, html {
   padding: 0;
   width: 100%;
   height: 100%;
-  background-color: #ffffff; /* 여기서 전체 배경색을 지정합니다 */
+  background-color: #ffffff;
 }
 
 #app {
