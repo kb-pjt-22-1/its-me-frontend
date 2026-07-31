@@ -81,7 +81,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
 import Button from '@/components/common/Button.vue';
-import { findBenefitForCategory, formatBenefit } from '@/services/cardService';
+import { findBenefitForCategory, formatBenefit } from '@/services/cardsService';
 
 const route = useRoute();
 const router = useRouter();
@@ -93,7 +93,7 @@ onMounted(() => {
   if (cardsStore.cards.length === 0) cardsStore.fetchCards();
 });
 
-const merchant = computed(() => merchantsStore.getById(route.params.merchantId));
+const merchant = computed(() => merchantsStore.getByIdWithCategory(route.params.merchantId));
 
 const recommendedCards = computed(() => {
   if (!merchant.value) return [];

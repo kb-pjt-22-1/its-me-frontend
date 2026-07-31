@@ -96,7 +96,7 @@ const normalizedHistory = computed(() =>
     const d = new Date(paymentTime);
     const hasValidDate = !Number.isNaN(d.getTime());
     const merchantId = item.merchantId ?? item.merchant?.id;
-    const merchant = merchantId ? merchantsStore.getById(merchantId) : null;
+    const merchant = merchantId ? merchantsStore.getByIdWithCategory(merchantId) : null;
 
     return {
       paymentId: item.paymentId ?? item.id,

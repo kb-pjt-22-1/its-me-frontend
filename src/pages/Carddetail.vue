@@ -28,6 +28,17 @@
       <p class="card-number">•••• •••• •••• {{ card.panLast4 }}</p>
     </div>
 
+    <!-- 카드 기본 정보 -->
+    <section v-if="card.description || typeof card.annualFee === 'number'" class="surface-card info-section">
+      <p v-if="card.description" class="card-description muted-text">{{ card.description }}</p>
+      <p v-if="typeof card.annualFee === 'number'" class="annual-fee">
+        연회비 <strong>{{ card.annualFee > 0 ? `${card.annualFee.toLocaleString()}원` : '없음' }}</strong>
+      </p>
+      <p v-if="card.supported === false" class="danger-text unsupported-notice">
+        더 이상 신규 발급/연동이 지원되지 않는 카드예요.
+      </p>
+    </section>
+
     <!-- 이번 달 이용실적 -->
     <section class="surface-card status-section">
       <p class="section-label">이번 달 이용실적</p>
@@ -67,13 +78,12 @@
           <p class="exclude-desc muted-text">카드 추천 시 이 카드를 추천 대상에서 제외합니다.</p>
         </div>
         <button
-          class="toggle-switch"
-          :class="{ on: isExcludedFromRecommendation }"
-          role="switch"
-          :aria-checked="isExcludedFromRecommendation"
+          class="exclude-toggle-btn"
+          :class="{ 'exclude-toggle-btn--on': isExcludedFromRecommendation }"
           @click="handleToggleRecommendation"
         >
-          <span class="toggle-knob"></span>
+          <span class="exclude-toggle-dot"></span>
+          {{ isExcludedFromRecommendation ? '제외됨' : '포함 중' }}
         </button>
       </div>
     </section>
@@ -174,6 +184,27 @@ const handleDeleteCard = async () => {
 .card-number { margin: 0; font-size: 14px; letter-spacing: 1px; opacity: .9; }
 
 .surface-card { padding: 20px; margin-bottom: 14px; }
+
+.info-section { padding: 16px 20px; }
+.card-description {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.annual-fee {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted, #918a81);
+}
+.annual-fee strong {
+  color: var(--charcoal, #151515);
+  font-weight: 800;
+  margin-left: 4px;
+}
+.unsupported-notice {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
 .section-label { margin: 0 0 8px; font-size: 12px; color: var(--muted, #918a81); }
 .tier-label { margin: 0 0 14px; font-size: 18px; color: var(--charcoal, #151515); }
 .progress-track { margin-bottom: 10px; }
@@ -192,6 +223,38 @@ const handleDeleteCard = async () => {
 .exclude-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .exclude-title { margin: 0 0 4px; font-size: 14px; font-weight: 700; color: var(--charcoal, #151515); }
 .exclude-desc { margin: 0; font-size: 12px; line-height: 1.5; }
+
+.exclude-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line, #e9e5df);
+  background: var(--surface, #ffffff);
+  color: var(--muted, #918a81);
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.exclude-toggle-btn--on {
+  border-color: var(--orange, #ffb800);
+  background: #fff6dd;
+  color: #b67a00;
+}
+.exclude-toggle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted, #c7c2b8);
+  flex: 0 0 auto;
+}
+.exclude-toggle-btn--on .exclude-toggle-dot {
+  background: var(--orange, #ffb800);
+}
 
 .primary-badge-row { display: flex; justify-content: center; padding: 10px 0 4px; }
 .primary-badge { font-size: 13px; font-weight: 700; }

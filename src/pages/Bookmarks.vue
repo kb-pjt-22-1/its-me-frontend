@@ -86,11 +86,11 @@ function bestDiscountLabel(categoryCode) {
 const enrichedBookmarks = computed(() =>
   bookmarksStore.bookmarks.map((b) => {
     const merchantId = b.merchantId ?? b.merchant_id ?? b.merchant?.id;
-    const merchant = merchantsStore.getById(merchantId) ?? {};
+    const merchant = merchantsStore.getByIdWithCategory(merchantId) ?? {};
     return {
       merchantId,
       name: b.name ?? merchant.name ?? '이름 없는 매장',
-      categoryName: b.categoryName ?? merchant.categoryName ?? merchant.categoryCode ?? '',
+      categoryName: b.categoryName ?? merchant.categoryName ?? '',
       icon: b.icon ?? merchant.icon ?? '📍',
       address: b.address ?? merchant.address ?? '',
       discountLabel: bestDiscountLabel(b.categoryCode ?? merchant.categoryCode),

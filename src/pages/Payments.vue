@@ -134,7 +134,7 @@ const pin = ref('');
 const pinError = ref(false);
 
 // StoreDetail.vue에서 "결제하기"를 누르면 /pay?merchantId=1 형태로 넘어옵니다.
-const merchant = computed(() => merchantsStore.getById(route.query.merchantId) ?? null);
+const merchant = computed(() => merchantsStore.getByIdWithCategory(route.query.merchantId) ?? null);
 
 const paymentRows = computed(() => {
   const activeCards = cardsStore.cards.filter((c) => c.status === 'ACTIVE');
