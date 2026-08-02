@@ -32,3 +32,141 @@
 @media (min-width: 700px) {
   .mobile-shell { margin: 24px auto; min-height: calc(100vh - 48px); border-radius: 18px; overflow: hidden; }
 }
+
+/* ===========================================================
+   공통 재사용 컴포넌트 스타일
+   (원래 components.css로 분리했었는데, 별도 파일 없이 여기로 합쳤습니다)
+   =========================================================== */
+
+.page-header {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.page-header h2 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--charcoal, #151515);
+}
+.back-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: none;
+  display: grid;
+  place-items: center;
+  color: var(--charcoal, #59554a);
+  cursor: pointer;
+  padding: 0;
+}
+.right-placeholder {
+  width: 30px;
+}
+
+.icon-btn-outline {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line, #e9e5df);
+  border-radius: 8px;
+  background: var(--surface, #ffffff);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--charcoal, #59554a);
+  font-size: 14px;
+}
+
+.section-title {
+  font-size: 15px;
+  margin: 0 0 12px;
+  color: var(--charcoal, #151515);
+}
+.section-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.section-hint {
+  font-size: 11px;
+  color: var(--muted, #918a81);
+}
+
+.pill {
+  display: inline-flex;
+  border-radius: 7px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.pill--mint { color: #00a47a; background: #ddf6ee; }
+.pill--gold { color: #b67a00; background: #fff6dd; }
+.pill--muted { color: var(--muted, #918a81); background: var(--page, #f2f1ee); }
+.pill--danger { color: var(--danger, #f05e58); background: #fde7e6; }
+
+.progress-track {
+  height: 5px;
+  border-radius: 99px;
+  background: #ece9e3;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffad00, #ffc830);
+}
+.progress-fill--purple {
+  background: linear-gradient(90deg, #7c6cf0, #6a5af5);
+}
+.progress-fill--met {
+  background: linear-gradient(90deg, #00c48c, #00a97b);
+}
+
+.info-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--page, #faf9f6);
+  color: var(--muted, #918a81);
+  font-size: 12px;
+}
+.info-strip--highlight {
+  background: #fff6dd;
+  color: var(--charcoal, #59554a);
+}
+.info-strip--highlight strong {
+  color: #b67a00;
+}
+
+.danger-text { color: var(--danger, #f05e58); font-weight: 700; }
+.success-text { color: var(--green, #00a97b); font-weight: 700; }
+.muted-text { color: var(--muted, #918a81); }
+
+.toggle-switch {
+  width: 46px;
+  height: 26px;
+  border-radius: 99px;
+  background: #d9d5cd;
+  border: none;
+  position: relative;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background 150ms ease;
+}
+.toggle-switch.on { background: var(--orange, #ffb800); }
+.toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .2);
+  transition: transform 150ms ease;
+}
+.toggle-switch.on .toggle-knob { transform: translateX(20px); }

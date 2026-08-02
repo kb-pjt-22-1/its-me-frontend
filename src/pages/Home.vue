@@ -18,7 +18,6 @@
             <div>
               <span class="pill pill--mint">주 사용 카드</span>
               <h3>{{ primaryCard.cardName }}</h3>
-              <p>본인 · {{ primaryCard.panLast4 }}</p>
             </div>
             <span class="card-glyph">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">

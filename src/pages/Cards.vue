@@ -30,7 +30,6 @@
         <div class="card-top-row">
           <div>
             <h3>{{ card.cardName }}</h3>
-            <p>본인 · {{ card.panLast4 }}</p>
           </div>
           <span class="card-glyph" :class="{ 'glyph-primary': card.isPrimary, 'glyph-disabled': card.status !== 'ACTIVE' }">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
