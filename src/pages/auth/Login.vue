@@ -108,11 +108,21 @@ const signupSuccessMessage = ref(
 
 const canSubmit = computed(() => userId.value.length > 0 && password.value.length > 0);
 
+// 라우터 가드가 로그인 화면으로 보낼 때 원래 가려던 경로를 redirect로 남겨둔다.
+// 외부 사이트로 튕기지 않도록 '/'로 시작하는 내부 경로만 받아들인다('//'는 프로토콜
+// 상대 URL이라 외부로 나간다).
+const redirectTarget = computed(() => {
+  const raw = route.query.redirect;
+  const path = Array.isArray(raw) ? raw[0] : raw;
+  const isInternalPath = typeof path === 'string' && path.startsWith('/') && !path.startsWith('//');
+  return isInternalPath ? path : '/';
+});
+
 async function handleLogin() {
   if (!canSubmit.value) return;
   const success = await authStore.login(userId.value, password.value);
   if (success) {
-    router.push('/');
+    router.push(redirectTarget.value);
   }
 }
 
@@ -136,7 +146,7 @@ const devLoginSlot = ref(getOrAssignDevLoginSlot());
 async function handleDevLogin() {
   const success = await authStore.devLogin(devLoginSlot.value);
   if (success) {
-    router.push('/');
+    router.push(redirectTarget.value);
   }
 }
 </script>
