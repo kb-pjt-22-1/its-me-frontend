@@ -22,20 +22,54 @@
 <script setup>
 // Header/NavBar는 '/' 하위 라우트에서 DefaultLayout이 직접 렌더링합니다.
 // 세션 복원은 라우터 가드(router/index.js)가 첫 라우팅 전에 처리하므로 여기서 하지 않습니다.
+import { onMounted, watch } from 'vue';
 import SidebarMenu from '@/components/SidebarMenu.vue';
 import { useAuthStore } from '@/stores/auth';
+import { useCardsStore } from '@/stores/cards';
+import { useMerchantsStore } from '@/stores/merchants';
+import { useBookmarksStore } from '@/stores/bookmarks';
+import { usePaymentStore } from '@/stores/payment';
 
 const authStore = useAuthStore();
+const cardsStore = useCardsStore();
+const merchantsStore = useMerchantsStore();
+const bookmarksStore = useBookmarksStore();
+const paymentStore = usePaymentStore();
+
+function fetchAllUserData() {
+  cardsStore.fetchCards();
+  merchantsStore.fetchMerchants();
+  bookmarksStore.fetchBookmarks();
+  paymentStore.fetchHistory();
+}
+
+onMounted(() => {
+  // main.js/라우터 가드에서 세션 복원이 끝난 뒤 이 컴포넌트가 뜨므로, 이미 로그인 상태일 수 있습니다.
+  if (authStore.isAuthenticated) fetchAllUserData();
+});
+
+// 앱이 이미 떠있는 상태에서 방금 로그인에 성공한 경우 - isAuthenticated가
+// false -> true로 바뀌는 순간을 잡아서 그때 데이터를 불러옵니다.
+watch(
+  () => authStore.isAuthenticated,
+  (isAuth, wasAuth) => {
+    if (isAuth && !wasAuth) fetchAllUserData();
+  }
+);
 </script>
 
 <style>
 /* 가장 바깥 배경만 여기서 관리 */
+:root {
+  --app-width: 440px;
+}
+
 body, html {
   margin: 0;
   padding: 0;
   width: 100%;
   height: 100%;
-  background-color: #ffffff; /* 여기서 전체 배경색을 지정합니다 */
+  background-color: #ffffff;
 }
 
 #app {

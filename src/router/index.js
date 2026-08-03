@@ -38,6 +38,20 @@ const router = createRouter({
             component: () => import('@/pages/PaymentsList.vue'),
             meta: {requiresAuth: true},
         },
+        // 카드 목록(/cards)에서 카드를 눌렀을 때 들어가는 상세 화면
+        {
+            path: '/cards/:userCardId',
+            name: 'card-detail',
+            component: () => import('@/pages/Carddetail.vue'),
+            meta: {requiresAuth: true},
+        },
+        // 매장 목록/지도에서 매장을 눌렀을 때 들어가는 상세 화면
+        {
+            path: '/stores/:merchantId',
+            name: 'store-detail',
+            component: () => import('@/pages/Storedetail.vue'),
+            meta: {requiresAuth: true},
+        },
     ],
 })
 

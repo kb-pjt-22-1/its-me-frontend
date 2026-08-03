@@ -10,6 +10,11 @@ import { useAuthStore } from '@/stores/auth'
 const app = createApp(App)
 
 app.use(createPinia())
+
+// 라우터가 페이지 이동을 처리하기 전에, localStorage에 남은 로그인 정보를 먼저 복원합니다.
+const authStore = useAuthStore()
+authStore.restoreSession()
+
 app.use(router)
 
 // api 인터셉터가 토큰 갱신까지 실패하면(세션 만료·무효화) 이 이벤트를 쏜다.
