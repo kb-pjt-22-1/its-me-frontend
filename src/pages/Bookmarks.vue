@@ -28,7 +28,10 @@
           style="flex-direction: row; align-items: center; min-height: auto; gap: 15px;"
           @click="goToStore(shop.merchantId)"
         >
-          <div class="store-icon">{{ shop.icon }}</div>
+          <div class="store-icon">
+            <img v-if="shop.icon" :src="shop.icon" alt="" />
+            <span v-else>📍</span>
+          </div>
 
           <div class="card-center">
             <h3>{{ shop.name }}</h3>
@@ -91,7 +94,7 @@ const enrichedBookmarks = computed(() =>
       merchantId,
       name: b.name ?? merchant.name ?? '이름 없는 매장',
       categoryName: b.categoryName ?? merchant.categoryName ?? '',
-      icon: b.icon ?? merchant.icon ?? '📍',
+      icon: b.icon ?? merchant.icon ?? null,
       address: b.address ?? merchant.address ?? '',
       discountLabel: bestDiscountLabel(b.categoryCode ?? merchant.categoryCode),
     };
@@ -123,7 +126,9 @@ const handleRemove = async (merchantId) => {
 .store-icon {
   width: 50px; height: 50px; background: var(--page, #f2f1ee); border-radius: 12px;
   display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex: 0 0 auto;
+  overflow: hidden;
 }
+.store-icon img { width: 26px; height: 26px; object-fit: contain; }
 .card-center { flex: 1; min-width: 0; }
 .card-center h3 { margin: 0 0 5px 0; font-size: 1.05rem; color: var(--charcoal, #2c2b27); }
 .details { font-size: 0.8rem; margin: 0 0 8px 0; }

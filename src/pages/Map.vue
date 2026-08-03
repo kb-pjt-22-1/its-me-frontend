@@ -64,7 +64,10 @@
           class="sheet-item"
           @click="goToStore(shop.id)"
         >
-          <div class="sheet-item-icon">{{ shop.icon ?? '📍' }}</div>
+          <div class="sheet-item-icon">
+            <img v-if="shop.icon" :src="shop.icon" alt="" />
+            <span v-else>📍</span>
+          </div>
           <div class="sheet-item-info">
             <strong>{{ shop.name }}</strong>
             <p class="muted-text">
@@ -452,8 +455,12 @@ onMounted(async () => {
   background: var(--page, #f2f1ee);
   display: grid;
   place-items: center;
-  font-size: 1.3rem;
-  flex: 0 0 auto;
+  overflow: hidden;
+}
+.sheet-item-icon img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 .sheet-item-info { flex: 1; min-width: 0; }
 .sheet-item-info strong { font-size: 14px; color: var(--charcoal, #151515); }
