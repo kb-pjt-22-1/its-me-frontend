@@ -42,14 +42,14 @@ const router = createRouter({
         {
             path: '/cards/:userCardId',
             name: 'card-detail',
-            component: () => import('@/pages/CardDetail.vue'),
+            component: () => import('@/pages/Carddetail.vue'),
             meta: {requiresAuth: true},
         },
         // 매장 목록/지도에서 매장을 눌렀을 때 들어가는 상세 화면
         {
             path: '/stores/:merchantId',
             name: 'store-detail',
-            component: () => import('@/pages/StoreDetail.vue'),
+            component: () => import('@/pages/Storedetail.vue'),
             meta: {requiresAuth: true},
         },
     ],
