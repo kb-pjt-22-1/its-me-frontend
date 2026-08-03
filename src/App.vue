@@ -22,16 +22,13 @@
 <script setup>
 // Header/NavBar는 '/' 하위 라우트에서 DefaultLayout이 직접 렌더링합니다.
 // 세션 복원은 라우터 가드(router/index.js)가 첫 라우팅 전에 처리하므로 여기서 하지 않습니다.
+import { onMounted, watch } from 'vue';
 import SidebarMenu from '@/components/SidebarMenu.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
 import { useBookmarksStore } from '@/stores/bookmarks';
 import { usePaymentStore } from '@/stores/payment';
-
-const route = useRoute();
-// 로그인/회원가입처럼 route.meta.hideChrome가 true인 화면은 헤더/사이드바/하단바 없이 뜹니다.
-const showChrome = computed(() => !route.meta.hideChrome);
 
 const authStore = useAuthStore();
 const cardsStore = useCardsStore();
@@ -47,14 +44,12 @@ function fetchAllUserData() {
 }
 
 onMounted(() => {
-  // main.js에서 라우터보다 먼저 세션을 복원해뒀으므로, 이 시점에 이미 로그인 상태일 수 있습니다
-  // (새로고침 등으로 세션이 남아있던 경우).
+  // main.js/라우터 가드에서 세션 복원이 끝난 뒤 이 컴포넌트가 뜨므로, 이미 로그인 상태일 수 있습니다.
   if (authStore.isAuthenticated) fetchAllUserData();
 });
 
 // 앱이 이미 떠있는 상태에서 방금 로그인에 성공한 경우 - isAuthenticated가
 // false -> true로 바뀌는 순간을 잡아서 그때 데이터를 불러옵니다.
-// (로그인 직후엔 App.vue의 onMounted가 이미 지나간 뒤라 따로 안 잡아주면 안 불려옵니다)
 watch(
   () => authStore.isAuthenticated,
   (isAuth, wasAuth) => {

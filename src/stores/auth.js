@@ -4,11 +4,6 @@ import {
   logoutRequest,
   devLoginRequest,
   signUpRequest,
-<<<<<<< HEAD
-  registerPin,
-  updatePin,
-} from '@/services/authService'
-=======
   refreshTokenRequest,
   fetchProfile,
 } from '@/services/authService'
@@ -25,7 +20,6 @@ import {
 // 진행 중인 Promise를 들고 재사용한다. 스토어 state에 두면 Pinia가 reactive로 감싸
 // 불필요한 추적이 붙어서, 모듈 스코프에 둔다.
 let bootstrapPromise = null
->>>>>>> 18f97df772816b3bd970b5c40def27ceff6db15f
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({

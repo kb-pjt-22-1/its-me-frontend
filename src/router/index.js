@@ -5,28 +5,6 @@ import Home from '@/pages/Home.vue'
 import Map from '@/pages/Map.vue'
 import Payments from '@/pages/Payments.vue'
 import Cards from '@/pages/Cards.vue'
-<<<<<<< HEAD
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes: [
-    { path: '/login', name: 'login', component: Login, meta: { hideChrome: true } },
-    { path: '/signup', name: 'signup', component: Signup, meta: { hideChrome: true } },
-
-    { path: '/', name: 'home', component: Home },
-    { path: '/map', name: 'map', component: Map },
-    { path: '/bookmarks', name: 'bookmarks', component: () => import('@/pages/Bookmarks.vue') },
-    { path: '/pay', name: 'pay', component: Payments },
-    { path: '/payments', name: 'payment-history', component: () => import('@/pages/PaymentsList.vue') },
-    { path: '/cards', name: 'cards', component: Cards },
-    { path: '/cards/:userCardId', name: 'card-detail', component: () => import('@/pages/Carddetail.vue') },
-    { path: '/stores/:merchantId', name: 'store-detail', component: () => import('@/pages/Storedetail.vue') },
-    { path: '/pin-setting', name: 'pin-setting', component: () => import('@/pages/Pinsetting.vue') },
-  ],
-})
-
-export default router
-=======
 import DefaultLayout from '@/layouts/menu/DefaultLayout.vue'
 import {useAuthStore} from '@/stores/auth'
 
@@ -60,6 +38,20 @@ const router = createRouter({
             component: () => import('@/pages/PaymentsList.vue'),
             meta: {requiresAuth: true},
         },
+        // 카드 목록(/cards)에서 카드를 눌렀을 때 들어가는 상세 화면
+        {
+            path: '/cards/:userCardId',
+            name: 'card-detail',
+            component: () => import('@/pages/CardDetail.vue'),
+            meta: {requiresAuth: true},
+        },
+        // 매장 목록/지도에서 매장을 눌렀을 때 들어가는 상세 화면
+        {
+            path: '/stores/:merchantId',
+            name: 'store-detail',
+            component: () => import('@/pages/StoreDetail.vue'),
+            meta: {requiresAuth: true},
+        },
     ],
 })
 
@@ -88,4 +80,3 @@ router.beforeEach(async (to) => {
 })
 
 export default router
->>>>>>> 18f97df772816b3bd970b5c40def27ceff6db15f

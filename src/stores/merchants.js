@@ -12,7 +12,7 @@ import { useAuthStore } from './auth'
 export const useMerchantsStore = defineStore('merchants', {
   state: () => ({
     merchants: [],
-    categories: [],   // [{ categoryId, categoryCode, categoryName, categoryIcon }]
+    categories: [],   // [{ categoryCode, categoryName, categoryIcon }]
     isLoading: false,
     error: null,
   }),
@@ -21,29 +21,27 @@ export const useMerchantsStore = defineStore('merchants', {
     getById: (state) => (merchantId) =>
       state.merchants.find((m) => m.id === Number(merchantId)),
 
-    getCategoryById: (state) => (categoryId) =>
-      state.categories.find((c) => c.categoryId === Number(categoryId)),
+    getCategoryByCode: (state) => (categoryCode) =>
+      state.categories.find((c) => c.categoryCode === categoryCode),
 
-    // 매장 하나에 카테고리 이름/코드/아이콘까지 합쳐서 반환 (컴포넌트에서 이거 하나만 쓰면 됨)
+    // 매장 하나에 카테고리 이름/아이콘까지 합쳐서 반환 (컴포넌트에서 이거 하나만 쓰면 됨)
     getByIdWithCategory: (state) => (merchantId) => {
       const m = state.merchants.find((m) => m.id === Number(merchantId))
       if (!m) return null
-      const cat = state.categories.find((c) => c.categoryId === m.categoryId)
+      const cat = state.categories.find((c) => c.categoryCode === m.categoryCode)
       return {
         ...m,
-        categoryCode: cat?.categoryCode,
         categoryName: cat?.categoryName,
         icon: cat?.categoryIcon,
       }
     },
 
-    // 화면에서 바로 쓰기 좋게, 매장 목록에 카테고리 이름/코드/아이콘을 붙여서 반환
+    // 화면에서 바로 쓰기 좋게, 매장 목록에 카테고리 이름/아이콘을 붙여서 반환
     merchantsWithCategory: (state) =>
       state.merchants.map((m) => {
-        const cat = state.categories.find((c) => c.categoryId === m.categoryId)
+        const cat = state.categories.find((c) => c.categoryCode === m.categoryCode)
         return {
           ...m,
-          categoryCode: cat?.categoryCode,
           categoryName: cat?.categoryName,
           icon: cat?.categoryIcon,
         }

@@ -14,7 +14,7 @@ export async function fetchMerchantDetail(merchantId) {
 
 /**
  * 매장 등록 [POST /api/v1/merchants]
- * payload: { categoryId, brandId, merchantCode, merchantName, address, latitude, longitude, phone }
+ * payload(MerchantRequestDto): { categoryCode, brandId, merchantCode, merchantName, address, latitude, longitude, phone }
  */
 export async function createMerchant(payload) {
   const { data } = await api.post('/v1/merchants', payload)
@@ -35,9 +35,9 @@ export async function deleteMerchant(merchantId) {
 
 /**
  * 매장 카테고리 목록 [GET /api/v1/merchant-categories]
- * 응답: [{ categoryId, categoryCode, categoryName, categoryIcon }]
- * ⚠ merchants 응답엔 categoryId만 있고 이름/코드가 없어서, 화면에 표시하려면
- *   이 목록을 같이 받아서 categoryId 기준으로 매칭해야 합니다.
+ * 응답: [{ categoryCode, categoryName, categoryIcon }]
+ * ⚠ merchants 응답엔 categoryCode만 있고 이름/아이콘이 없어서, 화면에 표시하려면
+ *   이 목록을 같이 받아서 categoryCode 기준으로 매칭해야 합니다.
  */
 export async function fetchMerchantCategories() {
   const { data } = await api.get('/v1/merchant-categories')
@@ -50,12 +50,12 @@ export async function fetchMerchantBrands() {
   return data
 }
 
-// merchants 테이블 실제 컬럼: merchant_id, category_id, brand_id, merchant_code,
+// merchants 테이블 실제 컬럼: merchant_id, brand_id, category_code, merchant_code,
 //   merchant_name, address, latitude, longitude, phone
 function normalizeMerchant(dto) {
   return {
     id: dto.merchantId,
-    categoryId: dto.categoryId,
+    categoryCode: dto.categoryCode,
     brandId: dto.brandId,
     merchantCode: dto.merchantCode,
     name: dto.merchantName,

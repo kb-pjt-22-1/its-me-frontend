@@ -81,7 +81,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
 import Button from '@/components/common/Button.vue';
-import { findBenefitForCategory, formatBenefit } from '@/services/cardsService';
+import { findBenefitForCategory, formatBenefit } from '@/services/cardService';
 
 const route = useRoute();
 const router = useRouter();
