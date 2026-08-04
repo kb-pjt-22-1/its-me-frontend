@@ -308,13 +308,9 @@ onMounted(async () => {
 
 <style scoped>
 .map-page {
-  position: fixed;
-  top: 60px;      /* Header.vue의 높이(sticky) */
-  bottom: 60px;   /* 하단 네비게이션의 높이(fixed) */
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
   width: 100%;
-  max-width: 440px;
+  height: 100%;
   overflow: hidden;
 }
 .map-container { position: absolute; inset: 0; width: 100%; height: 100%; }
