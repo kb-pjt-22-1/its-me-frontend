@@ -139,8 +139,14 @@ watch(myLocation, loadNearbyMerchants, { immediate: true })
 // 카테고리 이름/아이콘, 할인 뱃지를 붙이고 정렬만 프론트에서 처리
 // (거리 자체는 이미 백엔드가 계산해서 거리순으로 내려줌 - 이름순 정렬만 프론트가 필요)
 const nearbyMerchants = computed(() => {
+  if (!myLocation.value) {
+    return merchantsStore.merchantsWithCategory
+      .map((m) => ({ ...m, distanceLabel: '거리 정보 없음', discountLabel: bestDiscountLabel(m.categoryCode) }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
   const list = nearbyRaw.value.map((m) => {
-    const cat = merchantsStore.getCategoryByCode?.(m.categoryCode)
+    const cat = merchantsStore.getCategoryByCode(m.categoryCode)
     return {
       ...m,
       categoryName: cat?.categoryName,
@@ -149,8 +155,10 @@ const nearbyMerchants = computed(() => {
     }
   })
 
-  if (sortByDistance.value) return list // 백엔드가 이미 거리순으로 정렬해서 줌
-  return [...list].sort((a, b) => a.name.localeCompare(b.name))
+  return [...list].sort((a, b) => {
+    if (!sortByDistance.value) return a.name.localeCompare(b.name)
+    return a.distanceMeters - b.distanceMeters
+  })
 })
 
 function formatDistance(meters) {
