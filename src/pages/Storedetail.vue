@@ -11,10 +11,7 @@
     </header>
 
     <div class="store-banner">
-      <span class="banner-icon">
-        <img v-if="merchant.icon" :src="merchant.icon" alt="" />
-        <span v-else>📍</span>
-      </span>
+      <span class="banner-icon">{{ getCategoryEmoji(merchant.categoryCode) }}</span>
     </div>
 
     <div class="store-info">
@@ -85,6 +82,7 @@ import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
 import Button from '@/components/common/Button.vue';
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService';
+import { getCategoryEmoji } from '@/services/merchantsService';
 
 const route = useRoute();
 const router = useRouter();
@@ -150,9 +148,8 @@ const goToPay = () => {
 }
 .banner-icon {
   width: 64px; height: 64px; border-radius: 50%; background: rgba(255, 255, 255, .25);
-  display: grid; place-items: center; font-size: 28px; overflow: hidden;
+  display: grid; place-items: center; font-size: 28px;
 }
-.banner-icon img { width: 32px; height: 32px; object-fit: contain; }
 
 .store-info { margin-bottom: 22px; }
 .pill { margin-bottom: 8px; }
