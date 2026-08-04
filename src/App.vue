@@ -69,7 +69,7 @@ body, html {
   padding: 0;
   width: 100%;
   height: 100%;
-  background-color: #ffffff;
+  background-color: #f2f1ef;
 }
 
 #app {

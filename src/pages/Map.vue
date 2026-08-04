@@ -310,7 +310,7 @@ onMounted(async () => {
 .map-page {
   position: relative;
   width: 100%;
-  height: calc(100vh - 60px - 76px);
+  height: 100%;
   overflow: hidden;
 }
 .map-container { position: absolute; inset: 0; width: 100%; height: 100%; }
