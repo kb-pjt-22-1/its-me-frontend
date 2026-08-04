@@ -6,6 +6,16 @@ export async function fetchMerchantList() {
   return data.map(normalizeMerchant)
 }
 
+/**
+ * 주변 매장 조회 (거리 포함, 가까운 순 정렬) [GET /api/v1/merchants/nearby?lat=&lng=&radiusMeters=]
+ * 응답(NearbyMerchantResponseDto[]): MerchantResponseDto랑 똑같은데 distanceMeters(숫자, m)만 추가로 옴.
+ * 백엔드가 이미 거리순으로 정렬해서 내려줍니다.
+ */
+export async function fetchNearbyMerchants(lat, lng, radiusMeters = 1000) {
+  const { data } = await api.get('/v1/merchants/nearby', { params: { lat, lng, radiusMeters } })
+  return data.map((dto) => ({ ...normalizeMerchant(dto), distanceMeters: dto.distanceMeters }))
+}
+
 /** 특정 매장 조회 [GET /api/v1/merchants/{merchantId}] */
 export async function fetchMerchantDetail(merchantId) {
   const { data } = await api.get(`/v1/merchants/${merchantId}`)
