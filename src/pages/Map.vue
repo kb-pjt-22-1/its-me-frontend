@@ -65,10 +65,7 @@
           class="sheet-item"
           @click="goToStore(shop.id)"
         >
-          <div class="sheet-item-icon">
-            <img v-if="shop.icon" :src="shop.icon" alt="" />
-            <span v-else>📍</span>
-          </div>
+          <div class="sheet-item-icon">{{ getCategoryEmoji(shop.categoryCode) }}</div>
           <div class="sheet-item-info">
             <strong>{{ shop.name }}</strong>
             <p class="muted-text">
@@ -94,7 +91,7 @@ import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { useCardsStore } from '@/stores/cards'
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
-import { fetchNearbyMerchants } from '@/services/merchantsService'
+import { fetchNearbyMerchants, getCategoryEmoji } from '@/services/merchantsService'
 
 const router = useRouter()
 const merchantsStore = useMerchantsStore()
@@ -147,7 +144,6 @@ const nearbyMerchants = computed(() => {
     return {
       ...m,
       categoryName: cat?.categoryName,
-      icon: cat?.categoryIcon,
       distanceLabel: m.distanceMeters != null ? formatDistance(m.distanceMeters) : '거리 정보 없음',
       discountLabel: bestDiscountLabel(m.categoryCode),
     }
@@ -460,12 +456,8 @@ onMounted(async () => {
   background: var(--page, #f2f1ee);
   display: grid;
   place-items: center;
-  overflow: hidden;
-}
-.sheet-item-icon img {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
+  font-size: 1.3rem;
+  flex: 0 0 auto;
 }
 .sheet-item-info { flex: 1; min-width: 0; }
 .sheet-item-info strong { font-size: 14px; color: var(--charcoal, #151515); }
