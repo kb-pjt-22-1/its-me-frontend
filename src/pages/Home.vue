@@ -46,6 +46,16 @@
         <div class="bottom-container">
           <Button variant="box" @click="router.push('/pay')">
             <h3>간편 결제</h3>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.6" class="barcode-icon">
+              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+              <line x1="14" y1="14" x2="14" y2="17"></line>
+              <line x1="17" y1="14" x2="17" y2="14.01"></line>
+              <line x1="20" y1="14" x2="20" y2="17"></line>
+              <line x1="14" y1="20" x2="17" y2="20"></line>
+              <line x1="20" y1="20" x2="20" y2="20.01"></line>
+            </svg>
             <p v-if="recentSavedStore" class="recent-store-text">최근 저장: {{ recentSavedStore }}</p>
             <span class="pay-link-text">지금 결제 →</span>
           </Button>
@@ -237,6 +247,10 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
 }
 
 .gift-icon {
+  margin: 4px 0 2px;
+}
+
+.barcode-icon {
   margin: 4px 0 2px;
 }
 

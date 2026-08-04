@@ -58,6 +58,8 @@
         </button>
       </div>
     </template>
+
+    <Footer />
   </div>
 </template>
 
@@ -65,6 +67,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Button from '@/components/common/Button.vue';
+import Footer from '@/layouts/menu/Footer.vue';
 import { usePaymentStore } from '@/stores/payment';
 import { useMerchantsStore } from '@/stores/merchants';
 
@@ -144,7 +147,19 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.layout-container { padding: 0 18px 24px; }
+.layout-container {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 440px;
+  height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 0 18px 84px;
+  background: var(--page, #faf9f6);
+}
 .page-header { height: 60px; }
 
 .date-nav { display: flex; justify-content: center; align-items: center; gap: 20px; padding: 10px 0 20px; }
