@@ -305,7 +305,7 @@ onMounted(() => {
 .method-check.active { background: var(--orange, #ffb800); border-color: var(--orange, #ffb800); }
 
 .sticky-action {
-  position: fixed; left: 50%; transform: translateX(-50%); bottom: 0;
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 72px;
   width: min(100%, 440px); padding: 14px 18px; background: rgba(250, 249, 246, .97);
   border-top: 1px solid var(--line, #e9e5df); box-sizing: border-box; z-index: 25;
 }
