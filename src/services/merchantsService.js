@@ -6,6 +6,16 @@ export async function fetchMerchantList() {
   return data.map(normalizeMerchant)
 }
 
+/**
+ * 주변 매장 조회 (거리 포함, 가까운 순 정렬) [GET /api/v1/merchants/nearby?lat=&lng=&radiusMeters=]
+ * 응답(NearbyMerchantResponseDto[]): MerchantResponseDto랑 똑같은데 distanceMeters(숫자, m)만 추가로 옴.
+ * 백엔드가 이미 거리순으로 정렬해서 내려줍니다.
+ */
+export async function fetchNearbyMerchants(lat, lng, radiusMeters = 1000) {
+  const { data } = await api.get('/v1/merchants/nearby', { params: { lat, lng, radiusMeters } })
+  return data.map((dto) => ({ ...normalizeMerchant(dto), distanceMeters: dto.distanceMeters }))
+}
+
 /** 특정 매장 조회 [GET /api/v1/merchants/{merchantId}] */
 export async function fetchMerchantDetail(merchantId) {
   const { data } = await api.get(`/v1/merchants/${merchantId}`)
@@ -64,4 +74,35 @@ function normalizeMerchant(dto) {
     lng: dto.longitude,
     phone: dto.phone,
   }
+}
+
+// ---------------------------------------------------------
+// category_code -> 이모지 매핑
+// 백엔드가 주는 category_icon이 실제로 존재하지 않는 CDN URL(cdn.benepay.com)이라
+// 로딩이 항상 실패해서, 대신 이 매핑표로 이모지를 직접 붙입니다.
+// 알고 있는 코드만 채워뒀고, 없는 코드는 기본값(📍)으로 빠집니다.
+// merchant_categories 테이블에 새 카테고리가 추가되면 여기도 같이 추가해주세요.
+// ---------------------------------------------------------
+const CATEGORY_EMOJI = {
+  '5812': '🍽️', // 음식점
+  '5813': '☕', // 카페
+  '5814': '🍔', // 패스트푸드
+  '5462': '🥐', // 빵집
+  '5499': '🏪', // 편의점
+  '5411': '🛒', // 마트
+  '5311': '🏬', // 백화점
+  '5943': '✏️', // 문구점
+  '5541': '⛽', // 주유소
+  '7523': '🅿️', // 주차장
+  '7832': '🎬', // 영화관
+  '7994': '🎳', // 여가
+  '7230': '💇', // 뷰티
+  '8062': '🏥', // 병원
+  '5912': '💊', // 약국
+  '7011': '🏨', // 숙박
+}
+const DEFAULT_CATEGORY_EMOJI = '📍'
+
+export function getCategoryEmoji(categoryCode) {
+  return CATEGORY_EMOJI[categoryCode] ?? DEFAULT_CATEGORY_EMOJI
 }
