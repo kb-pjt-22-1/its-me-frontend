@@ -23,6 +23,15 @@ export async function fetchMerchantDetail(merchantId) {
 }
 
 /**
+ * 주변 매장 조회 [GET /api/v1/merchants/nearby]
+ * 서버가 반경 필터링 + 거리(m) 계산까지 해서 가까운 순으로 반환한다.
+ */
+export async function fetchNearbyMerchants(lat, lng, radiusMeters = 1000) {
+  const { data } = await api.get('/v1/merchants/nearby', { params: { lat, lng, radiusMeters } })
+  return data.map((dto) => ({ ...normalizeMerchant(dto), distance: dto.distanceMeters }))
+}
+
+/**
  * 매장 등록 [POST /api/v1/merchants]
  * payload(MerchantRequestDto): { categoryCode, brandId, merchantCode, merchantName, address, latitude, longitude, phone }
  */

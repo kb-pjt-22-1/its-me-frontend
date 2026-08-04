@@ -59,26 +59,31 @@
           반경 1km 안에 제휴 매장이 없어요.
         </div>
 
-        <button
-          v-for="shop in nearbyMerchants"
-          :key="shop.id"
-          class="sheet-item"
-          @click="goToStore(shop.id)"
-        >
-          <div class="sheet-item-icon">{{ getCategoryEmoji(shop.categoryCode) }}</div>
-          <div class="sheet-item-info">
-            <strong>{{ shop.name }}</strong>
-            <p class="muted-text">
-              {{ shop.categoryName }} · {{ shop.distanceLabel }}
-            </p>
-            <span v-if="shop.discountLabel" class="pill pill--gold">{{ shop.discountLabel }}</span>
-          </div>
-          <span class="sheet-bookmark" :class="{ active: bookmarksStore.isBookmarked(shop.id) }" @click.stop="toggleBookmark(shop)">
-            <svg width="18" height="18" viewBox="0 0 24 24" :fill="bookmarksStore.isBookmarked(shop.id) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path>
-            </svg>
-          </span>
-        </button>
+        <template v-else>
+          <button
+            v-for="shop in nearbyMerchants"
+            :key="shop.id"
+            class="sheet-item"
+            @click="goToStore(shop.id)"
+          >
+            <div class="sheet-item-icon">
+              <img v-if="shop.icon" :src="shop.icon" alt="" />
+              <span v-else>📍</span>
+            </div>
+            <div class="sheet-item-info">
+              <strong>{{ shop.name }}</strong>
+              <p class="muted-text">
+                {{ shop.categoryName }} · {{ shop.distanceLabel }}
+              </p>
+              <span v-if="shop.discountLabel" class="pill pill--gold">{{ shop.discountLabel }}</span>
+            </div>
+            <span class="sheet-bookmark" :class="{ active: bookmarksStore.isBookmarked(shop.id) }" @click.stop="toggleBookmark(shop)">
+              <svg width="18" height="18" viewBox="0 0 24 24" :fill="bookmarksStore.isBookmarked(shop.id) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path>
+              </svg>
+            </span>
+          </button>
+        </template>
       </div>
     </div>
   </div>
@@ -139,18 +144,27 @@ watch(myLocation, loadNearbyMerchants, { immediate: true })
 // 카테고리 이름/아이콘, 할인 뱃지를 붙이고 정렬만 프론트에서 처리
 // (거리 자체는 이미 백엔드가 계산해서 거리순으로 내려줌 - 이름순 정렬만 프론트가 필요)
 const nearbyMerchants = computed(() => {
+  if (!myLocation.value) {
+    return merchantsStore.merchantsWithCategory
+      .map((m) => ({ ...m, distance: null, distanceLabel: '거리 정보 없음', discountLabel: bestDiscountLabel(m.categoryCode) }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
   const list = nearbyRaw.value.map((m) => {
-    const cat = merchantsStore.getCategoryByCode?.(m.categoryCode)
+    const cat = merchantsStore.getCategoryByCode(m.categoryCode)
     return {
       ...m,
       categoryName: cat?.categoryName,
-      distanceLabel: m.distanceMeters != null ? formatDistance(m.distanceMeters) : '거리 정보 없음',
+      icon: cat?.categoryIcon,
+      distanceLabel: formatDistance(m.distance),
       discountLabel: bestDiscountLabel(m.categoryCode),
     }
   })
 
-  if (sortByDistance.value) return list // 백엔드가 이미 거리순으로 정렬해서 줌
-  return [...list].sort((a, b) => a.name.localeCompare(b.name))
+  return [...list].sort((a, b) => {
+    if (!sortByDistance.value) return a.name.localeCompare(b.name)
+    return a.distance - b.distance
+  })
 })
 
 function formatDistance(meters) {
