@@ -33,3 +33,19 @@ export async function verifyPassword(password) {
 export async function changePassword(currentPassword, newPassword) {
   await api.put('/users/me/password', { currentPassword, newPassword })
 }
+
+/**
+ * 간편 비밀번호(PIN) 최초 등록. 이미 등록돼 있으면 백엔드가 409로 거부한다 - Pinsetting.vue는
+ * getMyProfile().pinRegistered로 미리 걸러서 이 함수를 그 상태에서 호출하지 않는다.
+ */
+export async function registerPin(pin) {
+  await api.post('/users/me/pin', { pin })
+}
+
+/**
+ * 간편 비밀번호(PIN) 변경. currentPin이 틀리면 백엔드가 401로 거부하고(5회 실패 시 잠금),
+ * newPin이 3자리 이상 반복·연속 숫자면 400으로 거부한다.
+ */
+export async function updatePin(currentPin, newPin) {
+  await api.put('/users/me/pin', { currentPin, newPin })
+}
