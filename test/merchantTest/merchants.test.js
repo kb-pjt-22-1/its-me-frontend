@@ -18,8 +18,8 @@ import {
   updateMerchant,
   deleteMerchant,
 } from '@/services/merchantsService'
-import { useMerchantsStore } from './merchants'
-import { useAuthStore } from './auth'
+import { useMerchantsStore } from '@/stores/merchants'
+import { useAuthStore } from '@/stores/auth'
 
 function login(authStore) {
   authStore.accessToken = 'token'
