@@ -367,24 +367,6 @@ onMounted(async () => {
 }
 .map-container { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-.merchant-pin {
-  width: 32px;
-  height: 32px;
-  border-radius: 50% 50% 50% 0;
-  background: var(--surface, #ffffff);
-  border: 2px solid var(--orange, #ffb800);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, .18);
-  transform: rotate(-45deg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.merchant-pin-icon {
-  transform: rotate(45deg);
-  font-size: 15px;
-  line-height: 1;
-}
 .map-error {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   padding: 1rem; text-align: center; background: #f8f9fa; color: #dc3545; font-size: 0.875rem; z-index: 5;
@@ -543,4 +525,30 @@ onMounted(async () => {
   cursor: pointer;
 }
 .sheet-bookmark.active { color: var(--orange, #ffb800); }
+</style>
+
+<!--
+  카카오맵 CustomOverlay의 content는 Vue 템플릿이 아니라 순수 document.createElement로 만든
+  DOM이라 scoped 스타일의 data-v-* 속성이 안 붙습니다. 그래서 이 규칙만 스코프 없는
+  일반 style 블록에 둡니다.
+-->
+<style>
+.merchant-pin {
+  width: 32px;
+  height: 32px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--surface, #ffffff);
+  border: 2px solid var(--orange, #ffb800);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .18);
+  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.merchant-pin-icon {
+  transform: rotate(45deg);
+  font-size: 15px;
+  line-height: 1;
+}
 </style>
