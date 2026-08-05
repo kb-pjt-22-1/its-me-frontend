@@ -281,6 +281,8 @@ function createMerchantPinElement(merchant) {
   icon.textContent = getCategoryEmoji(merchant.categoryCode)
   wrapper.appendChild(icon)
 
+  wrapper.addEventListener('click', () => goToStore(merchant.id))
+
   return wrapper
 }
 
