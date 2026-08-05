@@ -74,6 +74,7 @@
         </div>
       </div>
 
+      <!-- 최근 결제 내역 -->
       <section class="transaction-section">
         <div class="section-header">
           <h3>최근 결제 내역</h3>
@@ -129,7 +130,7 @@ const progressPercentage = computed(() =>
 
 const recentSavedStore = computed(() => bookmarksStore.bookmarks[0]?.merchantName ?? bookmarksStore.bookmarks[0]?.name ?? null);
 
-// PaymentResponseDto엔 merchantId/userCardId만 오고 이름이 없어서
+// PaymentResponseDto엔 merchantId/userCardId만 오고 이름이 없어서(PaymentsList.vue와 동일),
 // merchantsStore/cardsStore에서 실제 이름을 찾아 붙입니다.
 const recentTransactions = computed(() =>
   [...paymentStore.history]
