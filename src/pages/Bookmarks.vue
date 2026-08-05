@@ -1,184 +1,136 @@
 <template>
   <div class="page-container">
+    <header class="page-header">
+      <button class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+      <h2>저장한 매장</h2>
+      <div class="right-placeholder"></div>
+    </header>
 
-    <div class="store-count">저장한 매장 {{ bookmarks.length }}곳</div>
+    <div v-if="bookmarksStore.isLoading" class="loading-text muted-text">불러오는 중...</div>
 
-    <div class="bookmark-list">
-      <Button
-        v-for="shop in bookmarks"
-        :key="shop.bookmarkId"
-        variant="box-outline"
-        class="store-card"
-        style="flex-direction: row; align-items: center; min-height: auto; gap: 15px;"
-        @click="goToStore(shop.merchantId)"
-      >
-        <div class="store-icon">{{ shop.icon }}</div>
+    <template v-else>
+      <div class="store-count muted-text">저장한 매장 {{ enrichedBookmarks.length }}곳</div>
 
-        <div class="card-center">
-          <h3>{{ shop.name }}</h3>
-          <p class="details">{{ shop.category }} · {{ shop.address }}</p>
-          <span v-if="shop.discountLabel" class="discount-badge">{{ shop.discountLabel }}</span>
-        </div>
+      <div v-if="enrichedBookmarks.length === 0" class="empty-text muted-text">
+        저장한 매장이 아직 없어요.
+      </div>
 
-        <span class="bookmark-badge" @click.stop="removeBookmark(shop.bookmarkId)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 2a2 2 0 0 0-2 2v18l8-5 8 5V4a2 2 0 0 0-2-2H6z"></path>
-          </svg>
-        </span>
-      </Button>
-    </div>
+      <div v-else class="bookmark-list">
+        <Button
+          v-for="shop in enrichedBookmarks"
+          :key="shop.merchantId"
+          variant="box-outline"
+          class="store-card"
+          style="flex-direction: row; align-items: center; min-height: auto; gap: 15px;"
+          @click="goToStore(shop.merchantId)"
+        >
+          <div class="store-icon">{{ getCategoryEmoji(shop.categoryCode) }}</div>
+
+          <div class="card-center">
+            <h3>{{ shop.name }}</h3>
+            <p class="details muted-text">{{ shop.categoryName }} · {{ shop.address }}</p>
+            <span v-if="shop.discountLabel" class="pill pill--gold">{{ shop.discountLabel }}</span>
+          </div>
+
+          <span class="bookmark-badge" @click.stop="handleRemove(shop.merchantId)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 2a2 2 0 0 0-2 2v18l8-5 8 5V4a2 2 0 0 0-2-2H6z"></path>
+            </svg>
+          </span>
+        </Button>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Button from '@/components/common/Button.vue';
+import { useBookmarksStore } from '@/stores/bookmarks';
+import { useMerchantsStore } from '@/stores/merchants';
+import { useCardsStore } from '@/stores/cards';
+import { findBenefitForCategory, formatBenefit } from '@/services/cardService';
+import { getCategoryEmoji } from '@/services/merchantsService';
 
 const router = useRouter();
+const bookmarksStore = useBookmarksStore();
+const merchantsStore = useMerchantsStore();
+const cardsStore = useCardsStore();
 
-// bookmarked_stores ⋈ merchants ⋈ merchant_categories (user_id=1, is_deleted=FALSE)
-// discountLabel은 user_id=1이 보유한 카드들의 benefits_info.categories 중,
-// 매장 카테고리(category_code)와 일치하는 항목에서 가장 유리한 걸 찾아 표시했습니다.
-//   - KB국민 노리카드: CAFE 10%, CVS 5%
-//   - KB국민 탄탄대로 체크카드: GAS 8%, MART 3%
-const bookmarks = ref([
-  {
-    bookmarkId: 'bm_0000000000000002',
-    merchantId: 3,
-    name: '동네마트 역삼점',
-    category: '마트',
-    address: '서울특별시 강남구 역삼동 789',
-    icon: '🛒',
-    discountLabel: '탄탄대로 체크카드 3% 할인', // MART 카테고리 매칭
-  },
-  {
-    bookmarkId: 'bm_0000000000000001',
-    merchantId: 1,
-    name: '스타벅스 강남점',
-    category: '카페',
-    address: '서울특별시 강남구 테헤란로 123',
-    icon: '☕',
-    discountLabel: '노리카드 10% 할인', // CAFE 카테고리 매칭
-  },
-]);
+onMounted(() => {
+  bookmarksStore.fetchBookmarks();
+  if (merchantsStore.merchants.length === 0) merchantsStore.fetchMerchants();
+});
 
-const goToStore = (merchantId) => {
-  router.push(`/stores/${merchantId}`);
-};
+// 보유 카드 중 이 매장 카테고리에 맞는 최고 혜택 찾기
+function bestDiscountLabel(categoryCode) {
+  if (!categoryCode) return null;
+  let best = null;
+  let bestCardName = '';
+  for (const card of cardsStore.cards) {
+    const benefit = findBenefitForCategory(card.benefitsInfo, categoryCode, card.currentAmount ?? 0);
+    const rate = benefit?.discountRate ?? benefit?.discountAmount ?? -1;
+    const bestRate = best?.discountRate ?? best?.discountAmount ?? -1;
+    if (benefit && rate > bestRate) {
+      best = benefit;
+      bestCardName = card.cardName;
+    }
+  }
+  return best ? `${bestCardName} ${formatBenefit(best)}` : null;
+}
 
-const removeBookmark = (bookmarkId) => {
-  // 실제로는 bookmarked_stores.is_deleted = TRUE 로 소프트 삭제하는 API 호출
-  bookmarks.value = bookmarks.value.filter((shop) => shop.bookmarkId !== bookmarkId);
+const enrichedBookmarks = computed(() =>
+  bookmarksStore.bookmarks.map((b) => {
+    const merchantId = b.merchantId ?? b.merchant_id ?? b.merchant?.id;
+    const merchant = merchantsStore.getByIdWithCategory(merchantId) ?? {};
+    return {
+      merchantId,
+      name: b.name ?? merchant.name ?? '이름 없는 매장',
+      categoryCode: b.categoryCode ?? merchant.categoryCode,
+      categoryName: b.categoryName ?? merchant.categoryName ?? '',
+      address: b.address ?? merchant.address ?? '',
+      discountLabel: bestDiscountLabel(b.categoryCode ?? merchant.categoryCode),
+    };
+  })
+);
+
+const goToStore = (merchantId) => router.push(`/stores/${merchantId}`);
+
+const handleRemove = async (merchantId) => {
+  try {
+    await bookmarksStore.removeBookmark(merchantId);
+  } catch (err) {
+    alert('북마크 해제에 실패했습니다. 다시 시도해주세요.');
+  }
 };
 </script>
 
 <style scoped>
-.page-container {
-  background-color: var(--page, #faf9f6);
-  min-height: 100vh;
-  padding: 20px;
-}
+.page-container { background-color: var(--page, #faf9f6); min-height: 100vh; padding: 20px; }
+.page-header { margin-bottom: 20px; }
+.page-header h2 { font-size: 1.2rem; }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
+.loading-text, .empty-text { text-align: center; padding: 60px 0; font-size: 0.9rem; }
 
-.header h2 {
-  margin: 0;
-  font-size: 1.2rem;
-}
-
-.back-btn {
-  border: none;
-  background: none;
-  cursor: pointer;
-  color: var(--charcoal, #59554a);
-  display: grid;
-  place-items: center;
-  padding: 0;
-}
-
-.view-toggle {
-  border: 1px solid var(--line, #e9e5df);
-  background: var(--surface, #ffffff);
-  padding: 8px;
-  border-radius: 10px;
-  cursor: pointer;
-  color: var(--charcoal, #59554a);
-  display: grid;
-  place-items: center;
-}
-
-.store-count {
-  font-weight: 700;
-  color: var(--muted, #918a81);
-  margin-bottom: 15px;
-  font-size: 0.9rem;
-}
-
-.bookmark-list {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.store-card {
-  padding: 15px;
-  text-align: left;
-}
+.store-count { font-weight: 700; margin-bottom: 15px; font-size: 0.9rem; }
+.bookmark-list { display: flex; flex-direction: column; gap: 15px; }
+.store-card { padding: 15px; text-align: left; }
 
 .store-icon {
-  width: 50px;
-  height: 50px;
-  background: var(--page, #f2f1ee);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.4rem;
-  flex: 0 0 auto;
+  width: 50px; height: 50px; background: var(--page, #f2f1ee); border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex: 0 0 auto;
 }
-
-.card-center {
-  flex: 1;
-  min-width: 0;
-}
-
-.card-center h3 {
-  margin: 0 0 5px 0;
-  font-size: 1.05rem;
-  color: var(--charcoal, #2c2b27);
-}
-
-.details {
-  color: var(--muted, #918a81);
-  font-size: 0.8rem;
-  margin: 0 0 8px 0;
-}
-
-.discount-badge {
-  display: inline-block;
-  background: #fff6dd;
-  color: #b67a00;
-  padding: 4px 8px;
-  border-radius: 7px;
-  font-size: 0.72rem;
-  font-weight: 800;
-}
+.card-center { flex: 1; min-width: 0; }
+.card-center h3 { margin: 0 0 5px 0; font-size: 1.05rem; color: var(--charcoal, #2c2b27); }
+.details { font-size: 0.8rem; margin: 0 0 8px 0; }
 
 .bookmark-badge {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: var(--orange, #ffb800);
-  color: #ffffff;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  cursor: pointer;
+  width: 32px; height: 32px; border-radius: 9px; background: var(--orange, #ffb800);
+  color: #ffffff; display: grid; place-items: center; flex: 0 0 auto; cursor: pointer;
 }
 </style>

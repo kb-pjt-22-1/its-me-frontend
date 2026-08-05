@@ -26,11 +26,13 @@ const goToBookmarks = () => {
 
 <style scoped>
 .app-header {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 50%;
+  transform: translateX(-50%);
   width: 100%;
-  max-width: 440px;  /* main.css의 .page-container와 동일 */
-  margin: 0 auto;
+  max-width: 440px;
+  margin: 0;
   height: 60px;
   background-color: var(--page, #faf9f6);
   display: flex;
@@ -39,6 +41,7 @@ const goToBookmarks = () => {
   padding: 0 20px;
   border-bottom: 1px solid var(--line, #e9e5df);
   z-index: 1000;
+  box-sizing: border-box;
 }
 
 .logo-link {

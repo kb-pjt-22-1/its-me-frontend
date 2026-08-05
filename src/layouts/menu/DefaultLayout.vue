@@ -11,30 +11,33 @@
 
 <script setup>
 import Header from './Header.vue'
-import Footer from './Footer.vue' 
+import Footer from './Footer.vue'
 </script>
 
 <style scoped>
-/* 1. 앱 본체 */
+/* 1. 앱 본체 - Header/Footer가 각각 position:fixed로 화면에 직접 붙어있어서,
+   여기서는 사실상 자리만 잡아주는 역할입니다 */
 .layout-container {
   width: 100%;
   max-width: 800px;
   min-height: 100vh;
-  background-color: var(--background); /* 테마 배경색 적용 */
-  box-shadow: 0 0 20px rgba(0,0,0,0.05);
-  
-  /* 핵심: 이게 있으면 브라우저 중앙에 고정됩니다 */
-  margin: 0 auto; 
-  
-  display: flex;
-  flex-direction: column;
+  background-color: var(--background);
+  margin: 0 auto;
+  position: relative;
 }
 
-/* 2. 본문 영역 */
+/* 2. 본문 영역 - 지도 화면과 같은 방식: 부모의 flex/overflow 계산에 기대지 않고
+   화면(뷰포트) 기준으로 헤더 아래(60px)부터 하단바 위(60px)까지 직접 고정합니다.
+   이 안에서만 스크롤되고, 헤더/하단바는 항상 그 자리에 고정되어 있습니다. */
 .main-content {
-  flex: 1; /* 푸터를 바닥으로 밀어냄 */
+  position: fixed;
+  top: 60px;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 440px;
   overflow-y: auto;
-  padding: 20px;
-  color: var(--foreground); /* 테마 텍스트 색상 적용 */
+  color: var(--foreground);
 }
 </style>
