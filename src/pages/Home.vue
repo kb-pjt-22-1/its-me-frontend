@@ -18,6 +18,7 @@
             <div>
               <span class="pill pill--mint">주 사용 카드</span>
               <h3>{{ primaryCard.cardName }}</h3>
+              <p>본인 · {{ primaryCard.panLast4 }}</p>
             </div>
             <span class="card-glyph">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -84,11 +85,14 @@
 
         <Button v-else tag="div" variant="box-outline" style="min-height: auto;">
           <div v-for="item in recentTransactions" :key="item.paymentId" class="transaction-item">
-            <div class="item-info">
-              <strong>{{ item.merchantName }}</strong>
-              <span class="amount">{{ item.finalAmount.toLocaleString() }}원</span>
+            <div class="item-icon">{{ item.icon }}</div>
+            <div class="item-main">
+              <div class="item-info">
+                <strong>{{ item.merchantName }}</strong>
+                <span class="amount">{{ item.finalAmount.toLocaleString() }}원</span>
+              </div>
+              <p class="item-date muted-text">{{ formatPaymentTime(item.paymentTime) }} · {{ item.cardName }}</p>
             </div>
-            <p class="item-date muted-text">{{ formatPaymentTime(item.paymentTime) }} | {{ item.cardName }}</p>
           </div>
         </Button>
       </section>
@@ -102,12 +106,15 @@ import { useRouter } from 'vue-router';
 import Button from '@/components/common/Button.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useCardsStore } from '@/stores/cards';
+import { useMerchantsStore } from '@/stores/merchants';
 import { useBookmarksStore } from '@/stores/bookmarks';
 import { usePaymentStore } from '@/stores/payment';
+import { getCategoryEmoji } from '@/services/merchantsService';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const cardsStore = useCardsStore();
+const merchantsStore = useMerchantsStore();
 const bookmarksStore = useBookmarksStore();
 const paymentStore = usePaymentStore();
 
@@ -123,17 +130,24 @@ const progressPercentage = computed(() =>
 
 const recentSavedStore = computed(() => bookmarksStore.bookmarks[0]?.merchantName ?? bookmarksStore.bookmarks[0]?.name ?? null);
 
+// PaymentResponseDto엔 merchantId/userCardId만 오고 이름이 없어서(PaymentsList.vue와 동일),
+// merchantsStore/cardsStore에서 실제 이름을 찾아 붙입니다.
 const recentTransactions = computed(() =>
   [...paymentStore.history]
     .sort((a, b) => new Date(b.paymentTime ?? 0) - new Date(a.paymentTime ?? 0))
     .slice(0, 3)
-    .map((item) => ({
-      paymentId: item.paymentId ?? item.id,
-      merchantName: item.merchantName ?? item.merchant?.name ?? '알 수 없는 매장',
-      finalAmount: item.finalAmount ?? item.amount ?? 0,
-      paymentTime: item.paymentTime,
-      cardName: item.cardName ?? item.card?.cardName ?? '',
-    }))
+    .map((item) => {
+      const merchant = item.merchantId ? merchantsStore.getByIdWithCategory(item.merchantId) : null;
+      const card = item.userCardId ? cardsStore.getById(item.userCardId) : null;
+      return {
+        paymentId: item.paymentId ?? item.id,
+        merchantName: item.merchantName ?? merchant?.name ?? '알 수 없는 매장',
+        icon: merchant?.categoryCode ? getCategoryEmoji(merchant.categoryCode) : '💳',
+        finalAmount: item.finalAmount ?? item.amount ?? 0,
+        paymentTime: item.paymentTime,
+        cardName: item.cardName ?? card?.cardName ?? '',
+      };
+    })
 );
 
 const monthlyBenefitTotal = computed(() =>
@@ -284,11 +298,30 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
 .transaction-item {
   width: 100%;
   padding: 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .transaction-item:first-child { padding-top: 0; }
 .transaction-item:last-child { padding-bottom: 0; }
 .transaction-item + .transaction-item { border-top: 1px solid var(--line, #e9e5df); }
+
+.item-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--page, #f2f1ee);
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  flex: 0 0 auto;
+}
+
+.item-main {
+  flex: 1;
+  min-width: 0;
+}
 
 .item-info {
   display: flex;
