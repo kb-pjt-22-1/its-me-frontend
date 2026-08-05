@@ -269,6 +269,21 @@ function initMap(kakao, center) {
   renderMerchantMarkers()
 }
 
+// 카테고리별로 다른 핀을 그리기 위해 기본 Marker 대신 CustomOverlay를 씁니다.
+// textContent로만 넣어서 merchant.name에 이상한 문자가 들어와도 HTML로 해석되지 않게 합니다.
+function createMerchantPinElement(merchant) {
+  const wrapper = document.createElement('div')
+  wrapper.className = 'merchant-pin'
+  wrapper.title = merchant.name ?? ''
+
+  const icon = document.createElement('span')
+  icon.className = 'merchant-pin-icon'
+  icon.textContent = getCategoryEmoji(merchant.categoryCode)
+  wrapper.appendChild(icon)
+
+  return wrapper
+}
+
 function renderMerchantMarkers() {
   if (!kakaoInstance || !mapInstance) return
   markers.forEach((marker) => marker.setMap(null))
@@ -283,10 +298,11 @@ function renderMerchantMarkers() {
     if (markers.length >= MAX_PIN_COUNT) break
     if (merchant.lat == null || merchant.lng == null) continue
     if (!bounds.contain(new kakaoInstance.maps.LatLng(merchant.lat, merchant.lng))) continue
-    const marker = new kakaoInstance.maps.Marker({
+    const marker = new kakaoInstance.maps.CustomOverlay({
       map: mapInstance,
       position: new kakaoInstance.maps.LatLng(merchant.lat, merchant.lng),
-      title: merchant.name,
+      content: createMerchantPinElement(merchant),
+      yAnchor: 1,
     })
     markers.push(marker)
   }
@@ -350,6 +366,25 @@ onMounted(async () => {
   overflow: hidden;
 }
 .map-container { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.merchant-pin {
+  width: 32px;
+  height: 32px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--surface, #ffffff);
+  border: 2px solid var(--orange, #ffb800);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .18);
+  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.merchant-pin-icon {
+  transform: rotate(45deg);
+  font-size: 15px;
+  line-height: 1;
+}
 .map-error {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   padding: 1rem; text-align: center; background: #f8f9fa; color: #dc3545; font-size: 0.875rem; z-index: 5;
