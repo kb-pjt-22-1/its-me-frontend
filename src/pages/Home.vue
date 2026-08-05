@@ -7,7 +7,6 @@
       </header>
 
       <div class="home-container">
-        <!-- 주 사용 카드 박스 -->
         <Button
           v-if="primaryCard"
           variant="box-outline"
@@ -43,7 +42,6 @@
         </Button>
         <div v-else class="card-box-skeleton surface-card">카드 정보를 불러오는 중...</div>
 
-        <!-- 하단 두 박스 -->
         <div class="bottom-container">
           <Button variant="box" @click="router.push('/pay')">
             <h3>간편 결제</h3>
@@ -74,7 +72,6 @@
         </div>
       </div>
 
-      <!-- 최근 결제 내역 -->
       <section class="transaction-section">
         <div class="section-header">
           <h3>최근 결제 내역</h3>
