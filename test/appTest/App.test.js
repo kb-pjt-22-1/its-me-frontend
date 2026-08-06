@@ -1,0 +1,112 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { nextTick } from 'vue'
+
+import App from '@/App.vue'
+import SidebarMenu from '@/components/SidebarMenu.vue'
+import { useAuthStore } from '@/stores/auth'
+import { useCardsStore } from '@/stores/cards'
+import { useMerchantsStore } from '@/stores/merchants'
+import { useBookmarksStore } from '@/stores/bookmarks'
+import { usePaymentStore } from '@/stores/payment'
+
+function setupStores() {
+  setActivePinia(createPinia())
+  const authStore = useAuthStore()
+  const cardsStore = useCardsStore()
+  const merchantsStore = useMerchantsStore()
+  const bookmarksStore = useBookmarksStore()
+  const paymentStore = usePaymentStore()
+
+  cardsStore.fetchCards = vi.fn()
+  merchantsStore.fetchMerchants = vi.fn()
+  bookmarksStore.fetchBookmarks = vi.fn()
+  paymentStore.fetchHistory = vi.fn()
+
+  return { authStore, cardsStore, merchantsStore, bookmarksStore, paymentStore }
+}
+
+function mountApp() {
+  return mount(App, {
+    global: {
+      stubs: { SidebarMenu: true, 'router-view': true },
+    },
+  })
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+describe('부트스트랩 판정 전 (isBootstrapped=false)', () => {
+  it('스플래시 화면만 보여주고 본문은 그리지 않는다', () => {
+    setupStores()
+    const wrapper = mountApp()
+
+    expect(wrapper.find('.app-splash').exists()).toBe(true)
+    expect(wrapper.find('.page-container').exists()).toBe(false)
+  })
+})
+
+describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
+  it('로그인 상태가 아니면 사이드메뉴 없이 본문만 보여주고 사용자 데이터를 불러오지 않는다', () => {
+    const stores = setupStores()
+    stores.authStore.isBootstrapped = true
+
+    const wrapper = mountApp()
+
+    expect(wrapper.find('.app-splash').exists()).toBe(false)
+    expect(wrapper.find('.page-container').exists()).toBe(true)
+    expect(wrapper.findComponent(SidebarMenu).exists()).toBe(false)
+    expect(stores.cardsStore.fetchCards).not.toHaveBeenCalled()
+    expect(stores.merchantsStore.fetchMerchants).not.toHaveBeenCalled()
+    expect(stores.bookmarksStore.fetchBookmarks).not.toHaveBeenCalled()
+    expect(stores.paymentStore.fetchHistory).not.toHaveBeenCalled()
+  })
+
+  it('이미 로그인 상태로 마운트되면 사이드메뉴를 보여주고 모든 사용자 데이터를 불러온다', () => {
+    const stores = setupStores()
+    stores.authStore.isBootstrapped = true
+    stores.authStore.accessToken = 'token'
+    stores.authStore.user = { userId: 1, name: '홍길동' }
+
+    const wrapper = mountApp()
+
+    expect(wrapper.findComponent(SidebarMenu).exists()).toBe(true)
+    expect(stores.cardsStore.fetchCards).toHaveBeenCalledTimes(1)
+    expect(stores.merchantsStore.fetchMerchants).toHaveBeenCalledTimes(1)
+    expect(stores.bookmarksStore.fetchBookmarks).toHaveBeenCalledTimes(1)
+    expect(stores.paymentStore.fetchHistory).toHaveBeenCalledTimes(1)
+  })
+
+  it('마운트 후 로그인에 성공하면(false->true) 그 시점에 사용자 데이터를 불러온다', async () => {
+    const stores = setupStores()
+    stores.authStore.isBootstrapped = true
+
+    mountApp()
+    expect(stores.cardsStore.fetchCards).not.toHaveBeenCalled()
+
+    stores.authStore.accessToken = 'token'
+    stores.authStore.user = { userId: 1, name: '홍길동' }
+    await nextTick()
+
+    expect(stores.cardsStore.fetchCards).toHaveBeenCalledTimes(1)
+    expect(stores.merchantsStore.fetchMerchants).toHaveBeenCalledTimes(1)
+    expect(stores.bookmarksStore.fetchBookmarks).toHaveBeenCalledTimes(1)
+    expect(stores.paymentStore.fetchHistory).toHaveBeenCalledTimes(1)
+  })
+
+  it('isAuthenticated에 영향 없는 상태 변화는 사용자 데이터를 불러오지 않는다', async () => {
+    const stores = setupStores()
+    stores.authStore.isBootstrapped = true
+
+    mountApp()
+
+    // isAuthenticated의 값 자체는 바뀌지 않으므로 watch 콜백이 실행되지 않는다.
+    stores.authStore.errorMessage = 'noop-change'
+    await nextTick()
+
+    expect(stores.cardsStore.fetchCards).not.toHaveBeenCalled()
+  })
+})
