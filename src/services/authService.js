@@ -74,8 +74,11 @@ export async function signUpRequest({ loginId, password, verificationToken, fcmT
   return data
 }
 
+/**
+ * 로그아웃. POST /api/auth/logout이 access 토큰은 블랙리스트에 넣고 refresh 세션은
+ * Redis에서 지운다(TokenServiceImpl 참고) - 여기서 실제로 호출해야 서버 쪽 refresh 토큰이
+ * 로그아웃 이후에도 계속 유효한 채로 남지 않는다.
+ */
 export async function logoutRequest() {
-  // 실제로는 서버에 토큰 무효화 요청을 보낼 수 있습니다.
-  // await axios.post(`${API_BASE}/auth/logout`)
-  return true
+  await api.post('/auth/logout')
 }
