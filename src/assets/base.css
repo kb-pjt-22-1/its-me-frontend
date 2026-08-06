@@ -1,20 +1,33 @@
-/* BenePay 디자인 토큰 */
+@font-face {
+  font-family: "KBFGText";
+  src: url("./fonts/KBFGText-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* BenePay 디자인 토큰. SmartCard 피그마 프로토타입(src/app/App.tsx의 KB_* 상수)의
+   실제 값과 일치시켰다 - 예전 값들은 비슷하게 어림한 근사치였다. */
 :root {
-  font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #151515;
-  background: #e9e8e5;
+  /* 헤더는 예외 - Header.vue가 이 토큰을 별도로 원래 폰트로 되돌린다 */
+  --font-default: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "KBFGText", var(--font-default);
+  color: #24211d;
+  background: #f7f7f5;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 
-  --orange: #ffb800;
-  --orange-deep: #f4aa00;
+  --orange: #ffbc00;       /* KB_YELLOW */
+  --orange-deep: #e6aa00;  /* PrimaryButton 눌림 상태 색 */
   --surface: #ffffff;
-  --page: #faf9f6;
-  --line: #e9e5df;
-  --muted: #918a81;
-  --green: #00a97b;
-  --danger: #f05e58;
-  --charcoal: #59554a;
+  --page: #f7f7f5;         /* KB_BG */
+  --line: #e7e4de;         /* KB_BORDER */
+  --muted: #8f897f;        /* KB_SECONDARY - 라벨/힌트/타임스탬프 */
+  --charcoal: #24211d;     /* KB_TEXT - 본문/헤딩/버튼 글자 */
+  --dark: #545045;         /* KB_DARK_GRAY - 어두운 카드(간편결제 박스 등) 배경 */
+  --inactive: #f0efec;     /* KB_INACTIVE - primary 버튼 비활성 배경 */
+  --green: #00a878;        /* KB_SUCCESS */
+  --danger: #d94343;       /* KB_ERROR */
 }
 
 *,
@@ -27,7 +40,7 @@
 
 html, body, #app { margin: 0; min-height: 100%; }
 body {
-  background: #e7e6e2;
+  background: var(--page);
   line-height: 1.6;
   font-size: 15px;
   -webkit-font-smoothing: antialiased;

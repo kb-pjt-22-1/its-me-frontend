@@ -78,7 +78,7 @@
         :class="{ selected: selectedMethodId === row.card.userCardId }"
         @click="selectedMethodId = row.card.userCardId"
       >
-        <span class="method-icon" :style="{ background: row.card.color || '#2c2b27' }"></span>
+        <span class="method-icon" :style="{ background: row.card.color || '#24211d' }"></span>
 
         <span class="method-info">
           <span class="method-name-row">
@@ -230,51 +230,51 @@ onMounted(() => {
 .display-box { padding: 40px 20px; text-align: center; margin-bottom: 24px; }
 .auth-prompt .lock-icon {
   width: 64px; height: 64px; margin: 0 auto 14px;
-  border-radius: 50%; background: var(--page, #faf9f6);
+  border-radius: 50%; background: var(--inactive, #f0efec);
   display: grid; place-items: center; font-size: 24px;
 }
 .auth-prompt h3 { margin: 0 0 6px; font-size: 16px; }
-.auth-prompt p { margin: 0; color: var(--muted, #918a81); font-size: 12px; }
+.auth-prompt p { margin: 0; color: var(--muted, #8f897f); font-size: 12px; }
 
 .pin-page { min-height: 100vh; padding-bottom: 20px; box-sizing: border-box; display: flex; flex-direction: column; }
 .pin-header { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 18px; }
-.pin-header h2 { margin: 0; font-size: 16px; color: var(--charcoal, #151515); }
+.pin-header h2 { margin: 0; font-size: 16px; color: var(--charcoal, #24211d); }
 .pin-header .back-btn {
   width: 30px; height: 30px; display: grid; place-items: center;
-  border: none; background: none; color: var(--charcoal, #59554a); cursor: pointer; padding: 0;
+  border: none; background: none; color: var(--charcoal, #24211d); cursor: pointer; padding: 0;
 }
 .pin-body { padding: 20px 18px 10px; }
-.pin-title { margin: 0 0 8px; font-size: 19px; letter-spacing: -.3px; color: var(--charcoal, #151515); }
-.pin-subtitle { margin: 0 0 22px; font-size: 13px; color: var(--muted, #918a81); }
+.pin-title { margin: 0 0 8px; font-size: 19px; letter-spacing: -.3px; color: var(--charcoal, #24211d); }
+.pin-subtitle { margin: 0 0 22px; font-size: 13px; color: var(--muted, #8f897f); }
 .pin-card-row {
   display: flex; justify-content: space-between; align-items: center;
-  background: var(--page, #f2f1ee); border-radius: 14px; padding: 16px 18px; margin-bottom: 34px;
+  background: var(--inactive, #f0efec); border-radius: 14px; padding: 16px 18px; margin-bottom: 34px;
 }
-.pin-card-row span { font-size: 13px; color: var(--muted, #918a81); }
-.pin-card-row strong { font-size: 14px; color: var(--charcoal, #151515); }
+.pin-card-row span { font-size: 13px; color: var(--muted, #8f897f); }
+.pin-card-row strong { font-size: 14px; color: var(--charcoal, #24211d); }
 .pin-dots { display: flex; justify-content: center; gap: 14px; }
-.pin-dot { width: 40px; height: 40px; border-radius: 50%; background: var(--page, #ece9e3); }
-.pin-dot.filled { background: var(--charcoal, #59554a); }
+.pin-dot { width: 40px; height: 40px; border-radius: 50%; background: var(--inactive, #f0efec); }
+.pin-dot.filled { background: var(--dark, #545045); }
 .pin-dots.shake { animation: pin-shake 0.4s ease; }
 @keyframes pin-shake {
   0%, 100% { transform: translateX(0); }
   20%, 60% { transform: translateX(-8px); }
   40%, 80% { transform: translateX(8px); }
 }
-.pin-error { margin: 14px 0 0; text-align: center; color: var(--danger, #f05e58); font-size: 12px; }
+.pin-error { margin: 14px 0 0; text-align: center; color: var(--danger, #d94343); font-size: 12px; }
 
 .keypad { margin-top: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 20px 18px 0; }
 .keypad-key {
-  height: 62px; border-radius: 14px; border: 1px solid var(--line, #e9e5df);
+  height: 62px; border-radius: 14px; border: 1px solid var(--line, #e7e4de);
   background: var(--surface, #ffffff); font-size: 20px; font-weight: 600;
-  color: var(--charcoal, #2c2b27); display: grid; place-items: center; cursor: pointer;
+  color: var(--charcoal, #24211d); display: grid; place-items: center; cursor: pointer;
 }
 .keypad-key:disabled { visibility: hidden; }
-.keypad-key--action { background: var(--page, #f2f1ee); color: var(--muted, #918a81); }
+.keypad-key--action { background: var(--inactive, #f0efec); color: var(--muted, #8f897f); }
 
 .main-action-btn {
   width: 100%; height: 54px; border-radius: 14px;
-  background: var(--orange, #ffb800); color: #171717; font-weight: 900;
+  background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900;
 }
 
 .payment-methods { display: flex; flex-direction: column; gap: 12px; }
@@ -282,31 +282,31 @@ onMounted(() => {
 
 .method-item {
   display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px;
-  border-radius: 16px; background: var(--surface, #ffffff); border: 1px solid var(--line, #e9e5df);
+  border-radius: 16px; background: var(--surface, #ffffff); border: 1px solid var(--line, #e7e4de);
   box-shadow: 0 3px 8px rgba(0, 0, 0, .05); text-align: left; cursor: pointer;
 }
-.method-item.selected { border: 2px solid var(--orange, #ffb800); padding: 13px; }
+.method-item.selected { border: 2px solid var(--orange, #ffbc00); padding: 13px; }
 
 .method-icon { width: 46px; height: 29px; border-radius: 6px; flex: 0 0 auto; }
 .method-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .method-name-row { display: flex; align-items: center; gap: 6px; }
 .method-name-row strong { font-size: 14px; }
 .method-badge {
-  font-size: 10px; font-weight: 800; color: var(--green, #00a97b);
-  background: #e0f8ef; border-radius: 6px; padding: 3px 6px;
+  font-size: 10px; font-weight: 800; color: var(--green, #00a878);
+  background: #ebf7f3; border-radius: 6px; padding: 3px 6px;
 }
-.method-number { font-size: 11px; color: var(--muted, #918a81); }
+.method-number { font-size: 11px; color: var(--muted, #8f897f); }
 .method-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
-.method-reward { font-size: 12px; font-weight: 800; color: var(--charcoal, #59554a); white-space: nowrap; }
+.method-reward { font-size: 12px; font-weight: 800; color: var(--charcoal, #24211d); white-space: nowrap; }
 .method-check {
-  width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line, #e9e5df);
+  width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line, #e7e4de);
   display: grid; place-items: center;
 }
-.method-check.active { background: var(--orange, #ffb800); border-color: var(--orange, #ffb800); }
+.method-check.active { background: var(--orange, #ffbc00); border-color: var(--orange, #ffbc00); }
 
 .sticky-action {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: 0;
   width: min(100%, 440px); padding: 14px 18px; background: rgba(250, 249, 246, .97);
-  border-top: 1px solid var(--line, #e9e5df); box-sizing: border-box; z-index: 25;
+  border-top: 1px solid var(--line, #e7e4de); box-sizing: border-box; z-index: 25;
 }
 </style>

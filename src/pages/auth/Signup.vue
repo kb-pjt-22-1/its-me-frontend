@@ -209,7 +209,7 @@ async function handleSignUp() {
 
 .verify-box {
   height: 55px;
-  border: 1px solid var(--line, #e9e5df);
+  border: 1px solid var(--line, #e7e4de);
   border-radius: 13px;
   background: var(--surface, #ffffff);
   padding: 0 16px;
@@ -232,7 +232,7 @@ async function handleSignUp() {
 .verify-text {
   flex: 1;
   font-size: 14px;
-  color: var(--charcoal, #2c2b27);
+  color: var(--charcoal, #24211d);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -255,14 +255,14 @@ async function handleSignUp() {
 
 .input-box {
   height: 55px;
-  border: 1px solid var(--line, #e9e5df);
+  border: 1px solid var(--line, #e7e4de);
   border-radius: 13px;
   background: var(--surface, #ffffff);
   padding: 0 13px;
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--muted, #918a81);
+  color: var(--muted, #8f897f);
 }
 
 .input-box input {
@@ -270,14 +270,14 @@ async function handleSignUp() {
   border: 0;
   outline: 0;
   font-size: 15px;
-  color: var(--charcoal, #2c2b27);
+  color: var(--charcoal, #24211d);
   min-width: 0;
   background: transparent;
 }
-.input-box input::placeholder { color: var(--muted, #a79f97); }
+.input-box input::placeholder { color: var(--muted, #8f897f); }
 
 .error-text {
-  color: var(--danger, #f05e58);
+  color: var(--danger, #d94343);
   font-size: 0.85rem;
   text-align: center;
   margin: 0;
@@ -285,14 +285,14 @@ async function handleSignUp() {
 
 .login-copy {
   text-align: center;
-  color: var(--muted, #a0958d);
+  color: var(--muted, #8f897f);
   font-size: 13px;
   margin-top: 25px;
 }
 
 .login-link {
   font-weight: 800;
-  color: var(--charcoal, #171717);
+  color: var(--charcoal, #24211d);
   text-decoration: none;
 }
 </style>

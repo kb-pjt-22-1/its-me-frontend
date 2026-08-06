@@ -46,7 +46,7 @@
       <template v-if="typeof card.currentAmount === 'number' && typeof card.targetAmount === 'number'">
         <h3 class="tier-label">{{ tierLabel }}</h3>
         <div class="progress-track">
-          <div class="progress-fill progress-fill--purple" :style="{ width: tierPercent + '%' }"></div>
+          <div class="progress-fill" :class="{ 'progress-fill--met': card.performanceMet }" :style="{ width: tierPercent + '%' }"></div>
         </div>
         <p class="recognized-amount muted-text">
           실적인정금액 <strong>{{ card.currentAmount.toLocaleString() }}원</strong>
@@ -194,10 +194,10 @@ const handleDeleteCard = async () => {
 .annual-fee {
   margin: 0;
   font-size: 13px;
-  color: var(--muted, #918a81);
+  color: var(--muted, #8f897f);
 }
 .annual-fee strong {
-  color: var(--charcoal, #151515);
+  color: var(--charcoal, #24211d);
   font-weight: 800;
   margin-left: 4px;
 }
@@ -205,23 +205,23 @@ const handleDeleteCard = async () => {
   margin: 10px 0 0;
   font-size: 12px;
 }
-.section-label { margin: 0 0 8px; font-size: 12px; color: var(--muted, #918a81); }
-.tier-label { margin: 0 0 14px; font-size: 18px; color: var(--charcoal, #151515); }
+.section-label { margin: 0 0 8px; font-size: 12px; color: var(--muted, #8f897f); }
+.tier-label { margin: 0 0 14px; font-size: 18px; color: var(--charcoal, #24211d); }
 .progress-track { margin-bottom: 10px; }
 
 .recognized-amount { margin: 0; font-size: 13px; }
-.recognized-amount strong { color: var(--charcoal, #151515); font-weight: 800; margin-left: 4px; }
+.recognized-amount strong { color: var(--charcoal, #24211d); font-weight: 800; margin-left: 4px; }
 
 .benefit-row {
   display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px;
-  padding: 8px 0; color: var(--charcoal, #2c2b27);
+  padding: 8px 0; color: var(--charcoal, #24211d);
 }
-.benefit-row + .benefit-row { border-top: 1px solid var(--line, #e9e5df); }
+.benefit-row + .benefit-row { border-top: 1px solid var(--line, #e7e4de); }
 .benefit-cat { font-weight: 700; flex: 0 0 auto; }
 .benefit-rate { color: var(--orange, #d98d00); font-weight: 700; }
 
 .exclude-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.exclude-title { margin: 0 0 4px; font-size: 14px; font-weight: 700; color: var(--charcoal, #151515); }
+.exclude-title { margin: 0 0 4px; font-size: 14px; font-weight: 700; color: var(--charcoal, #24211d); }
 .exclude-desc { margin: 0; font-size: 12px; line-height: 1.5; }
 
 .exclude-toggle-btn {
@@ -230,9 +230,9 @@ const handleDeleteCard = async () => {
   gap: 6px;
   padding: 9px 14px;
   border-radius: 999px;
-  border: 1.5px solid var(--line, #e9e5df);
+  border: 1.5px solid var(--line, #e7e4de);
   background: var(--surface, #ffffff);
-  color: var(--muted, #918a81);
+  color: var(--muted, #8f897f);
   font-size: 12.5px;
   font-weight: 800;
   cursor: pointer;
@@ -241,7 +241,7 @@ const handleDeleteCard = async () => {
   transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 .exclude-toggle-btn--on {
-  border-color: var(--orange, #ffb800);
+  border-color: var(--orange, #ffbc00);
   background: #fff6dd;
   color: #b67a00;
 }
@@ -249,11 +249,11 @@ const handleDeleteCard = async () => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--muted, #c7c2b8);
+  background: var(--muted, #8f897f);
   flex: 0 0 auto;
 }
 .exclude-toggle-btn--on .exclude-toggle-dot {
-  background: var(--orange, #ffb800);
+  background: var(--orange, #ffbc00);
 }
 
 .primary-badge-row { display: flex; justify-content: center; padding: 10px 0 4px; }
@@ -261,7 +261,7 @@ const handleDeleteCard = async () => {
 
 .set-primary-btn {
   width: 100%; height: 54px; border-radius: 14px; border: none;
-  background: var(--orange, #ffb800); color: #171717; font-weight: 900;
+  background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900;
   font-size: 15px; cursor: pointer; margin-top: 6px;
 }
 .delete-card-btn {

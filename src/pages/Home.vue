@@ -1,7 +1,7 @@
 <template>
   <div class="home-content">
     <div class="layout-container">
-      <header>
+      <header class="home-header">
         <h1>안녕하세요, {{ userName }}님!</h1>
         <p>오늘도 스마트한 소비를 시작해보세요.</p>
       </header>
@@ -35,7 +35,11 @@
               <span class="muted-text">실적 충족까지 {{ remainingAmount.toLocaleString() }}원</span>
             </div>
             <div class="progress-track">
-              <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
+              <div
+                class="progress-fill"
+                :class="{ 'progress-fill--met': primaryCard.currentAmount >= primaryCard.targetAmount }"
+                :style="{ width: progressPercentage + '%' }"
+              ></div>
             </div>
             <p class="progress-target">목표 {{ primaryCard.targetAmount.toLocaleString() }}원</p>
           </template>
@@ -61,7 +65,7 @@
           </Button>
           <Button tag="div" variant="box-outline">
             <h3>이번 달 혜택</h3>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--orange, #ffb800)" stroke-width="1.8" class="gift-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--orange, #ffbc00)" stroke-width="1.8" class="gift-icon">
               <rect x="3" y="8" width="18" height="4"></rect>
               <path d="M12 8v13"></path>
               <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path>
@@ -117,9 +121,12 @@ const primaryCard = computed(() => cardsStore.primaryCard);
 const remainingAmount = computed(() =>
   primaryCard.value ? Math.max(primaryCard.value.targetAmount - primaryCard.value.currentAmount, 0) : 0
 );
-const progressPercentage = computed(() =>
-  primaryCard.value ? Math.min((primaryCard.value.currentAmount / primaryCard.value.targetAmount) * 100, 100) : 0
-);
+const progressPercentage = computed(() => {
+  if (!primaryCard.value) return 0;
+  // 목표가 0원이면 나눗셈이 무의미하다 - 채울 목표가 없으니 이미 다 채운 것으로 본다.
+  if (primaryCard.value.targetAmount === 0) return 100;
+  return Math.min((primaryCard.value.currentAmount / primaryCard.value.targetAmount) * 100, 100);
+});
 
 const recentSavedStore = computed(() => bookmarksStore.bookmarks[0]?.merchantName ?? bookmarksStore.bookmarks[0]?.name ?? null);
 
@@ -158,6 +165,23 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
   padding: 18px 18px 24px;
 }
 
+.home-header {
+  margin-bottom: 20px;
+}
+
+.home-header h1 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--charcoal, #24211d);
+}
+
+.home-header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted, #8f897f);
+}
+
 .home-container {
   display: flex;
   flex-direction: column;
@@ -168,10 +192,16 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
   text-align: left;
 }
 
+:deep(.card-box.btn--box-outline) {
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 2px 16px rgba(46, 42, 36, 0.06);
+}
+
 .card-box-skeleton {
   padding: 40px 20px;
   text-align: center;
-  color: var(--muted, #918a81);
+  color: var(--muted, #8f897f);
   font-size: 13px;
 }
 
@@ -191,7 +221,7 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
 
 .card-top-row p {
   margin: 0;
-  color: var(--muted, #918980);
+  color: var(--muted, #8f897f);
   font-size: 12px;
 }
 
@@ -199,7 +229,7 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
   width: 34px;
   height: 34px;
   border-radius: 9px;
-  background: var(--charcoal, #47433d);
+  background: var(--dark, #545045);
   color: #ffffff;
   display: grid;
   place-items: center;
@@ -219,7 +249,7 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
   width: 100%;
   text-align: right;
   margin: 7px 0 0;
-  color: var(--muted, #8d857b);
+  color: var(--muted, #8f897f);
   font-size: 11px;
 }
 
@@ -234,8 +264,13 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
   width: 0;
 }
 
+:deep(.bottom-container .btn--box-outline) {
+  border: none;
+  box-shadow: 0 2px 12px rgba(46, 42, 36, 0.06);
+}
+
 .pay-link-text {
-  color: var(--orange, #ffb800);
+  color: var(--orange, #ffbc00);
   font-weight: 700;
   margin-top: auto;
 }
@@ -268,6 +303,11 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
   margin-top: 30px;
 }
 
+:deep(.transaction-section .btn--box-outline) {
+  border: none;
+  box-shadow: 0 2px 12px rgba(46, 42, 36, 0.06);
+}
+
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -288,7 +328,7 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
 
 .transaction-item:first-child { padding-top: 0; }
 .transaction-item:last-child { padding-bottom: 0; }
-.transaction-item + .transaction-item { border-top: 1px solid var(--line, #e9e5df); }
+.transaction-item + .transaction-item { border-top: 1px solid var(--line, #e7e4de); }
 
 .item-info {
   display: flex;
@@ -296,7 +336,7 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
   width: 100%;
   font-size: 1rem;
   margin-bottom: 5px;
-  color: var(--charcoal, #151515);
+  color: var(--charcoal, #24211d);
 }
 
 .item-date {

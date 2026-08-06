@@ -243,7 +243,7 @@ onBeforeUnmount(() => {
   height: 28px;
   display: grid;
   place-items: center;
-  color: var(--muted, #918a81);
+  color: var(--muted, #8f897f);
   background: transparent;
   border: none;
   padding: 0;
@@ -256,7 +256,7 @@ onBeforeUnmount(() => {
 
 .input-box {
   height: 55px;
-  border: 1px solid var(--line, #e9e5df);
+  border: 1px solid var(--line, #e7e4de);
   border-radius: 13px;
   background: var(--surface, #ffffff);
   padding: 0 13px;
@@ -270,11 +270,11 @@ onBeforeUnmount(() => {
   border: 0;
   outline: 0;
   font-size: 15px;
-  color: var(--charcoal, #2c2b27);
+  color: var(--charcoal, #24211d);
   min-width: 0;
   background: transparent;
 }
-.input-box input::placeholder { color: var(--muted, #a79f97); }
+.input-box input::placeholder { color: var(--muted, #8f897f); }
 .input-box input:disabled { color: var(--muted, #b6afa6); }
 
 .otp-box {
@@ -289,7 +289,7 @@ onBeforeUnmount(() => {
 }
 
 .error-text {
-  color: var(--danger, #f05e58);
+  color: var(--danger, #d94343);
   font-size: 0.85rem;
   text-align: center;
   margin: 0;
@@ -306,7 +306,7 @@ onBeforeUnmount(() => {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: #ddf6ee;
+  background: #ebf7f3;
   color: #00a878;
   display: grid;
   place-items: center;

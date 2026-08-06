@@ -203,14 +203,14 @@ async function handleDevLogin() {
 
 .input-box {
   height: 55px;
-  border: 1px solid var(--line, #e9e5df);
+  border: 1px solid var(--line, #e7e4de);
   border-radius: 13px;
   background: var(--surface, #ffffff);
   padding: 0 13px;
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--muted, #918a81);
+  color: var(--muted, #8f897f);
 }
 
 .input-box input {
@@ -218,25 +218,25 @@ async function handleDevLogin() {
   border: 0;
   outline: 0;
   font-size: 15px;
-  color: var(--charcoal, #2c2b27);
+  color: var(--charcoal, #24211d);
   min-width: 0;
   background: transparent;
 }
-.input-box input::placeholder { color: var(--muted, #a79f97); }
+.input-box input::placeholder { color: var(--muted, #8f897f); }
 
 .input-action {
   width: 28px;
   height: 28px;
   display: grid;
   place-items: center;
-  color: var(--muted, #999288);
+  color: var(--muted, #8f897f);
   background: transparent;
   border: none;
   padding: 0;
 }
 
 .error-text {
-  color: var(--danger, #f05e58);
+  color: var(--danger, #d94343);
   font-size: 0.85rem;
   text-align: center;
   margin: 0;
@@ -251,14 +251,14 @@ async function handleDevLogin() {
 
 .signup-copy {
   text-align: center;
-  color: var(--muted, #a0958d);
+  color: var(--muted, #8f897f);
   font-size: 13px;
   margin-top: 25px;
 }
 
 .signup-link {
   font-weight: 800;
-  color: var(--charcoal, #171717);
+  color: var(--charcoal, #24211d);
   text-decoration: none;
 }
 
@@ -270,7 +270,7 @@ async function handleDevLogin() {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--muted, #a79f97);
+  color: var(--muted, #8f897f);
   font-size: 12px;
   margin-bottom: 14px;
 }
@@ -279,13 +279,13 @@ async function handleDevLogin() {
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--line, #e9e5df);
+  background: var(--line, #e7e4de);
 }
 
 .dev-slot-hint {
   text-align: center;
   font-size: 11px;
-  color: var(--muted, #a79f97);
+  color: var(--muted, #8f897f);
   margin: 8px 0 0;
 }
 </style>

@@ -363,10 +363,10 @@ onMounted(async () => {
 .search-bar {
   height: 48px; background: var(--surface, #ffffff); border-radius: 14px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, .08); display: flex; align-items: center; gap: 10px;
-  padding: 0 16px; color: var(--muted, #918a81); margin-bottom: 12px;
+  padding: 0 16px; color: var(--muted, #8f897f); margin-bottom: 12px;
 }
-.search-bar input { flex: 1; border: none; outline: none; background: transparent; font-size: 14px; color: var(--charcoal, #151515); }
-.search-bar input::placeholder { color: var(--muted, #a79f97); }
+.search-bar input { flex: 1; border: none; outline: none; background: transparent; font-size: 14px; color: var(--charcoal, #24211d); }
+.search-bar input::placeholder { color: var(--muted, #8f897f); }
 
 .category-chips {
   display: flex; gap: 8px; overflow-x: auto; padding-bottom: 14px; padding-right: 24px;
@@ -378,15 +378,15 @@ onMounted(async () => {
 
 .chip {
   flex: 0 0 auto; height: 34px; padding: 0 16px; border-radius: 999px; border: none;
-  background: var(--surface, #ffffff); color: var(--charcoal, #59554a); font-size: 13px;
+  background: var(--surface, #ffffff); color: var(--charcoal, #24211d); font-size: 13px;
   font-weight: 700; box-shadow: 0 2px 8px rgba(0, 0, 0, .06); cursor: pointer;
 }
-.chip.active { background: var(--orange, #ffb800); color: #171717; }
+.chip.active { background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); }
 
 .locate-btn {
   position: absolute; right: 18px; bottom: 108px; width: 46px; height: 46px; border-radius: 50%;
   border: none; background: var(--surface, #ffffff); box-shadow: 0 6px 16px rgba(0, 0, 0, .15);
-  display: grid; place-items: center; color: var(--charcoal, #151515); z-index: 20; cursor: pointer;
+  display: grid; place-items: center; color: var(--charcoal, #24211d); z-index: 20; cursor: pointer;
   transition: bottom 280ms cubic-bezier(.2, .8, .2, 1);
 }
 .locate-btn--raised {
@@ -429,14 +429,14 @@ onMounted(async () => {
   width: 40px;
   height: 4px;
   border-radius: 99px;
-  background: var(--line, #e2ded6);
+  background: var(--line, #e7e4de);
 }
 .sheet-summary {
   width: 100%;
   text-align: left;
 }
 .sheet-meta { margin: 0; font-size: 11px; }
-.sheet-title { margin: 2px 0 0; font-size: 15px; font-weight: 800; color: var(--charcoal, #151515); }
+.sheet-title { margin: 2px 0 0; font-size: 15px; font-weight: 800; color: var(--charcoal, #24211d); }
 
 .sheet-body {
   padding: 0 18px 18px;
@@ -450,16 +450,16 @@ onMounted(async () => {
   align-items: center;
   margin-bottom: 12px;
 }
-.sheet-list-header h3 { margin: 0; font-size: 14px; color: var(--charcoal, #151515); }
+.sheet-list-header h3 { margin: 0; font-size: 14px; color: var(--charcoal, #24211d); }
 .sheet-list-right { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .sort-btn {
-  border: 1px solid var(--line, #e9e5df);
+  border: 1px solid var(--line, #e7e4de);
   background: var(--surface, #ffffff);
   border-radius: 999px;
   padding: 5px 10px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--charcoal, #59554a);
+  color: var(--charcoal, #24211d);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -475,7 +475,7 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid var(--line, #e9e5df);
+  border-bottom: 1px solid var(--line, #e7e4de);
   background: none;
   border-left: none;
   border-right: none;
@@ -488,14 +488,14 @@ onMounted(async () => {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: var(--page, #f2f1ee);
+  background: var(--inactive, #f0efec);
   display: grid;
   place-items: center;
   font-size: 1.3rem;
   flex: 0 0 auto;
 }
 .sheet-item-info { flex: 1; min-width: 0; }
-.sheet-item-info strong { font-size: 14px; color: var(--charcoal, #151515); }
+.sheet-item-info strong { font-size: 14px; color: var(--charcoal, #24211d); }
 .sheet-item-info p { margin: 4px 0 6px; font-size: 11.5px; }
 .sheet-bookmark {
   width: 34px;
@@ -503,9 +503,9 @@ onMounted(async () => {
   border-radius: 10px;
   display: grid;
   place-items: center;
-  color: var(--muted, #c7c2b8);
+  color: var(--muted, #8f897f);
   flex: 0 0 auto;
   cursor: pointer;
 }
-.sheet-bookmark.active { color: var(--orange, #ffb800); }
+.sheet-bookmark.active { color: var(--orange, #ffbc00); }
 </style>

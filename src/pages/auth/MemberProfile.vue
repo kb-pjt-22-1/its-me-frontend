@@ -330,7 +330,7 @@ async function handleChangePassword() {
 
 .field-box {
   min-height: 55px;
-  border: 1px solid var(--line, #e9e5df);
+  border: 1px solid var(--line, #e7e4de);
   border-radius: 13px;
   background: var(--surface, #ffffff);
   padding: 0 16px;
@@ -348,7 +348,7 @@ async function handleChangePassword() {
 
 .field-value {
   font-size: 15px;
-  color: var(--charcoal, #2c2b27);
+  color: var(--charcoal, #24211d);
   font-weight: 600;
   text-align: right;
 }
@@ -364,7 +364,7 @@ async function handleChangePassword() {
   font-size: 15px;
   font-weight: 600;
   text-align: right;
-  color: var(--charcoal, #2c2b27);
+  color: var(--charcoal, #24211d);
   background: transparent;
   min-width: 0;
 }
@@ -392,7 +392,7 @@ async function handleChangePassword() {
 }
 
 .error-text {
-  color: var(--danger, #f05e58);
+  color: var(--danger, #d94343);
   font-size: 0.85rem;
   text-align: center;
   margin: 0 0 12px;
