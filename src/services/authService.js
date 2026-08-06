@@ -79,21 +79,3 @@ export async function logoutRequest() {
   // await axios.post(`${API_BASE}/auth/logout`)
   return true
 }
-
-// ---------------------------------------------------------
-// 아래부터는 간편 비밀번호(PIN) 설정 화면을 위해 새로 추가한 함수입니다.
-// 위쪽 로그인/회원가입 관련 함수는 하나도 안 건드렸습니다.
-// 백엔드 MemberController 실제 경로: POST/PUT /api/users/me/pin
-// ---------------------------------------------------------
-
-/** PIN 최초 등록 [POST /api/users/me/pin] */
-export async function registerPin(pin) {
-  const { data } = await api.post('/users/me/pin', { pin })
-  return data
-}
-
-/** PIN 변경 [PUT /api/users/me/pin] */
-export async function updatePin(pin) {
-  const { data } = await api.put('/users/me/pin', { pin })
-  return data
-}

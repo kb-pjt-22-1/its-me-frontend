@@ -54,33 +54,33 @@
           </div>
         </div>
 
-        <div v-if="nearbyMerchants.length === 0" class="sheet-empty muted-text">
+        <div v-if="nearbyLoading" class="sheet-empty muted-text">불러오는 중...</div>
+        <div v-else-if="nearbyMerchants.length === 0" class="sheet-empty muted-text">
           반경 1km 안에 제휴 매장이 없어요.
         </div>
 
-        <button
-          v-for="shop in nearbyMerchants"
-          :key="shop.id"
-          class="sheet-item"
-          @click="goToStore(shop.id)"
-        >
-          <div class="sheet-item-icon">
-            <img v-if="shop.icon" :src="shop.icon" alt="" />
-            <span v-else>📍</span>
-          </div>
-          <div class="sheet-item-info">
-            <strong>{{ shop.name }}</strong>
-            <p class="muted-text">
-              {{ shop.categoryName }} · {{ shop.distanceLabel }}
-            </p>
-            <span v-if="shop.discountLabel" class="pill pill--gold">{{ shop.discountLabel }}</span>
-          </div>
-          <span class="sheet-bookmark" :class="{ active: bookmarksStore.isBookmarked(shop.id) }" @click.stop="toggleBookmark(shop)">
-            <svg width="18" height="18" viewBox="0 0 24 24" :fill="bookmarksStore.isBookmarked(shop.id) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path>
-            </svg>
-          </span>
-        </button>
+        <template v-else>
+          <button
+            v-for="shop in nearbyMerchants"
+            :key="shop.id"
+            class="sheet-item"
+            @click="goToStore(shop.id)"
+          >
+            <div class="sheet-item-icon">{{ getCategoryEmoji(shop.categoryCode) }}</div>
+            <div class="sheet-item-info">
+              <strong>{{ shop.name }}</strong>
+              <p class="muted-text">
+                {{ shop.categoryName }} · {{ shop.distanceLabel }}
+              </p>
+              <span v-if="shop.discountLabel" class="pill pill--gold">{{ shop.discountLabel }}</span>
+            </div>
+            <span class="sheet-bookmark" :class="{ active: bookmarksStore.isBookmarked(shop.id) }" @click.stop="toggleBookmark(shop)">
+              <svg width="18" height="18" viewBox="0 0 24 24" :fill="bookmarksStore.isBookmarked(shop.id) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path>
+              </svg>
+            </span>
+          </button>
+        </template>
       </div>
     </div>
   </div>
@@ -93,6 +93,7 @@ import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { useCardsStore } from '@/stores/cards'
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
+import { fetchNearbyMerchants, getCategoryEmoji } from '@/services/merchantsService'
 
 const router = useRouter()
 const merchantsStore = useMerchantsStore()
@@ -103,18 +104,8 @@ const cardsStore = useCardsStore()
 const sheetExpanded = ref(false)
 const sortByDistance = ref(true)
 const myLocation = ref(null) // { lat, lng }
-
-// 하버사인 공식으로 두 좌표 사이 거리(m) 계산
-function distanceMeters(lat1, lng1, lat2, lng2) {
-  const R = 6371000
-  const toRad = (deg) => (deg * Math.PI) / 180
-  const dLat = toRad(lat2 - lat1)
-  const dLng = toRad(lng2 - lng1)
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
+const nearbyRaw = ref([])   // GET /merchants/nearby 결과 (거리순 정렬은 이미 백엔드가 해줌)
+const nearbyLoading = ref(false)
 
 function bestDiscountLabel(categoryCode) {
   if (!categoryCode) return null
@@ -128,27 +119,47 @@ function bestDiscountLabel(categoryCode) {
   return best ? formatBenefit(best) : null
 }
 
-// 현재 위치 기준 반경 1km 이내 매장, 거리순 정렬 (매장 25% 정도가 실제 사용자 위치 근처가 아닐 수도 있어서
-// 위치를 못 가져왔으면 전체 매장을 그냥 이름순으로 보여줍니다)
+// 위치가 바뀔 때마다 반경 1km 이내 매장을 백엔드에서 거리순으로 받아옵니다.
+// (거리 계산은 이제 프론트가 아니라 백엔드가 해줍니다)
+async function loadNearbyMerchants() {
+  if (!myLocation.value) {
+    nearbyRaw.value = []
+    return
+  }
+  nearbyLoading.value = true
+  try {
+    nearbyRaw.value = await fetchNearbyMerchants(myLocation.value.lat, myLocation.value.lng, 1000)
+  } catch (err) {
+    console.warn('주변 매장 조회 실패', err)
+    nearbyRaw.value = []
+  } finally {
+    nearbyLoading.value = false
+  }
+}
+watch(myLocation, loadNearbyMerchants, { immediate: true })
+
+// 카테고리 이름/아이콘, 할인 뱃지를 붙이고 정렬만 프론트에서 처리
+// (거리 자체는 이미 백엔드가 계산해서 거리순으로 내려줌 - 이름순 정렬만 프론트가 필요)
 const nearbyMerchants = computed(() => {
-  const list = merchantsStore.merchantsWithCategory.map((m) => {
-    let distance = null
-    if (myLocation.value && m.lat != null && m.lng != null) {
-      distance = distanceMeters(myLocation.value.lat, myLocation.value.lng, m.lat, m.lng)
-    }
+  if (!myLocation.value) {
+    return merchantsStore.merchantsWithCategory
+      .map((m) => ({ ...m, distanceLabel: '거리 정보 없음', discountLabel: bestDiscountLabel(m.categoryCode) }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  const list = nearbyRaw.value.map((m) => {
+    const cat = merchantsStore.getCategoryByCode(m.categoryCode)
     return {
       ...m,
-      distance,
-      distanceLabel: distance != null ? formatDistance(distance) : '거리 정보 없음',
+      categoryName: cat?.categoryName,
+      distanceLabel: m.distanceMeters != null ? formatDistance(m.distanceMeters) : '거리 정보 없음',
       discountLabel: bestDiscountLabel(m.categoryCode),
     }
   })
 
-  const filtered = myLocation.value ? list.filter((m) => m.distance == null || m.distance <= 1000) : list
-
-  return [...filtered].sort((a, b) => {
+  return [...list].sort((a, b) => {
     if (!sortByDistance.value) return a.name.localeCompare(b.name)
-    return (a.distance ?? Infinity) - (b.distance ?? Infinity)
+    return a.distanceMeters - b.distanceMeters
   })
 })
 
@@ -229,6 +240,22 @@ function loadKakaoMapScript() {
   })
 }
 
+// 이 레벨보다 축소하면(숫자가 커질수록 축소) 매장이 하도 많아서(2만개+) 핀을 다 찍으면
+// 지도가 안 보일 정도라 핀을 아예 안 그립니다. 카카오맵 레벨 3이 초기 기본값.
+const MAX_PIN_LEVEL = 6
+// 화면(bounds) 안에 있어도 밀집 지역이면 여전히 몇백~몇천 개가 잡힐 수 있어서, 한 번에
+// 만드는 마커 개수 자체를 상한선으로 막습니다.
+const MAX_PIN_COUNT = 300
+
+let renderMarkersTimer = null
+
+// 줌 스크롤/드래그 중엔 idle 이벤트가 짧은 간격으로 여러 번 발생해서, 매번 마커를 다시
+// 만들면 그 자체가 버벅임의 원인이 됩니다. 제스처가 끝나고 나서 한 번만 그리도록 디바운스.
+function scheduleRenderMerchantMarkers() {
+  clearTimeout(renderMarkersTimer)
+  renderMarkersTimer = setTimeout(renderMerchantMarkers, 150)
+}
+
 function initMap(kakao, center) {
   const map = new kakao.maps.Map(mapContainer.value, {
     center: new kakao.maps.LatLng(center.lat, center.lng),
@@ -237,6 +264,8 @@ function initMap(kakao, center) {
   new kakao.maps.Marker({ map, position: new kakao.maps.LatLng(center.lat, center.lng) })
   kakaoInstance = kakao
   mapInstance = map
+  // 줌/드래그가 끝날 때마다(idle) 화면에 보이는 매장만 다시 그립니다.
+  kakao.maps.event.addListener(map, 'idle', scheduleRenderMerchantMarkers)
   renderMerchantMarkers()
 }
 
@@ -245,15 +274,22 @@ function renderMerchantMarkers() {
   markers.forEach((marker) => marker.setMap(null))
   markers = []
 
-  merchants.value.forEach((merchant) => {
-    if (merchant.lat == null || merchant.lng == null) return
+  if (mapInstance.getLevel() > MAX_PIN_LEVEL) return
+
+  // 조건에 맞는 전체가 아니라 지금 화면(bounds) 안에 있는 것만 마커로 그립니다.
+  const bounds = mapInstance.getBounds()
+
+  for (const merchant of merchants.value) {
+    if (markers.length >= MAX_PIN_COUNT) break
+    if (merchant.lat == null || merchant.lng == null) continue
+    if (!bounds.contain(new kakaoInstance.maps.LatLng(merchant.lat, merchant.lng))) continue
     const marker = new kakaoInstance.maps.Marker({
       map: mapInstance,
       position: new kakaoInstance.maps.LatLng(merchant.lat, merchant.lng),
       title: merchant.name,
     })
     markers.push(marker)
-  })
+  }
 }
 
 watch([selectedCategory, searchQuery, () => merchantsStore.merchants], () => {
@@ -455,12 +491,8 @@ onMounted(async () => {
   background: var(--page, #f2f1ee);
   display: grid;
   place-items: center;
-  overflow: hidden;
-}
-.sheet-item-icon img {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
+  font-size: 1.3rem;
+  flex: 0 0 auto;
 }
 .sheet-item-info { flex: 1; min-width: 0; }
 .sheet-item-info strong { font-size: 14px; color: var(--charcoal, #151515); }

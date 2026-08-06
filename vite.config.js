@@ -31,5 +31,17 @@ export default defineConfig({
         alias: {
             '@': fileURLToPath(new URL('./src', import.meta.url))
         }
-    }
+    },
+    test: {
+        environment: 'jsdom',
+        globals: true,
+        // 아직 작성된 테스트가 없어도 CI가 실패하지 않도록 함.
+        // 테스트가 하나라도 생기면 자동으로 정상 동작.
+        passWithNoTests: true,
+        coverage: {
+            provider: 'v8',
+            reporter: ['text', 'lcov'],
+            reportsDirectory: './coverage',
+        },
+    },
 })

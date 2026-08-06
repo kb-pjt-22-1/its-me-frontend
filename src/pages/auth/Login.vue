@@ -115,7 +115,11 @@ const redirectTarget = computed(() => {
   const raw = route.query.redirect;
   const path = Array.isArray(raw) ? raw[0] : raw;
   const isInternalPath = typeof path === 'string' && path.startsWith('/') && !path.startsWith('//');
-  return isInternalPath ? path : '/';
+  if (isInternalPath) return path;
+
+  // 방금 회원가입을 마치고 처음 로그인하는 거라면(redirect가 따로 없을 때) 홈 대신
+  // PIN 설정 화면부터 보여준다 - 가입 직후 계정엔 아직 PIN이 없다.
+  return route.query.signup === 'success' ? '/pin-setting' : '/';
 });
 
 async function handleLogin() {

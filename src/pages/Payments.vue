@@ -200,16 +200,16 @@ const handleKeypadPress = (key) => {
 };
 
 const checkPin = async () => {
-  const enteredPin = pin.value;
-  const { verified } = await verifyPin(enteredPin);
-
-  if (verified) {
+  try {
+    await verifyPin(pin.value);
     isAuthenticated.value = true;
     isEnteringPin.value = false;
-    pin.value = '';
     pinError.value = false;
-  } else {
+  } catch {
+    // 백엔드가 5회 실패 시 잠그는 등 구체적인 사유가 있지만, 결제 인증 화면은 자리를 좁게
+    // 쓰는 키패드뿐이라 나머지 화면들처럼 서버 메시지를 그대로 노출하지 않고 짧게 통일한다.
     pinError.value = true;
+  } finally {
     pin.value = '';
   }
 };
@@ -305,7 +305,7 @@ onMounted(() => {
 .method-check.active { background: var(--orange, #ffb800); border-color: var(--orange, #ffb800); }
 
 .sticky-action {
-  position: fixed; left: 50%; transform: translateX(-50%); bottom: 72px;
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 0;
   width: min(100%, 440px); padding: 14px 18px; background: rgba(250, 249, 246, .97);
   border-top: 1px solid var(--line, #e9e5df); box-sizing: border-box; z-index: 25;
 }
