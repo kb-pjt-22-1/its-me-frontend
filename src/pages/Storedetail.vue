@@ -42,7 +42,7 @@
       >
         <span v-if="row.isBest" class="reco-badge">추천</span>
         <div class="reco-top">
-          <span class="reco-icon" :style="{ background: row.card.color || '#2c2b27' }">
+          <span class="reco-icon" :style="{ background: row.card.color || '#24211d' }">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
               <rect x="2" y="5" width="20" height="14" rx="3"></rect>
               <line x1="2" y1="10" x2="22" y2="10"></line>
@@ -153,53 +153,53 @@ const goToPay = () => {
 
 .store-info { margin-bottom: 22px; }
 .pill { margin-bottom: 8px; }
-.store-name { margin: 0 0 6px; font-size: 19px; color: var(--charcoal, #151515); }
+.store-name { margin: 0 0 6px; font-size: 19px; color: var(--charcoal, #24211d); }
 .store-address { margin: 0 0 14px; font-size: 13px; }
 
 .benefit-strip {
   background: #fff6dd; border-radius: 12px; padding: 12px 14px; font-size: 12.5px;
-  color: var(--charcoal, #59554a); line-height: 1.6;
+  color: var(--charcoal, #24211d); line-height: 1.6;
 }
 .benefit-strip strong { color: #b67a00; }
-.benefit-strip--muted { background: var(--page, #f2f1ee); color: var(--muted, #918a81); }
+.benefit-strip--muted { background: var(--inactive, #f0efec); color: var(--muted, #8f897f); }
 .benefit-strip--muted strong { color: inherit; }
 
 .recommend-section { margin-bottom: 26px; }
-.section-title { font-size: 15px; margin: 0 0 12px; color: var(--charcoal, #151515); }
+.section-title { font-size: 15px; margin: 0 0 12px; color: var(--charcoal, #24211d); }
 
 .reco-card {
   position: relative;
-  border: 1px solid var(--line, #e9e5df) !important;
+  border: 1px solid var(--line, #e7e4de) !important;
   border-radius: 14px !important;
   padding: 14px !important;
   margin-bottom: 12px;
   cursor: pointer;
 }
-.reco-card--best { border: 2px solid var(--orange, #ffb800) !important; padding: 13px !important; }
-.reco-card--selected { border: 2px solid var(--orange, #ffb800) !important; padding: 13px !important; background: #fffaf0 !important; }
+.reco-card--best { border: 2px solid var(--orange, #ffbc00) !important; padding: 13px !important; }
+.reco-card--selected { border: 2px solid var(--orange, #ffbc00) !important; padding: 13px !important; background: #fffaf0 !important; }
 
 .reco-check {
-  width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line, #e9e5df);
+  width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line, #e7e4de);
   display: grid; place-items: center; flex: 0 0 auto; margin-left: 4px;
 }
-.reco-check.active { background: var(--orange, #ffb800); border-color: var(--orange, #ffb800); }
+.reco-check.active { background: var(--orange, #ffbc00); border-color: var(--orange, #ffbc00); }
 
 .reco-badge {
-  position: absolute; top: -9px; left: 12px; background: var(--orange, #ffb800); color: #171717;
+  position: absolute; top: -9px; left: 12px; background: var(--orange, #ffbc00); color: var(--charcoal, #24211d);
   font-size: 10px; font-weight: 800; border-radius: 6px; padding: 2px 7px;
 }
 
 .reco-top { display: flex; align-items: center; gap: 12px; width: 100%; }
 .reco-icon { width: 40px; height: 26px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 auto; }
 .reco-name-block { flex: 1; min-width: 0; }
-.reco-name-block strong { display: block; font-size: 13.5px; color: var(--charcoal, #151515); margin-bottom: 3px; }
-.reco-name-block p { margin: 0; font-size: 11px; color: var(--muted, #918a81); }
+.reco-name-block strong { display: block; font-size: 13.5px; color: var(--charcoal, #24211d); margin-bottom: 3px; }
+.reco-name-block p { margin: 0; font-size: 11px; color: var(--muted, #8f897f); }
 .reco-rate { font-size: 12.5px; font-weight: 800; color: var(--orange, #d98d00); white-space: nowrap; flex: 0 0 auto; }
-.reco-rate--none { color: var(--muted, #918a81); font-weight: 600; }
+.reco-rate--none { color: var(--muted, #8f897f); font-weight: 600; }
 
 .pay-btn {
   width: 100%; height: 54px; border-radius: 14px; border: none;
-  background: var(--orange, #ffb800); color: #171717; font-weight: 900; font-size: 15px; cursor: pointer;
+  background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900; font-size: 15px; cursor: pointer;
 }
 .not-found { padding-top: 60px; text-align: center; }
 </style>

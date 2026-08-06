@@ -36,7 +36,8 @@
             <circle cx="12" cy="8" r="4"></circle>
             <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"></path>
           </svg>
-          <input v-model="loginId" type="text" placeholder="아이디 (영문·숫자, 4~20자)" autocapitalize="none" />
+          <label for="signup-login-id" class="sr-only">아이디</label>
+          <input id="signup-login-id" v-model="loginId" type="text" placeholder="아이디 (영문·숫자, 4~20자)" autocapitalize="none" />
         </div>
 
         <div class="input-box">
@@ -44,7 +45,8 @@
             <rect x="4" y="10" width="16" height="10" rx="2"></rect>
             <path d="M7 10V7a5 5 0 0 1 10 0v3"></path>
           </svg>
-          <input v-model="password" type="password" placeholder="비밀번호 (문자·숫자·특수문자 포함 8자 이상)" />
+          <label for="signup-password" class="sr-only">비밀번호</label>
+          <input id="signup-password" v-model="password" type="password" placeholder="비밀번호 (문자·숫자·특수문자 포함 8자 이상)" />
         </div>
 
         <div class="input-box">
@@ -52,7 +54,8 @@
             <rect x="4" y="10" width="16" height="10" rx="2"></rect>
             <path d="M7 10V7a5 5 0 0 1 10 0v3"></path>
           </svg>
-          <input v-model="passwordConfirm" type="password" placeholder="비밀번호 확인" />
+          <label for="signup-password-confirm" class="sr-only">비밀번호 확인</label>
+          <input id="signup-password-confirm" v-model="passwordConfirm" type="password" placeholder="비밀번호 확인" />
         </div>
 
         <p v-if="formError || authStore.errorMessage" class="error-text">
@@ -209,7 +212,7 @@ async function handleSignUp() {
 
 .verify-box {
   height: 55px;
-  border: 1px solid var(--line, #e9e5df);
+  border: 1px solid var(--line, #e7e4de);
   border-radius: 13px;
   background: var(--surface, #ffffff);
   padding: 0 16px;
@@ -232,7 +235,7 @@ async function handleSignUp() {
 .verify-text {
   flex: 1;
   font-size: 14px;
-  color: var(--charcoal, #2c2b27);
+  color: var(--charcoal, #24211d);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -255,14 +258,14 @@ async function handleSignUp() {
 
 .input-box {
   height: 55px;
-  border: 1px solid var(--line, #e9e5df);
+  border: 1px solid var(--line, #e7e4de);
   border-radius: 13px;
   background: var(--surface, #ffffff);
   padding: 0 13px;
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--muted, #918a81);
+  color: var(--muted, #8f897f);
 }
 
 .input-box input {
@@ -270,14 +273,14 @@ async function handleSignUp() {
   border: 0;
   outline: 0;
   font-size: 15px;
-  color: var(--charcoal, #2c2b27);
+  color: var(--charcoal, #24211d);
   min-width: 0;
   background: transparent;
 }
-.input-box input::placeholder { color: var(--muted, #a79f97); }
+.input-box input::placeholder { color: var(--muted, #8f897f); }
 
 .error-text {
-  color: var(--danger, #f05e58);
+  color: var(--danger, #d94343);
   font-size: 0.85rem;
   text-align: center;
   margin: 0;
@@ -285,14 +288,14 @@ async function handleSignUp() {
 
 .login-copy {
   text-align: center;
-  color: var(--muted, #a0958d);
+  color: var(--muted, #8f897f);
   font-size: 13px;
   margin-top: 25px;
 }
 
 .login-link {
   font-weight: 800;
-  color: var(--charcoal, #171717);
+  color: var(--charcoal, #24211d);
   text-decoration: none;
 }
 </style>

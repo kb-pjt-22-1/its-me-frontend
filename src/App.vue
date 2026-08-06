@@ -69,7 +69,7 @@ body, html {
   padding: 0;
   width: 100%;
   height: 100%;
-  background-color: #f2f1ef;
+  background-color: #f7f7f5;
 }
 
 #app {
@@ -89,7 +89,7 @@ body, html {
 .splash-spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid var(--line, #e9e5df);
+  border: 3px solid var(--line, #e7e4de);
   border-top-color: var(--orange, #ffbc00);
   border-radius: 50%;
   animation: splash-spin 0.7s linear infinite;
