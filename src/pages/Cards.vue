@@ -105,6 +105,19 @@ const handleSync = async () => {
   }
 };
 
+const CARD_STATUS_TEXT = {
+  SUSPENDED: '정지됨',
+  EXPIRED: '만료',
+  UNLINKED: '연동 해제',
+};
+
+// 목표가 0원이면 나눗셈이 무의미하다 - 채울 목표가 없으니 이미 다 채운 것으로 본다.
+function calcPercentage(card, hasTarget) {
+  if (!hasTarget) return 0;
+  if (card.targetAmount === 0) return 100;
+  return Math.min((card.currentAmount / card.targetAmount) * 100, 100);
+}
+
 const myCards = computed(() =>
   cardsStore.cards.map((card) => {
     const hasTarget = typeof card.targetAmount === 'number';
@@ -113,11 +126,8 @@ const myCards = computed(() =>
       ...card,
       isMet,
       remaining: hasTarget ? Math.max(card.targetAmount - card.currentAmount, 0) : 0,
-      percentage: hasTarget ? Math.min((card.currentAmount / card.targetAmount) * 100, 100) : 0,
-      statusText: card.status === 'SUSPENDED' ? '정지됨'
-        : card.status === 'EXPIRED' ? '만료'
-        : card.status === 'UNLINKED' ? '연동 해제'
-        : card.status,
+      percentage: calcPercentage(card, hasTarget),
+      statusText: CARD_STATUS_TEXT[card.status] ?? card.status,
     };
   })
 );
@@ -138,7 +148,7 @@ const goToCardDetail = (userCardId) => {
   margin: 0 0 18px;
   font-size: 22px;
   letter-spacing: -.5px;
-  color: var(--charcoal, #151515);
+  color: var(--charcoal, #24211d);
 }
 
 .loading-text,
@@ -159,8 +169,8 @@ const goToCardDetail = (userCardId) => {
   padding: 0 24px;
   border-radius: 14px;
   border: none;
-  background: var(--orange, #ffb800);
-  color: #171717;
+  background: var(--orange, #ffbc00);
+  color: var(--charcoal, #24211d);
   font-weight: 800;
   cursor: pointer;
 }
@@ -189,6 +199,12 @@ const goToCardDetail = (userCardId) => {
   text-align: left;
 }
 
+:deep(.card-item.btn--box-outline) {
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 2px 16px rgba(46, 42, 36, 0.06);
+}
+
 .card-top-row {
   display: flex;
   justify-content: space-between;
@@ -203,12 +219,12 @@ const goToCardDetail = (userCardId) => {
 .card-top-row h3 {
   margin: 0 0 4px;
   font-size: 17px;
-  color: var(--charcoal, #151515);
+  color: var(--charcoal, #24211d);
 }
 
 .card-top-row p {
   margin: 0;
-  color: var(--muted, #918980);
+  color: var(--muted, #8f897f);
   font-size: 12px;
 }
 
@@ -216,13 +232,13 @@ const goToCardDetail = (userCardId) => {
   width: 34px;
   height: 34px;
   border-radius: 9px;
-  background: var(--charcoal, #47433d);
+  background: var(--dark, #545045);
   color: #ffffff;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
 }
-.card-glyph.glyph-primary { background: var(--charcoal, #2c2b27); }
+.card-glyph.glyph-primary { background: var(--dark, #545045); }
 .card-glyph.glyph-disabled { background: #c7c7c7; }
 
 .status-row {
@@ -239,7 +255,7 @@ const goToCardDetail = (userCardId) => {
   width: 100%;
   text-align: right;
   margin: 7px 0 0;
-  color: var(--muted, #8d857b);
+  color: var(--muted, #8f897f);
   font-size: 11px;
 }
 </style>

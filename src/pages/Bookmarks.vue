@@ -105,13 +105,14 @@ const handleRemove = async (merchantId) => {
   try {
     await bookmarksStore.removeBookmark(merchantId);
   } catch (err) {
+    console.error('북마크 해제 실패', err.message);
     alert('북마크 해제에 실패했습니다. 다시 시도해주세요.');
   }
 };
 </script>
 
 <style scoped>
-.page-container { background-color: var(--page, #faf9f6); min-height: 100vh; padding: 20px; }
+.page-container { background-color: var(--page, #f7f7f5); min-height: 100vh; padding: 20px; }
 .page-header { margin-bottom: 20px; }
 .page-header h2 { font-size: 1.2rem; }
 
@@ -122,15 +123,15 @@ const handleRemove = async (merchantId) => {
 .store-card { padding: 15px; text-align: left; }
 
 .store-icon {
-  width: 50px; height: 50px; background: var(--page, #f2f1ee); border-radius: 12px;
+  width: 50px; height: 50px; background: var(--inactive, #f0efec); border-radius: 12px;
   display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex: 0 0 auto;
 }
 .card-center { flex: 1; min-width: 0; }
-.card-center h3 { margin: 0 0 5px 0; font-size: 1.05rem; color: var(--charcoal, #2c2b27); }
+.card-center h3 { margin: 0 0 5px 0; font-size: 1.05rem; color: var(--charcoal, #24211d); }
 .details { font-size: 0.8rem; margin: 0 0 8px 0; }
 
 .bookmark-badge {
-  width: 32px; height: 32px; border-radius: 9px; background: var(--orange, #ffb800);
-  color: #ffffff; display: grid; place-items: center; flex: 0 0 auto; cursor: pointer;
+  width: 32px; height: 32px; border-radius: 9px; background: var(--orange, #ffbc00);
+  color: var(--charcoal, #24211d); display: grid; place-items: center; flex: 0 0 auto; cursor: pointer;
 }
 </style>

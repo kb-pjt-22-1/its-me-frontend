@@ -34,7 +34,9 @@ const sizeClass = computed(() => `btn--${props.size}`)
 </script>
 
 <style scoped>
-/* base.css의 --orange, --charcoal, --muted 변수를 그대로 참조합니다. 값이 없으면 fallback 사용 */
+/* base.css의 --orange, --charcoal, --muted 변수를 그대로 참조합니다. 값이 없으면 fallback 사용.
+   radius/padding/눌림 색은 프로토타입의 PrimaryButton(App.tsx)과 정확히 맞췄다 - 필 모양이
+   아니라 12px 라운드 사각형이 실제 디자인이다. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -42,8 +44,10 @@ const sizeClass = computed(() => `btn--${props.size}`)
   gap: 6px;
   border: none;
   cursor: pointer;
-  transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
+  border-radius: 12px;
+  transition: background-color 150ms ease, color 150ms ease, transform 100ms ease;
 }
+.btn:active:not(:disabled) { transform: scale(.97); }
 
 .btn:disabled {
   opacity: .45;
@@ -51,47 +55,52 @@ const sizeClass = computed(() => `btn--${props.size}`)
   pointer-events: none;
 }
 
-/* primary - 꽉 찬 오렌지 pill 버튼 */
+/* primary - 꽉 찬 오렌지 버튼. 비활성 상태는 투명도가 아니라 프로토타입과 동일하게
+   연회색 배경 + 회색 글자로 바꾼다(KB_INACTIVE/KB_SECONDARY) - 아래서 :disabled를 오버라이드. */
 .btn--primary {
-  background-color: var(--orange, #ffb800);
-  color: #171717;
-  font-weight: 800;
-  border-radius: 9999px;
+  background-color: var(--orange, #ffbc00);
+  color: var(--charcoal, #24211d);
+  font-weight: 700;
 }
-.btn--primary:hover:not(:disabled) { background-color: var(--orange-deep, #f4aa00); }
+.btn--primary:hover:not(:disabled) { background-color: var(--orange-deep, #e6aa00); }
+.btn--primary:disabled {
+  opacity: 1;
+  background-color: var(--inactive, #f0efec);
+  color: var(--muted, #8f897f);
+}
 
-/* outline - 테두리만 있는 pill 버튼 */
+/* outline - 테두리만 있는 버튼 */
 .btn--outline {
   background-color: transparent;
-  color: var(--charcoal, #59554a);
-  border: 1px solid var(--line, #e9e5df);
-  border-radius: 9999px;
+  color: var(--charcoal, #24211d);
+  border: 1.5px solid var(--line, #e7e4de);
 }
-.btn--outline:hover:not(:disabled) { background-color: var(--page, #faf9f6); }
+.btn--outline:hover:not(:disabled) { background-color: var(--page, #f7f7f5); }
 
 /* link - 배경 없는 골드 텍스트 ("지금 결제 →" 스타일) */
 .btn--link {
   background-color: transparent;
-  color: var(--orange, #ffb800);
+  color: var(--orange, #ffbc00);
   font-weight: 800;
   padding: 0 !important;
   border-radius: 0;
 }
-.btn--link:hover:not(:disabled) { color: var(--orange-deep, #f4aa00); }
+.btn--link:hover:not(:disabled) { color: var(--orange-deep, #e6aa00); }
 
 /* link-muted - 배경 없는 회색 텍스트 ("전체보기" 스타일) */
 .btn--link-muted {
   background-color: transparent;
-  color: var(--muted, #918a81);
+  color: var(--muted, #8f897f);
   font-weight: 700;
   padding: 0 !important;
   border-radius: 0;
 }
-.btn--link-muted:hover:not(:disabled) { color: var(--charcoal, #59554a); }
+.btn--link-muted:hover:not(:disabled) { color: var(--charcoal, #24211d); }
 
-/* box - 꽉 찬 어두운 배경의 카드형 박스 (간편결제 박스) */
+/* box - 꽉 찬 어두운 배경의 카드형 박스 (간편결제 박스). --charcoal은 본문 글자색이라
+   배경엔 못 쓴다 - 어두운 박스 배경 전용인 --dark(KB_DARK_GRAY)를 쓴다. */
 .btn--box {
-  background-color: var(--charcoal, #3a362e);
+  background-color: var(--dark, #545045);
   color: #ffffff;
   flex-direction: column;
   align-items: flex-start;
@@ -108,7 +117,7 @@ const sizeClass = computed(() => `btn--${props.size}`)
 .btn--box-outline {
   background-color: var(--card, #ffffff);
   color: var(--card-foreground, #2e2a24);
-  border: 2px solid var(--primary, var(--orange, #ffb800));
+  border: 2px solid var(--primary, var(--orange, #ffbc00));
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
@@ -133,10 +142,12 @@ const sizeClass = computed(() => `btn--${props.size}`)
   width: 100%;
 }
 
-/* size - link 계열, box 계열은 padding이 아래 값 대신 자체 값을 씁니다 */
+/* size - link 계열, box 계열은 padding이 아래 값 대신 자체 값을 씁니다.
+   lg는 프로토타입 PrimaryButton 실측값(padding 14px 24px, minHeight 52px) 그대로다 -
+   로그인/가입 폼처럼 화면의 주된 액션 버튼이 이 크기다. */
 .btn--sm { padding: 8px 14px; font-size: 12px; }
 .btn--md { padding: 12px 20px; font-size: 14px; }
-.btn--lg { padding: 16px 24px; font-size: 15px; }
+.btn--lg { padding: 14px 24px; font-size: 15px; min-height: 52px; }
 .btn--box.btn--md,
 .btn--box-outline.btn--md,
 .btn--box.btn--sm,

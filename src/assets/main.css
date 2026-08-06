@@ -48,7 +48,7 @@
 .page-header h2 {
   margin: 0;
   font-size: 16px;
-  color: var(--charcoal, #151515);
+  color: var(--charcoal, #24211d);
 }
 .back-btn {
   width: 30px;
@@ -57,7 +57,7 @@
   background: none;
   display: grid;
   place-items: center;
-  color: var(--charcoal, #59554a);
+  color: var(--charcoal, #24211d);
   cursor: pointer;
   padding: 0;
 }
@@ -68,20 +68,20 @@
 .icon-btn-outline {
   width: 32px;
   height: 32px;
-  border: 1px solid var(--line, #e9e5df);
+  border: 1px solid var(--line, #e7e4de);
   border-radius: 8px;
   background: var(--surface, #ffffff);
   display: grid;
   place-items: center;
   cursor: pointer;
-  color: var(--charcoal, #59554a);
+  color: var(--charcoal, #24211d);
   font-size: 14px;
 }
 
 .section-title {
   font-size: 15px;
   margin: 0 0 12px;
-  color: var(--charcoal, #151515);
+  color: var(--charcoal, #24211d);
 }
 .section-title-row {
   display: flex;
@@ -91,37 +91,36 @@
 }
 .section-hint {
   font-size: 11px;
-  color: var(--muted, #918a81);
+  color: var(--muted, #8f897f);
 }
 
 .pill {
   display: inline-flex;
-  border-radius: 7px;
-  padding: 4px 8px;
+  border-radius: 6px;
+  padding: 3px 8px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
-.pill--mint { color: #00a47a; background: #ddf6ee; }
+.pill--mint { color: var(--green, #00a878); background: #ebf7f3; }
 .pill--gold { color: #b67a00; background: #fff6dd; }
-.pill--muted { color: var(--muted, #918a81); background: var(--page, #f2f1ee); }
-.pill--danger { color: var(--danger, #f05e58); background: #fde7e6; }
+.pill--muted { color: var(--muted, #8f897f); background: var(--inactive, #f0efec); }
+.pill--danger { color: var(--danger, #d94343); background: #fde7e6; }
 
 .progress-track {
-  height: 5px;
+  width: 100%;
+  height: 6px;
   border-radius: 99px;
-  background: #ece9e3;
+  background: var(--inactive, #f0efec);
   overflow: hidden;
 }
 .progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #ffad00, #ffc830);
-}
-.progress-fill--purple {
-  background: linear-gradient(90deg, #7c6cf0, #6a5af5);
+  background: linear-gradient(90deg, #ffbc00, #ffd84d);
+  transition: width 0.4s;
 }
 .progress-fill--met {
-  background: linear-gradient(90deg, #00c48c, #00a97b);
+  background: linear-gradient(90deg, #00c48c, #00a878);
 }
 
 .info-strip {
@@ -130,21 +129,21 @@
   gap: 8px;
   padding: 12px 14px;
   border-radius: 12px;
-  background: var(--page, #faf9f6);
-  color: var(--muted, #918a81);
+  background: var(--inactive, #f0efec);
+  color: var(--muted, #8f897f);
   font-size: 12px;
 }
 .info-strip--highlight {
   background: #fff6dd;
-  color: var(--charcoal, #59554a);
+  color: var(--charcoal, #24211d);
 }
 .info-strip--highlight strong {
   color: #b67a00;
 }
 
-.danger-text { color: var(--danger, #f05e58); font-weight: 700; }
-.success-text { color: var(--green, #00a97b); font-weight: 700; }
-.muted-text { color: var(--muted, #918a81); }
+.danger-text { color: var(--danger, #d94343); font-weight: 700; }
+.success-text { color: var(--green, #00a878); font-weight: 700; }
+.muted-text { color: var(--muted, #8f897f); }
 
 .toggle-switch {
   width: 46px;
@@ -157,7 +156,7 @@
   flex: 0 0 auto;
   transition: background 150ms ease;
 }
-.toggle-switch.on { background: var(--orange, #ffb800); }
+.toggle-switch.on { background: var(--orange, #ffbc00); }
 .toggle-knob {
   position: absolute;
   top: 3px;

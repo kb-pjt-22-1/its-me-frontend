@@ -16,8 +16,8 @@
   width: 100%;
   max-width: 440px;  /* main.css의 .page-container, Header와 동일 */
   height: 60px;
-  background-color: var(--page, #faf9f6);
-  border-top: 1px solid var(--line, #e9e5df);
+  background-color: var(--page, #f7f7f5);
+  border-top: 1px solid var(--line, #e7e4de);
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -26,12 +26,12 @@
 
 .nav-item {
   text-decoration: none;
-  color: var(--charcoal, #59554a);
+  color: var(--charcoal, #24211d);
   font-weight: 700;
   font-size: 0.9rem;
 }
 
 .nav-item.router-link-active {
-  color: var(--orange, #ffb800);
+  color: var(--orange, #ffbc00);
 }
 </style>
