@@ -83,9 +83,9 @@
           <h3>최근 결제 내역</h3>
           <Button variant="link-muted" size="sm" @click="router.push('/payments')">전체보기</Button>
         </div>
-
+ 
         <div v-if="recentTransactions.length === 0" class="empty-text muted-text">최근 결제 내역이 없어요.</div>
-
+ 
         <Button v-else tag="div" variant="box-outline" style="min-height: auto;">
           <div v-for="item in recentTransactions" :key="item.paymentId" class="transaction-item">
             <div class="item-info">

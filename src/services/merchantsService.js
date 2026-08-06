@@ -16,6 +16,32 @@ export async function fetchNearbyMerchants(lat, lng, radiusMeters = 1000) {
   return data.map((dto) => ({ ...normalizeMerchant(dto), distanceMeters: dto.distanceMeters }))
 }
 
+/**
+ * 지도 화면(bounds) 안에 있는 매장만 조회 [GET /api/v1/merchants/within-bounds]
+ * 매장 전체(2만 건+)를 한 번에 안 받고, 지도에 지금 보이는 영역만 요청합니다.
+ */
+export async function fetchMerchantsWithinBounds(bounds) {
+  const { data } = await api.get('/v1/merchants/within-bounds', {
+    params: {
+      swLat: bounds.swLat,
+      swLng: bounds.swLng,
+      neLat: bounds.neLat,
+      neLng: bounds.neLng,
+    },
+  })
+  return data.map(normalizeMerchant)
+}
+
+/**
+ * 매장명 또는 카테고리명으로 검색 [GET /api/v1/merchants/search?q=]
+ * bounds 기반 조회로는 화면 밖 매장이 없어 클라이언트에서 검색할 수 없으므로,
+ * 서버가 전체 매장을 대상으로 검색해서 돌려줍니다.
+ */
+export async function searchMerchants(query) {
+  const { data } = await api.get('/v1/merchants/search', { params: { q: query } })
+  return data.map(normalizeMerchant)
+}
+
 /** 특정 매장 조회 [GET /api/v1/merchants/{merchantId}] */
 export async function fetchMerchantDetail(merchantId) {
   const { data } = await api.get(`/v1/merchants/${merchantId}`)
@@ -100,6 +126,9 @@ const CATEGORY_EMOJI = {
   '8062': '🏥', // 병원
   '5912': '💊', // 약국
   '7011': '🏨', // 숙박
+  '7299': '📖', // 독서실
+  '8299': '🎓', // 학원
+  '7997': '💪', // 피트니스센터
 }
 const DEFAULT_CATEGORY_EMOJI = '📍'
 

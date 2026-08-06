@@ -11,8 +11,7 @@
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <label for="map-search" class="sr-only">매장명 또는 카테고리 검색</label>
-        <input id="map-search" v-model="searchQuery" type="text" placeholder="매장명 또는 카테고리 검색" />
+        <input v-model="searchQuery" type="text" placeholder="지금 화면에 보이는 매장명 또는 카테고리 검색" />
       </div>
 
       <div ref="chipsContainer" class="category-chips" @wheel="onChipsWheel">
@@ -55,8 +54,7 @@
           </div>
         </div>
 
-        <div v-if="nearbyLoading" class="sheet-empty muted-text">불러오는 중...</div>
-        <div v-else-if="nearbyMerchants.length === 0" class="sheet-empty muted-text">
+        <div v-if="nearbyMerchants.length === 0" class="sheet-empty muted-text">
           반경 1km 안에 제휴 매장이 없어요.
         </div>
 
@@ -94,7 +92,7 @@ import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { useCardsStore } from '@/stores/cards'
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
-import { fetchNearbyMerchants, getCategoryEmoji } from '@/services/merchantsService'
+import { fetchMerchantsWithinBounds, getCategoryEmoji } from '@/services/merchantsService'
 
 const router = useRouter()
 const merchantsStore = useMerchantsStore()
@@ -105,8 +103,18 @@ const cardsStore = useCardsStore()
 const sheetExpanded = ref(false)
 const sortByDistance = ref(true)
 const myLocation = ref(null) // { lat, lng }
-const nearbyRaw = ref([])   // GET /merchants/nearby 결과 (거리순 정렬은 이미 백엔드가 해줌)
-const nearbyLoading = ref(false)
+const NEARBY_RADIUS_M = 1000
+
+// 두 좌표 사이 거리(m). 별도 API 없이 바텀시트를 boundsMerchants로 정렬하기 위해 씁니다.
+function distanceMeters(lat1, lng1, lat2, lng2) {
+  const toRad = (deg) => (deg * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
 
 function bestDiscountLabel(categoryCode) {
   if (!categoryCode) return null
@@ -120,48 +128,33 @@ function bestDiscountLabel(categoryCode) {
   return best ? formatBenefit(best) : null
 }
 
-// 위치가 바뀔 때마다 반경 1km 이내 매장을 백엔드에서 거리순으로 받아옵니다.
-// (거리 계산은 이제 프론트가 아니라 백엔드가 해줍니다)
-async function loadNearbyMerchants() {
-  if (!myLocation.value) {
-    nearbyRaw.value = []
-    return
-  }
-  nearbyLoading.value = true
-  try {
-    nearbyRaw.value = await fetchNearbyMerchants(myLocation.value.lat, myLocation.value.lng, 1000)
-  } catch (err) {
-    console.warn('주변 매장 조회 실패', err)
-    nearbyRaw.value = []
-  } finally {
-    nearbyLoading.value = false
-  }
-}
-watch(myLocation, loadNearbyMerchants, { immediate: true })
-
-// 카테고리 이름/아이콘, 할인 뱃지를 붙이고 정렬만 프론트에서 처리
-// (거리 자체는 이미 백엔드가 계산해서 거리순으로 내려줌 - 이름순 정렬만 프론트가 필요)
+// 바텀시트("주변 제휴 매장")는 별도 /nearby 호출 없이, 지도 화면(bounds)에서
+// 이미 받아온 boundsMerchants를 그대로 재사용합니다 - 지도 핀과 항상 같은 데이터를 봅니다.
+// 반경 1km는 클라이언트에서 거리 계산 후 걸러냅니다.
+// 밀집 지역에서 목록이 과도하게 길어지지 않도록 지도 핀(MAX_PIN_COUNT)과 같은 취지로 상한을 둡니다.
+const MAX_SHEET_ITEMS = 100
 const nearbyMerchants = computed(() => {
-  if (!myLocation.value) {
-    return merchantsStore.merchantsWithCategory
-      .map((m) => ({ ...m, distanceLabel: '거리 정보 없음', discountLabel: bestDiscountLabel(m.categoryCode) }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }
+  const withDistance = boundsMerchantsWithCategory.value
+    .map((m) => {
+      const distance = myLocation.value
+        ? distanceMeters(myLocation.value.lat, myLocation.value.lng, m.lat, m.lng)
+        : null
+      return {
+        ...m,
+        distanceMeters: distance,
+        distanceLabel: distance != null ? formatDistance(distance) : '거리 정보 없음',
+        discountLabel: bestDiscountLabel(m.categoryCode),
+      }
+    })
+    .filter((m) => m.distanceMeters == null || m.distanceMeters <= NEARBY_RADIUS_M)
 
-  const list = nearbyRaw.value.map((m) => {
-    const cat = merchantsStore.getCategoryByCode(m.categoryCode)
-    return {
-      ...m,
-      categoryName: cat?.categoryName,
-      distanceLabel: m.distanceMeters != null ? formatDistance(m.distanceMeters) : '거리 정보 없음',
-      discountLabel: bestDiscountLabel(m.categoryCode),
+  const sorted = [...withDistance].sort((a, b) => {
+    if (!sortByDistance.value || a.distanceMeters == null || b.distanceMeters == null) {
+      return a.name.localeCompare(b.name)
     }
-  })
-
-  return [...list].sort((a, b) => {
-    if (!sortByDistance.value) return a.name.localeCompare(b.name)
     return a.distanceMeters - b.distanceMeters
   })
+  return sorted.slice(0, MAX_SHEET_ITEMS)
 })
 
 function formatDistance(meters) {
@@ -190,20 +183,35 @@ const loadError = ref('')
 const KAKAO_MAP_KEY = import.meta.env.VITE_KAKAO_MAP_KEY
 
 const searchQuery = ref('')
-// merchantsStore에 실제로 존재하는 카테고리만 뽑아서 목록을 만듭니다 (하드코딩 없음)
+// 매장 전체를 안 받으니, 칩 목록은 (개수 적은) 카테고리 사전 자체에서 뽑습니다.
 const categories = computed(() => {
-  const labels = [...new Set(merchantsStore.merchantsWithCategory.map((m) => m.categoryName).filter(Boolean))]
+  const labels = merchantsStore.categories.map((c) => c.categoryName).filter(Boolean)
   return ['전체', ...labels]
 })
 const selectedCategory = ref('전체')
 
+// 지도 idle마다 화면(bounds) 안에서 받아온 매장들 - 검색/카테고리 필터는 전부
+// 이 화면 안 매장들을 대상으로만 동작합니다(화면 밖 매장은 애초에 검색 대상이 아님).
+const boundsMerchants = ref([])
+
+// categoryName을 여기서 한 번만 붙여서, 아래 merchants/nearbyMerchants 두 computed가 공유합니다.
+const boundsMerchantsWithCategory = computed(() =>
+  boundsMerchants.value.map((m) => ({
+    ...m,
+    categoryName: merchantsStore.getCategoryByCode(m.categoryCode)?.categoryName,
+  })),
+)
+
 const merchants = computed(() => {
+  let list = boundsMerchantsWithCategory.value
+
   const query = searchQuery.value.trim().toLowerCase()
-  return merchantsStore.merchantsWithCategory.filter((m) => {
-    const matchesCategory = selectedCategory.value === '전체' || m.categoryName === selectedCategory.value
-    const matchesQuery = !query || m.name?.toLowerCase().includes(query) || m.categoryName?.toLowerCase().includes(query)
-    return matchesCategory && matchesQuery
-  })
+  if (query) {
+    list = list.filter((m) => m.name?.toLowerCase().includes(query) || m.categoryName?.toLowerCase().includes(query))
+  }
+
+  if (selectedCategory.value === '전체') return list
+  return list.filter((m) => m.categoryName === selectedCategory.value)
 })
 
 let kakaoInstance = null
@@ -242,20 +250,20 @@ function loadKakaoMapScript() {
   })
 }
 
-// 이 레벨보다 축소하면(숫자가 커질수록 축소) 매장이 하도 많아서(2만개+) 핀을 다 찍으면
-// 지도가 안 보일 정도라 핀을 아예 안 그립니다. 카카오맵 레벨 3이 초기 기본값.
+// 이 레벨보다 축소하면(숫자가 커질수록 축소) 매장이 하도 많아서(2만개+) bounds 안에도
+// 몇천 개가 잡힐 수 있어 아예 조회를 안 합니다. 카카오맵 레벨 3이 초기 기본값.
 const MAX_PIN_LEVEL = 6
-// 화면(bounds) 안에 있어도 밀집 지역이면 여전히 몇백~몇천 개가 잡힐 수 있어서, 한 번에
-// 만드는 마커 개수 자체를 상한선으로 막습니다.
+// bounds 조회는 서버에서 걸러서 오지만, 혹시나 응답이 많을 때를 대비해 마커 생성
+// 개수 자체도 상한선으로 막아둡니다.
 const MAX_PIN_COUNT = 300
 
-let renderMarkersTimer = null
+let boundsLoadTimer = null
 
-// 줌 스크롤/드래그 중엔 idle 이벤트가 짧은 간격으로 여러 번 발생해서, 매번 마커를 다시
-// 만들면 그 자체가 버벅임의 원인이 됩니다. 제스처가 끝나고 나서 한 번만 그리도록 디바운스.
-function scheduleRenderMerchantMarkers() {
-  clearTimeout(renderMarkersTimer)
-  renderMarkersTimer = setTimeout(renderMerchantMarkers, 150)
+// 줌 스크롤/드래그 중엔 idle 이벤트가 짧은 간격으로 여러 번 발생해서, 매번 새로 요청하면
+// 그 자체가 버벅임의 원인이 됩니다. 제스처가 끝나고 나서 한 번만 요청하도록 디바운스.
+function scheduleLoadBoundsMerchants() {
+  clearTimeout(boundsLoadTimer)
+  boundsLoadTimer = setTimeout(loadBoundsMerchants, 150)
 }
 
 function initMap(kakao, center) {
@@ -268,9 +276,52 @@ function initMap(kakao, center) {
   const centerMarker = new kakao.maps.Marker({ map, position: new kakao.maps.LatLng(center.lat, center.lng) })
   kakaoInstance = kakao
   mapInstance = map
-  // 줌/드래그가 끝날 때마다(idle) 화면에 보이는 매장만 다시 그립니다.
-  kakao.maps.event.addListener(map, 'idle', scheduleRenderMerchantMarkers)
-  renderMerchantMarkers()
+  // 줌/드래그가 끝날 때마다(idle) 화면에 보이는 영역의 매장만 새로 받아옵니다.
+  kakao.maps.event.addListener(map, 'idle', scheduleLoadBoundsMerchants)
+  loadBoundsMerchants()
+}
+
+// 매장 전체를 미리 안 받고, 지금 화면(bounds)에 보이는 것만 백엔드에 요청합니다.
+async function loadBoundsMerchants() {
+  if (!kakaoInstance || !mapInstance) return
+
+  if (mapInstance.getLevel() > MAX_PIN_LEVEL) {
+    boundsMerchants.value = []
+    return
+  }
+
+  const bounds = mapInstance.getBounds()
+  const sw = bounds.getSouthWest()
+  const ne = bounds.getNorthEast()
+
+  try {
+    boundsMerchants.value = await fetchMerchantsWithinBounds({
+      swLat: sw.getLat(),
+      swLng: sw.getLng(),
+      neLat: ne.getLat(),
+      neLng: ne.getLng(),
+    })
+  } catch (err) {
+    console.warn('지도 영역 매장 조회 실패', err)
+    boundsMerchants.value = []
+  }
+}
+
+// 카테고리별로 다른 핀을 그리기 위해 기본 Marker 대신 CustomOverlay를 씁니다.
+// textContent로만 넣어서 merchant.name에 이상한 문자가 들어와도 HTML로 해석되지 않게 합니다.
+function createMerchantPinElement(merchant) {
+  const wrapper = document.createElement('div')
+  wrapper.className = 'merchant-pin'
+  wrapper.title = merchant.name ?? ''
+
+  const icon = document.createElement('span')
+  icon.className = 'merchant-pin-icon'
+  icon.textContent = getCategoryEmoji(merchant.categoryCode)
+  wrapper.appendChild(icon)
+
+  wrapper.addEventListener('click', () => goToStore(merchant.id))
+
+  return wrapper
 }
 
 function renderMerchantMarkers() {
@@ -278,27 +329,20 @@ function renderMerchantMarkers() {
   markers.forEach((marker) => marker.setMap(null))
   markers = []
 
-  if (mapInstance.getLevel() > MAX_PIN_LEVEL) return
-
-  // 조건에 맞는 전체가 아니라 지금 화면(bounds) 안에 있는 것만 마커로 그립니다.
-  const bounds = mapInstance.getBounds()
-
   for (const merchant of merchants.value) {
     if (markers.length >= MAX_PIN_COUNT) break
     if (merchant.lat == null || merchant.lng == null) continue
-    if (!bounds.contain(new kakaoInstance.maps.LatLng(merchant.lat, merchant.lng))) continue
-    const marker = new kakaoInstance.maps.Marker({
+    const marker = new kakaoInstance.maps.CustomOverlay({
       map: mapInstance,
       position: new kakaoInstance.maps.LatLng(merchant.lat, merchant.lng),
-      title: merchant.name,
+      content: createMerchantPinElement(merchant),
+      yAnchor: 1,
     })
     markers.push(marker)
   }
 }
 
-watch([selectedCategory, searchQuery, () => merchantsStore.merchants], () => {
-  renderMerchantMarkers()
-})
+watch(merchants, renderMerchantMarkers)
 
 function recenterToMyLocation() {
   if (!mapInstance || !kakaoInstance) return
@@ -320,7 +364,7 @@ function onChipsWheel(event) {
 }
 
 onMounted(async () => {
-  if (merchantsStore.merchants.length === 0) merchantsStore.fetchMerchants()
+  merchantsStore.fetchCategories()
 
   let kakao
   try {
@@ -354,6 +398,7 @@ onMounted(async () => {
   overflow: hidden;
 }
 .map-container { position: absolute; inset: 0; width: 100%; height: 100%; }
+
 .map-error {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   padding: 1rem; text-align: center; background: #f8f9fa; color: #a3242f; font-size: 0.875rem; z-index: 5;
@@ -511,5 +556,31 @@ onMounted(async () => {
   flex: 0 0 auto;
   cursor: pointer;
 }
-.sheet-bookmark.active { color: var(--orange, #ffbc00); }
+.sheet-bookmark.active { color: var(--orange, #ffb800); }
+</style>
+
+<!--
+  카카오맵 CustomOverlay의 content는 Vue 템플릿이 아니라 순수 document.createElement로 만든
+  DOM이라 scoped 스타일의 data-v-* 속성이 안 붙습니다. 그래서 이 규칙만 스코프 없는
+  일반 style 블록에 둡니다.
+-->
+<style>
+.merchant-pin {
+  width: 32px;
+  height: 32px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--surface, #ffffff);
+  border: 2px solid var(--orange, #ffb800);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .18);
+  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.merchant-pin-icon {
+  transform: rotate(45deg);
+  font-size: 15px;
+  line-height: 1;
+}
 </style>
