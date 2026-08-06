@@ -35,20 +35,16 @@ export const useMerchantsStore = defineStore('merchants', {
         icon: cat?.categoryIcon,
       }
     },
-
-    // 화면에서 바로 쓰기 좋게, 매장 목록에 카테고리 이름/아이콘을 붙여서 반환
-    merchantsWithCategory: (state) =>
-      state.merchants.map((m) => {
-        const cat = state.categories.find((c) => c.categoryCode === m.categoryCode)
-        return {
-          ...m,
-          categoryName: cat?.categoryName,
-          icon: cat?.categoryIcon,
-        }
-      }),
   },
 
   actions: {
+    // 매장 전체(2만 건+)는 안 받고 카테고리 목록(20개 안팎)만 가볍게 불러옵니다.
+    // 지도 화면처럼 매장 자체는 bounds 기반으로 따로 받는 화면에서 씁니다.
+    async fetchCategories() {
+      if (this.categories.length > 0) return
+      this.categories = await fetchMerchantCategories()
+    },
+
     async fetchMerchants() {
       const authStore = useAuthStore()
       if (!authStore.isAuthenticated) return

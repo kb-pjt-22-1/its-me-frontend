@@ -13,6 +13,8 @@ import api from '@/api/index.js'
 import {
   fetchMerchantList,
   fetchNearbyMerchants,
+  fetchMerchantsWithinBounds,
+  searchMerchants,
   fetchMerchantDetail,
   createMerchant,
   updateMerchant,
@@ -81,6 +83,30 @@ describe('fetchNearbyMerchants', () => {
     expect(api.get).toHaveBeenCalledWith('/v1/merchants/nearby', {
       params: { lat: 37.5, lng: 127.0, radiusMeters: 500 },
     })
+  })
+})
+
+describe('fetchMerchantsWithinBounds', () => {
+  it('bounds 네 좌표를 params로 넘기고 결과를 정규화해서 반환한다', async () => {
+    api.get.mockResolvedValueOnce({ data: [rawMerchant] })
+
+    const result = await fetchMerchantsWithinBounds({ swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 })
+
+    expect(api.get).toHaveBeenCalledWith('/v1/merchants/within-bounds', {
+      params: { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 },
+    })
+    expect(result).toEqual([normalizedMerchant])
+  })
+})
+
+describe('searchMerchants', () => {
+  it('검색어를 q 파라미터로 넘기고 결과를 정규화해서 반환한다', async () => {
+    api.get.mockResolvedValueOnce({ data: [rawMerchant] })
+
+    const result = await searchMerchants('스타벅스')
+
+    expect(api.get).toHaveBeenCalledWith('/v1/merchants/search', { params: { q: '스타벅스' } })
+    expect(result).toEqual([normalizedMerchant])
   })
 })
 
