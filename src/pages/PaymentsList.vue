@@ -156,13 +156,13 @@ onMounted(() => {
   overflow-y: auto;
   box-sizing: border-box;
   padding: 0 18px 84px;
-  background: var(--page, #faf9f6);
+  background: var(--page, #f7f7f5);
 }
 .page-header { height: 60px; }
 
 .date-nav { display: flex; justify-content: center; align-items: center; gap: 20px; padding: 10px 0 20px; }
-.date-nav h3 { margin: 0; font-size: 15px; color: var(--charcoal, #151515); }
-.date-arrow { border: none; background: none; cursor: pointer; color: var(--muted, #918a81); font-size: 14px; padding: 4px 8px; }
+.date-nav h3 { margin: 0; font-size: 15px; color: var(--charcoal, #24211d); }
+.date-arrow { border: none; background: none; cursor: pointer; color: var(--muted, #8f897f); font-size: 14px; padding: 4px 8px; }
 
 .loading-text, .empty-text { text-align: center; padding: 60px 0; font-size: 0.9rem; }
 
@@ -170,25 +170,25 @@ onMounted(() => {
 .summary-text p, .summary-benefit p { margin: 0 0 8px; font-size: 12px; color: rgba(255, 255, 255, .75); }
 .summary-text h2 { margin: 0; font-size: 20px; color: #ffffff; }
 .summary-benefit { text-align: right; }
-.summary-benefit h2 { margin: 0; font-size: 20px; color: var(--orange, #ffb800); }
+.summary-benefit h2 { margin: 0; font-size: 20px; color: var(--orange, #ffbc00); }
 
-.history-group h4 { color: var(--muted, #918a81); font-size: 0.85rem; font-weight: 700; margin: 0 0 12px; }
+.history-group h4 { color: var(--muted, #8f897f); font-size: 0.85rem; font-weight: 700; margin: 0 0 12px; }
 .history-group + .history-group { margin-top: 22px; }
 
 .history-item {
   width: 100%; display: flex; align-items: center; gap: 12px; padding: 13px 0;
-  border-bottom: 1px solid var(--line, #e9e5df); background: none; border-left: none;
+  border-bottom: 1px solid var(--line, #e7e4de); background: none; border-left: none;
   border-right: none; border-top: none; cursor: pointer; text-align: left;
 }
 .item-icon {
-  width: 40px; height: 40px; border-radius: 10px; background: var(--page, #f2f1ee);
+  width: 40px; height: 40px; border-radius: 10px; background: var(--inactive, #f0efec);
   display: grid; place-items: center; font-size: 1.2rem; flex: 0 0 auto;
 }
 .item-info { flex: 1; min-width: 0; }
-.name { font-weight: 700; margin: 0 0 4px; color: var(--charcoal, #151515); font-size: 0.95rem; }
+.name { font-weight: 700; margin: 0 0 4px; color: var(--charcoal, #24211d); font-size: 0.95rem; }
 .desc { font-size: 0.8rem; margin: 0; }
 .item-price { text-align: right; flex: 0 0 auto; }
-.price { font-weight: 700; color: var(--charcoal, #151515); margin: 0 0 4px; font-size: 0.9rem; white-space: nowrap; }
-.benefit { font-size: 0.78rem; color: var(--orange, #ffb800); margin: 0; white-space: nowrap; }
-.chevron { color: var(--muted, #c7c2b8); flex: 0 0 auto; }
+.price { font-weight: 700; color: var(--charcoal, #24211d); margin: 0 0 4px; font-size: 0.9rem; white-space: nowrap; }
+.benefit { font-size: 0.78rem; color: var(--orange, #ffbc00); margin: 0; white-space: nowrap; }
+.chevron { color: var(--muted, #8f897f); flex: 0 0 auto; }
 </style>
