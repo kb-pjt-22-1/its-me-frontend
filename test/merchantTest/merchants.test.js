@@ -74,22 +74,27 @@ describe('getters', () => {
     expect(result.categoryName).toBeUndefined()
     expect(result.icon).toBeUndefined()
   })
+})
 
-  it('merchantsWithCategory: 전체 매장 목록에 카테고리 정보를 합쳐서 반환한다', () => {
+describe('fetchCategories', () => {
+  it('카테고리가 비어있으면 서버에서 불러와 채운다', async () => {
     const store = useMerchantsStore()
-    store.merchants = [
-      { id: 1, categoryCode: '5812' },
-      { id: 2, categoryCode: '5813' },
-    ]
-    store.categories = [
-      { categoryCode: '5812', categoryName: '음식점', categoryIcon: '🍽️' },
-      { categoryCode: '5813', categoryName: '카페', categoryIcon: '☕' },
-    ]
+    const categories = [{ categoryCode: '5812', categoryName: '음식점' }]
+    fetchMerchantCategories.mockResolvedValueOnce(categories)
 
-    expect(store.merchantsWithCategory).toEqual([
-      { id: 1, categoryCode: '5812', categoryName: '음식점', icon: '🍽️' },
-      { id: 2, categoryCode: '5813', categoryName: '카페', icon: '☕' },
-    ])
+    await store.fetchCategories()
+
+    expect(fetchMerchantCategories).toHaveBeenCalledTimes(1)
+    expect(store.categories).toEqual(categories)
+  })
+
+  it('카테고리를 이미 갖고 있으면 다시 요청하지 않는다', async () => {
+    const store = useMerchantsStore()
+    store.categories = [{ categoryCode: '5812', categoryName: '음식점' }]
+
+    await store.fetchCategories()
+
+    expect(fetchMerchantCategories).not.toHaveBeenCalled()
   })
 })
 
