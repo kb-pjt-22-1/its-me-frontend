@@ -49,3 +49,17 @@ body {
 button, input { font: inherit; }
 button { border: 0; background: none; color: inherit; cursor: pointer; }
 a { color: inherit; text-decoration: none; }
+
+/* 아이콘/placeholder만으로 의도를 전달하는 입력창들이 스크린리더에서도 이름을 갖도록.
+   시각적으로는 숨기고 label-input 연결만 제공한다. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

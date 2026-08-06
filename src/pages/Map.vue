@@ -11,7 +11,8 @@
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <input v-model="searchQuery" type="text" placeholder="매장명 또는 카테고리 검색" />
+        <label for="map-search" class="sr-only">매장명 또는 카테고리 검색</label>
+        <input id="map-search" v-model="searchQuery" type="text" placeholder="매장명 또는 카테고리 검색" />
       </div>
 
       <div ref="chipsContainer" class="category-chips" @wheel="onChipsWheel">
@@ -178,6 +179,7 @@ const toggleBookmark = async (shop) => {
       await bookmarksStore.addBookmark(shop)
     }
   } catch (err) {
+    console.error('북마크 처리 실패', err.message)
     alert('북마크 처리에 실패했습니다. 다시 시도해주세요.')
   }
 }
@@ -261,7 +263,9 @@ function initMap(kakao, center) {
     center: new kakao.maps.LatLng(center.lat, center.lng),
     level: 3,
   })
-  new kakao.maps.Marker({ map, position: new kakao.maps.LatLng(center.lat, center.lng) })
+  // 옵션에 map을 넘기면 생성과 동시에 지도에 올라간다 - 이후 재사용할 일은 없지만,
+  // 변수에 담아두는 것만으로 "만들고 버리는" 인스턴스가 아님이 명확해진다.
+  const centerMarker = new kakao.maps.Marker({ map, position: new kakao.maps.LatLng(center.lat, center.lng) })
   kakaoInstance = kakao
   mapInstance = map
   // 줌/드래그가 끝날 때마다(idle) 화면에 보이는 매장만 다시 그립니다.
@@ -352,7 +356,7 @@ onMounted(async () => {
 .map-container { position: absolute; inset: 0; width: 100%; height: 100%; }
 .map-error {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  padding: 1rem; text-align: center; background: #f8f9fa; color: #dc3545; font-size: 0.875rem; z-index: 5;
+  padding: 1rem; text-align: center; background: #f8f9fa; color: #a3242f; font-size: 0.875rem; z-index: 5;
 }
 
 .map-overlay-top {

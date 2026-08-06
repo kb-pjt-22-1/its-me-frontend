@@ -136,6 +136,11 @@ const pinError = ref(false);
 // StoreDetail.vue에서 "결제하기"를 누르면 /pay?merchantId=1 형태로 넘어옵니다.
 const merchant = computed(() => merchantsStore.getByIdWithCategory(route.query.merchantId) ?? null);
 
+function rewardLabelFor(benefit) {
+  if (!merchant.value) return '';
+  return benefit ? formatBenefit(benefit) : '혜택 없음';
+}
+
 const paymentRows = computed(() => {
   const activeCards = cardsStore.cards.filter((c) => c.status === 'ACTIVE');
 
@@ -146,9 +151,7 @@ const paymentRows = computed(() => {
     return {
       card,
       benefit,
-      rewardLabel: merchant.value
-        ? (benefit ? formatBenefit(benefit) : '혜택 없음')
-        : '',
+      rewardLabel: rewardLabelFor(benefit),
     };
   });
 

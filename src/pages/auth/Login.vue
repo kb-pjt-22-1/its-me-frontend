@@ -18,7 +18,8 @@
             <circle cx="12" cy="8" r="4"></circle>
             <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"></path>
           </svg>
-          <input type="text" v-model="userId" placeholder="아이디" autocapitalize="none" @keydown.enter="canSubmit && handleLogin()" />
+          <label for="login-user-id" class="sr-only">아이디</label>
+          <input id="login-user-id" type="text" v-model="userId" placeholder="아이디" autocapitalize="none" @keydown.enter="canSubmit && handleLogin()" />
         </div>
 
         <div class="input-box">
@@ -26,7 +27,9 @@
             <rect x="4" y="10" width="16" height="10" rx="2"></rect>
             <path d="M7 10V7a5 5 0 0 1 10 0v3"></path>
           </svg>
+          <label for="login-password" class="sr-only">비밀번호</label>
           <input
+            id="login-password"
             :type="showPassword ? 'text' : 'password'"
             v-model="password"
             placeholder="비밀번호"
@@ -140,7 +143,10 @@ const DEV_LOGIN_SLOT_STORAGE_KEY = 'devLoginSlot';
 function getOrAssignDevLoginSlot() {
   const stored = localStorage.getItem(DEV_LOGIN_SLOT_STORAGE_KEY);
   if (stored) return Number(stored);
-  const assigned = Math.floor(Math.random() * DEV_LOGIN_MAX_SLOT) + 1;
+  // 보안과 무관한 슬롯 분배지만, crypto.getRandomValues를 쓰면 Math.random() 관련
+  // 정적분석 경고(S2245) 없이 넘어갈 수 있다.
+  const randomByte = crypto.getRandomValues(new Uint8Array(1))[0];
+  const assigned = (randomByte % DEV_LOGIN_MAX_SLOT) + 1;
   localStorage.setItem(DEV_LOGIN_SLOT_STORAGE_KEY, String(assigned));
   return assigned;
 }

@@ -16,7 +16,9 @@
         <p class="gate-desc">본인 확인을 위해 비밀번호를 입력해주세요</p>
         <form class="gate-form" @submit.prevent="handleGateSubmit">
           <div class="field-box field-box--editable">
+            <label for="profile-gate-password" class="sr-only">비밀번호</label>
             <input
+              id="profile-gate-password"
               v-model="gatePassword"
               type="password"
               placeholder="비밀번호"
@@ -55,8 +57,9 @@
             </div>
 
             <div class="field-box field-box--editable">
-              <span class="field-label">휴대폰 번호</span>
+              <label for="profile-phone" class="field-label">휴대폰 번호</label>
               <input
+                id="profile-phone"
                 v-model="phoneNumber"
                 type="text"
                 inputmode="numeric"
@@ -94,10 +97,12 @@
 
             <form class="password-form" @submit.prevent="handleChangePassword">
               <div class="field-box field-box--editable">
-                <input v-model="newPassword" type="password" placeholder="새 비밀번호 (문자·숫자·특수문자 포함 8자 이상)" @input="clearPasswordMessages" />
+                <label for="profile-new-password" class="sr-only">새 비밀번호</label>
+                <input id="profile-new-password" v-model="newPassword" type="password" placeholder="새 비밀번호 (문자·숫자·특수문자 포함 8자 이상)" @input="clearPasswordMessages" />
               </div>
               <div class="field-box field-box--editable">
-                <input v-model="newPasswordConfirm" type="password" placeholder="새 비밀번호 확인" @input="clearPasswordMessages" />
+                <label for="profile-new-password-confirm" class="sr-only">새 비밀번호 확인</label>
+                <input id="profile-new-password-confirm" v-model="newPasswordConfirm" type="password" placeholder="새 비밀번호 확인" @input="clearPasswordMessages" />
               </div>
 
               <!-- submit을 누르기 전, 입력하는 동안 바로 불일치를 알려준다 -->
@@ -125,12 +130,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import PageContainer from '@/components/common/PageContainer.vue';
 import Button from '@/components/common/Button.vue';
 import { getMyProfile, updateMyProfile, verifyPassword, changePassword } from '@/services/memberService';
 
-const PHONE_PATTERN = /^01[0-9]-?\d{3,4}-?\d{4}$/;
+const PHONE_PATTERN = /^01\d-?\d{3,4}-?\d{4}$/;
 // 회원가입(Signup.vue)과 동일한 규칙 - 백엔드 ChangePasswordRequestDto와도 맞춰뒀다.
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,64}$/;
 const ROLE_LABELS = { USER: '일반회원', ADMIN: '관리자' };
@@ -181,7 +186,7 @@ const formattedBirthDate = computed(() => {
 
 const formattedCreatedAt = computed(() => {
   const c = profile.value?.createdAt;
-  return c ? String(c).slice(0, 10).replace(/-/g, '.') : '-';
+  return c ? String(c).slice(0, 10).replaceAll('-', '.') : '-';
 });
 
 // phoneNumber가 원래 값과 같으면 저장할 이유가 없다 - 굳이 PUT을 또 보내지 않는다.
@@ -189,13 +194,15 @@ const canSave = computed(() =>
   PHONE_PATTERN.test(phoneNumber.value) && phoneNumber.value !== profile.value?.phoneNumber
 );
 
+function formatPhoneDigits(digits) {
+  if (digits.length > 7) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  if (digits.length > 3) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return digits;
+}
+
 function onPhoneInput(event) {
   const digits = event.target.value.replace(/\D/g, '').slice(0, 11);
-  phoneNumber.value = digits.length > 7
-    ? `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
-    : digits.length > 3
-      ? `${digits.slice(0, 3)}-${digits.slice(3)}`
-      : digits;
+  phoneNumber.value = formatPhoneDigits(digits);
   formError.value = '';
   successMessage.value = '';
 }

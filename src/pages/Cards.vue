@@ -105,23 +105,29 @@ const handleSync = async () => {
   }
 };
 
+const CARD_STATUS_TEXT = {
+  SUSPENDED: '정지됨',
+  EXPIRED: '만료',
+  UNLINKED: '연동 해제',
+};
+
+// 목표가 0원이면 나눗셈이 무의미하다 - 채울 목표가 없으니 이미 다 채운 것으로 본다.
+function calcPercentage(card, hasTarget) {
+  if (!hasTarget) return 0;
+  if (card.targetAmount === 0) return 100;
+  return Math.min((card.currentAmount / card.targetAmount) * 100, 100);
+}
+
 const myCards = computed(() =>
   cardsStore.cards.map((card) => {
     const hasTarget = typeof card.targetAmount === 'number';
     const isMet = card.performanceMet ?? (hasTarget && card.currentAmount >= card.targetAmount);
-    // 목표가 0원이면 나눗셈이 무의미하다 - 채울 목표가 없으니 이미 다 채운 것으로 본다.
-    const percentage = hasTarget
-      ? (card.targetAmount === 0 ? 100 : Math.min((card.currentAmount / card.targetAmount) * 100, 100))
-      : 0;
     return {
       ...card,
       isMet,
       remaining: hasTarget ? Math.max(card.targetAmount - card.currentAmount, 0) : 0,
-      percentage,
-      statusText: card.status === 'SUSPENDED' ? '정지됨'
-        : card.status === 'EXPIRED' ? '만료'
-        : card.status === 'UNLINKED' ? '연동 해제'
-        : card.status,
+      percentage: calcPercentage(card, hasTarget),
+      statusText: CARD_STATUS_TEXT[card.status] ?? card.status,
     };
   })
 );

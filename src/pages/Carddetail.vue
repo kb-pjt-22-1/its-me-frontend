@@ -143,6 +143,7 @@ const handleToggleRecommendation = async () => {
   try {
     await cardsStore.toggleRecommendation(card.value.userCardId);
   } catch (err) {
+    console.error('추천 제외 설정 변경 실패', err.message);
     alert('설정 변경에 실패했습니다. 다시 시도해주세요.');
   }
 };
@@ -152,6 +153,7 @@ const handleSetPrimary = async () => {
   try {
     await cardsStore.setPrimary(card.value.userCardId);
   } catch (err) {
+    console.error('대표 카드 설정 실패', err.message);
     alert('대표 카드 설정에 실패했습니다. 다시 시도해주세요.');
   }
 };
@@ -163,6 +165,7 @@ const handleDeleteCard = async () => {
     await cardsStore.deleteCard(card.value.userCardId);
     router.push('/cards');
   } catch (err) {
+    console.error('카드 삭제 실패', err.message);
     alert('카드 삭제에 실패했습니다. 다시 시도해주세요.');
   }
 };
@@ -243,7 +246,7 @@ const handleDeleteCard = async () => {
 .exclude-toggle-btn--on {
   border-color: var(--orange, #ffbc00);
   background: #fff6dd;
-  color: #b67a00;
+  color: #8a5a00;
 }
 .exclude-toggle-dot {
   width: 8px;

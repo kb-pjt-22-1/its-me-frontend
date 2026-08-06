@@ -105,6 +105,7 @@ const handleRemove = async (merchantId) => {
   try {
     await bookmarksStore.removeBookmark(merchantId);
   } catch (err) {
+    console.error('북마크 해제 실패', err.message);
     alert('북마크 해제에 실패했습니다. 다시 시도해주세요.');
   }
 };
@@ -131,6 +132,6 @@ const handleRemove = async (merchantId) => {
 
 .bookmark-badge {
   width: 32px; height: 32px; border-radius: 9px; background: var(--orange, #ffbc00);
-  color: #ffffff; display: grid; place-items: center; flex: 0 0 auto; cursor: pointer;
+  color: var(--charcoal, #24211d); display: grid; place-items: center; flex: 0 0 auto; cursor: pointer;
 }
 </style>
