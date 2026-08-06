@@ -13,7 +13,9 @@
         <router-link to="/payments" class="menu-item" @click="toggleMenu">
           결제 내역 &gt;
         </router-link>
-        <div class="menu-item">간편 비밀번호(PIN) 설정 &gt;</div>
+        <router-link to="/pin-setting" class="menu-item" @click="toggleMenu">
+          간편 비밀번호(PIN) 설정 &gt;
+        </router-link>
         <router-link to="/member-profile" class="menu-item" @click="toggleMenu">
           개인정보 및 보안 &gt;
         </router-link>

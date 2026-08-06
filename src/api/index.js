@@ -69,18 +69,27 @@ api.interceptors.response.use(
 
     original._retry = true
 
+    // 갱신 자체가 실패하는 경우와, 갱신엔 성공했는데 "새 토큰으로 다시 보낸 요청"이 또
+    // 401인 경우를 반드시 구분해야 한다. 후자는 흔하다 - 현재 비밀번호/PIN 재확인처럼
+    // 인증(로그인 여부)과 무관하게 401을 쓰는 엔드포인트가 여럿이라(InvalidCredentialsException),
+    // 토큰은 멀쩡한데 "입력한 값이 틀렸다"는 뜻일 뿐이다. 이걸 세션 만료로 오인해 로그아웃시키면
+    // PIN/비밀번호 화면이 오답을 보여줄 새도 없이 로그인 화면으로 튕겨버리게 된다.
+    let accessToken
     try {
-      const accessToken = await refreshAccessToken()
-      original.headers = { ...original.headers, Authorization: `Bearer ${accessToken}` }
-      return await api(original)
+      accessToken = await refreshAccessToken()
     } catch {
-      // 갱신까지 실패하면 세션이 끝난 것이다. 남은 토큰을 지우고 알림만 띄운다.
+      // 갱신 자체가 실패했다 - 리프레시 토큰까지 무효하니 이번엔 진짜 세션이 끝난 것이다.
       // 여기서 라우터를 직접 import하면 router -> pages -> stores -> api 로 순환이 생기므로,
       // main.js가 듣고 있는 이벤트로 넘겨 로그인 화면 이동을 맡긴다.
       clearAuthStorage()
       window.dispatchEvent(new CustomEvent('auth:session-expired'))
       return Promise.reject(error)
     }
+
+    // 갱신은 성공했다 - 새 토큰으로 원래 요청을 그대로 재시도한다. 이 재시도가 또 실패해도
+    // (401 포함) 그건 이 요청 자체의 문제이니 세션은 건드리지 않고 호출한 쪽에 그대로 넘긴다.
+    original.headers = { ...original.headers, Authorization: `Bearer ${accessToken}` }
+    return api(original)
   }
 )
 
