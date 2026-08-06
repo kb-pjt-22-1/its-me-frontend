@@ -15,7 +15,21 @@ const router = createRouter({
         {path: '/login', name: 'login', component: Login, meta: {guestOnly: true}},
         {path: '/signup', name: 'signup', component: Signup, meta: {guestOnly: true}},
         // 햄버거 메뉴 '개인정보 및 보안'에서 진입 (SidebarMenu.vue)
-        {path: '/member-profile', name: 'member-profile', component: () => import('@/pages/auth/MemberProfile.vue')},
+        {
+            path: '/member-profile',
+            name: 'member-profile',
+            component: () => import('@/pages/auth/MemberProfile.vue'),
+            meta: {requiresAuth: true},
+        },
+        // 햄버거 메뉴 '간편 비밀번호(PIN) 설정'에서 진입하거나, 회원가입 후 첫 로그인 시
+        // Login.vue가 이리로 보낸다. 최초 설정/변경 중 뭘 보여줄지는 Pinsetting.vue가
+        // getMyProfile().pinRegistered로 스스로 판단한다 - 라우트는 하나뿐이다.
+        {
+            path: '/pin-setting',
+            name: 'pin-setting',
+            component: () => import('@/pages/Pinsetting.vue'),
+            meta: {requiresAuth: true},
+        },
         {
             // 로그인 여부에 따른 분기는 아래 beforeEach 가드가 담당한다.
             // 여기에 redirect: '/login'을 두면 안 된다 - vue-router가 '/'에서 이 라우트의

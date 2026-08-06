@@ -1,0 +1,51 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('@/api', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+}))
+
+import api from '@/api/index.js'
+import { registerPin, updatePin } from '@/services/memberService.js'
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+describe('registerPin', () => {
+  it('pin을 body로 POST /users/me/pin을 호출한다', async () => {
+    api.post.mockResolvedValueOnce({})
+
+    await registerPin('481027')
+
+    expect(api.post).toHaveBeenCalledWith('/users/me/pin', { pin: '481027' })
+  })
+
+  it('실패하면 예외를 그대로 던진다(호출부가 409 등을 처리)', async () => {
+    const error = { response: { status: 409, data: { message: 'PIN already registered' } } }
+    api.post.mockRejectedValueOnce(error)
+
+    await expect(registerPin('481027')).rejects.toBe(error)
+  })
+})
+
+describe('updatePin', () => {
+  it('currentPin과 newPin을 body로 PUT /users/me/pin을 호출한다', async () => {
+    api.put.mockResolvedValueOnce({})
+
+    await updatePin('481027', '592841')
+
+    expect(api.put).toHaveBeenCalledWith('/users/me/pin', { currentPin: '481027', newPin: '592841' })
+  })
+
+  it('실패하면 예외를 그대로 던진다(호출부가 401/423 등을 처리)', async () => {
+    const error = { response: { status: 401, data: { message: 'current PIN is incorrect' } } }
+    api.put.mockRejectedValueOnce(error)
+
+    await expect(updatePin('000000', '592841')).rejects.toBe(error)
+  })
+})
