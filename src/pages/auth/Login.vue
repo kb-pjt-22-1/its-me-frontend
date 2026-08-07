@@ -18,7 +18,8 @@
             <circle cx="12" cy="8" r="4"></circle>
             <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"></path>
           </svg>
-          <input type="text" v-model="userId" placeholder="아이디" autocapitalize="none" @keydown.enter="canSubmit && handleLogin()" />
+          <label for="login-user-id" class="sr-only">아이디</label>
+          <input id="login-user-id" type="text" v-model="userId" placeholder="아이디" autocapitalize="none" @keydown.enter="canSubmit && handleLogin()" />
         </div>
 
         <div class="input-box">
@@ -26,7 +27,9 @@
             <rect x="4" y="10" width="16" height="10" rx="2"></rect>
             <path d="M7 10V7a5 5 0 0 1 10 0v3"></path>
           </svg>
+          <label for="login-password" class="sr-only">비밀번호</label>
           <input
+            id="login-password"
             :type="showPassword ? 'text' : 'password'"
             v-model="password"
             placeholder="비밀번호"
@@ -108,11 +111,25 @@ const signupSuccessMessage = ref(
 
 const canSubmit = computed(() => userId.value.length > 0 && password.value.length > 0);
 
+// 라우터 가드가 로그인 화면으로 보낼 때 원래 가려던 경로를 redirect로 남겨둔다.
+// 외부 사이트로 튕기지 않도록 '/'로 시작하는 내부 경로만 받아들인다('//'는 프로토콜
+// 상대 URL이라 외부로 나간다).
+const redirectTarget = computed(() => {
+  const raw = route.query.redirect;
+  const path = Array.isArray(raw) ? raw[0] : raw;
+  const isInternalPath = typeof path === 'string' && path.startsWith('/') && !path.startsWith('//');
+  if (isInternalPath) return path;
+
+  // 방금 회원가입을 마치고 처음 로그인하는 거라면(redirect가 따로 없을 때) 홈 대신
+  // PIN 설정 화면부터 보여준다 - 가입 직후 계정엔 아직 PIN이 없다.
+  return route.query.signup === 'success' ? '/pin-setting' : '/';
+});
+
 async function handleLogin() {
   if (!canSubmit.value) return;
   const success = await authStore.login(userId.value, password.value);
   if (success) {
-    router.push('/');
+    router.push(redirectTarget.value);
   }
 }
 
@@ -126,7 +143,10 @@ const DEV_LOGIN_SLOT_STORAGE_KEY = 'devLoginSlot';
 function getOrAssignDevLoginSlot() {
   const stored = localStorage.getItem(DEV_LOGIN_SLOT_STORAGE_KEY);
   if (stored) return Number(stored);
-  const assigned = Math.floor(Math.random() * DEV_LOGIN_MAX_SLOT) + 1;
+  // 보안과 무관한 슬롯 분배지만, crypto.getRandomValues를 쓰면 Math.random() 관련
+  // 정적분석 경고(S2245) 없이 넘어갈 수 있다.
+  const randomByte = crypto.getRandomValues(new Uint8Array(1))[0];
+  const assigned = (randomByte % DEV_LOGIN_MAX_SLOT) + 1;
   localStorage.setItem(DEV_LOGIN_SLOT_STORAGE_KEY, String(assigned));
   return assigned;
 }
@@ -136,7 +156,7 @@ const devLoginSlot = ref(getOrAssignDevLoginSlot());
 async function handleDevLogin() {
   const success = await authStore.devLogin(devLoginSlot.value);
   if (success) {
-    router.push('/');
+    router.push(redirectTarget.value);
   }
 }
 </script>
@@ -189,14 +209,14 @@ async function handleDevLogin() {
 
 .input-box {
   height: 55px;
-  border: 1px solid var(--line, #e9e5df);
+  border: 1px solid var(--line, #e7e4de);
   border-radius: 13px;
   background: var(--surface, #ffffff);
   padding: 0 13px;
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--muted, #918a81);
+  color: var(--muted, #8f897f);
 }
 
 .input-box input {
@@ -204,25 +224,25 @@ async function handleDevLogin() {
   border: 0;
   outline: 0;
   font-size: 15px;
-  color: var(--charcoal, #2c2b27);
+  color: var(--charcoal, #24211d);
   min-width: 0;
   background: transparent;
 }
-.input-box input::placeholder { color: var(--muted, #a79f97); }
+.input-box input::placeholder { color: var(--muted, #8f897f); }
 
 .input-action {
   width: 28px;
   height: 28px;
   display: grid;
   place-items: center;
-  color: var(--muted, #999288);
+  color: var(--muted, #8f897f);
   background: transparent;
   border: none;
   padding: 0;
 }
 
 .error-text {
-  color: var(--danger, #f05e58);
+  color: var(--danger, #d94343);
   font-size: 0.85rem;
   text-align: center;
   margin: 0;
@@ -237,14 +257,14 @@ async function handleDevLogin() {
 
 .signup-copy {
   text-align: center;
-  color: var(--muted, #a0958d);
+  color: var(--muted, #8f897f);
   font-size: 13px;
   margin-top: 25px;
 }
 
 .signup-link {
   font-weight: 800;
-  color: var(--charcoal, #171717);
+  color: var(--charcoal, #24211d);
   text-decoration: none;
 }
 
@@ -256,7 +276,7 @@ async function handleDevLogin() {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--muted, #a79f97);
+  color: var(--muted, #8f897f);
   font-size: 12px;
   margin-bottom: 14px;
 }
@@ -265,13 +285,13 @@ async function handleDevLogin() {
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--line, #e9e5df);
+  background: var(--line, #e7e4de);
 }
 
 .dev-slot-hint {
   text-align: center;
   font-size: 11px;
-  color: var(--muted, #a79f97);
+  color: var(--muted, #8f897f);
   margin: 8px 0 0;
 }
 </style>

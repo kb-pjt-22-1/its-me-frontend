@@ -21,16 +21,35 @@ export async function devLoginRequest(slot) {
   return { accessToken: data.accessToken, refreshToken: data.refreshToken, user }
 }
 
+/**
+ * 액세스 토큰 재발급. 백엔드는 로테이션 방식이라 refreshToken도 새로 내려주고, 예전
+ * refreshToken을 다시 쓰면 탈취로 간주해 세션을 끊는다 - 받은 값을 반드시 저장해야 한다.
+ */
+export async function refreshTokenRequest(refreshToken) {
+  const { data } = await api.post('/auth/refresh', { refreshToken })
+  return { accessToken: data.accessToken, refreshToken: data.refreshToken }
+}
+
+/**
+ * 내 프로필 조회. accessToken을 넘기지 않으면 api 인터셉터가 저장된 토큰을 붙이고,
+ * 만료됐으면 refreshToken으로 갱신해 재시도한다. 그래서 자동 로그인에서는 이 호출의
+ * 성공 여부가 곧 '세션이 살아있는가'에 대한 판정이 된다(실패를 삼키지 않는 이유).
+ */
+export async function fetchProfile(accessToken) {
+  const { data } = await api.get(
+    '/users/me',
+    accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : undefined
+  )
+  return { userId: data.userId, loginId: data.loginId, name: data.name }
+}
+
 // 로그인 응답(LoginResponseDto)에는 name이 없어 프로필을 한 번 더 불러온다. 이 호출은
 // accessToken을 localStorage에 저장하기 전에 실행되므로 api 인스턴스의 인터셉터가 아직
 // 토큰을 못 찾는다 - 그래서 Authorization 헤더를 직접 넘긴다. 실패해도 로그인 자체를
 // 막을 이유는 없어 loginId를 이름 대신 보여주는 선으로 물러난다.
 async function fetchProfileOrFallback(accessToken, userId, loginId) {
   try {
-    const { data } = await api.get('/users/me', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    return { userId: data.userId, loginId: data.loginId, name: data.name }
+    return await fetchProfile(accessToken)
   } catch {
     return { userId, loginId, name: loginId }
   }

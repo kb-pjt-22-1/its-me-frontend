@@ -1,7 +1,19 @@
 <template>
   <div class="layout-container">
+    <h1 class="page-title">내 카드</h1>
 
-    <div class="card-list">
+    <div v-if="cardsStore.isLoading && myCards.length === 0" class="loading-text muted-text">
+      카드 목록을 불러오는 중...
+    </div>
+    <div v-else-if="myCards.length === 0" class="empty-state">
+      <p class="empty-text muted-text">등록된 카드가 없어요.</p>
+      <button class="sync-btn" :disabled="syncing" @click="handleSync">
+        {{ syncing ? '연동 중...' : '보유 카드 자동 연동' }}
+      </button>
+      <p v-if="syncError" class="sync-error danger-text">{{ syncError }}</p>
+    </div>
+
+    <div v-else class="card-list">
       <Button
         v-for="card in myCards"
         :key="card.userCardId"
@@ -11,14 +23,13 @@
         @click="goToCardDetail(card.userCardId)"
       >
         <div class="card-top-row">
-          <span v-if="card.isPrimary" class="badge">주 사용 카드</span>
-          <span v-else-if="card.status !== 'ACTIVE'" class="badge badge-suspended">{{ card.statusText }}</span>
+          <span v-if="card.isPrimary" class="pill pill--mint">주 사용 카드</span>
+          <span v-else-if="card.status !== 'ACTIVE'" class="pill pill--danger">{{ card.statusText }}</span>
         </div>
 
         <div class="card-top-row">
           <div>
             <h3>{{ card.cardName }}</h3>
-            <p>본인 · {{ card.panLast4 }}</p>
           </div>
           <span class="card-glyph" :class="{ 'glyph-primary': card.isPrimary, 'glyph-disabled': card.status !== 'ACTIVE' }">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -29,28 +40,31 @@
         </div>
 
         <template v-if="card.status === 'ACTIVE'">
-          <div class="status-row">
-            <span :class="card.isMet ? 'success-text' : 'danger-text'">
-              {{ card.isMet ? '전월 실적 충족' : '전월 실적 미달' }}
-            </span>
-            <span class="status-muted">
-              {{ card.isMet ? '혜택 적용 중' : `실적 충족까지 ${card.remaining.toLocaleString()}원` }}
-            </span>
-          </div>
-          <div class="progress-container">
-            <div
-              class="progress-bar"
-              :class="{ 'progress-bar-met': card.isMet }"
-              :style="{ width: card.percentage + '%' }"
-            ></div>
-          </div>
-          <p class="progress-target">목표 {{ card.targetAmount.toLocaleString() }}원</p>
+          <template v-if="typeof card.targetAmount === 'number'">
+            <div class="status-row">
+              <span :class="card.isMet ? 'success-text' : 'danger-text'">
+                {{ card.isMet ? '전월 실적 충족' : '전월 실적 미달' }}
+              </span>
+              <span class="muted-text">
+                {{ card.isMet ? '혜택 적용 중' : `실적 충족까지 ${card.remaining.toLocaleString()}원` }}
+              </span>
+            </div>
+            <div class="progress-track">
+              <div
+                class="progress-fill"
+                :class="{ 'progress-fill--met': card.isMet }"
+                :style="{ width: card.percentage + '%' }"
+              ></div>
+            </div>
+            <p class="progress-target">목표 {{ card.targetAmount.toLocaleString() }}원</p>
+          </template>
+          <p v-else class="muted-text loading-inline">실적 정보를 불러오는 중...</p>
         </template>
 
         <template v-else>
           <div class="status-row">
             <span class="danger-text">사용 불가</span>
-            <span class="status-muted">카드사 문의 필요</span>
+            <span class="muted-text">카드사 문의 필요</span>
           </div>
         </template>
       </Button>
@@ -59,58 +73,68 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Button from '@/components/common/Button.vue';
+import { useCardsStore } from '@/stores/cards';
 
 const router = useRouter();
+const cardsStore = useCardsStore();
 
-// user_cards ⋈ cards ⋈ card_monthly_status (user_id=1, 홍길동)
-// user_card_id=1: card_id=1(KB국민 노리카드), is_primary=TRUE, status=ACTIVE
-//   min_benefit_amount=300000, card_monthly_status.total_spending_amount=105400
-// user_card_id=2: card_id=2(KB국민 탄탄대로 체크카드), is_primary=FALSE, status=ACTIVE
-//   min_benefit_amount=200000, card_monthly_status.total_spending_amount=11400
-// (user_card_id=3은 user_id=2 소유라 제외)
-const rawCards = ref([
-  {
-    userCardId: 1,
-    cardName: 'KB국민 노리카드',
-    panLast4: '1234',
-    isPrimary: true,
-    status: 'ACTIVE',
-    targetAmount: 300000,
-    currentAmount: 105400,
-  },
-  {
-    userCardId: 2,
-    cardName: 'KB국민 탄탄대로 체크카드',
-    panLast4: '5678',
-    isPrimary: false,
-    status: 'ACTIVE',
-    targetAmount: 200000,
-    currentAmount: 11400,
-  },
-]);
+const syncing = ref(false);
+const syncError = ref('');
+
+onMounted(() => {
+  cardsStore.fetchCards();
+});
+
+const handleSync = async () => {
+  syncing.value = true;
+  syncError.value = '';
+  try {
+    await cardsStore.syncCards();
+    if (cardsStore.cards.length === 0) {
+      syncError.value = '연동 요청은 됐는데 카드가 안 들어왔어요. 백엔드에 카드 연동 기능이 아직 없을 수 있어요.';
+    }
+  } catch (err) {
+    syncError.value = err.response?.status === 404
+      ? '백엔드에 카드 연동(/cards/sync) 기능이 아직 없어요.'
+      : (err.response?.data?.message ?? '카드 연동에 실패했어요.');
+  } finally {
+    syncing.value = false;
+  }
+};
+
+const CARD_STATUS_TEXT = {
+  SUSPENDED: '정지됨',
+  EXPIRED: '만료',
+  UNLINKED: '연동 해제',
+};
+
+// 목표가 0원이면 나눗셈이 무의미하다 - 채울 목표가 없으니 이미 다 채운 것으로 본다.
+function calcPercentage(card, hasTarget) {
+  if (!hasTarget) return 0;
+  if (card.targetAmount === 0) return 100;
+  return Math.min((card.currentAmount / card.targetAmount) * 100, 100);
+}
 
 const myCards = computed(() =>
-  rawCards.value.map((card) => {
-    const isMet = card.currentAmount >= card.targetAmount;
+  cardsStore.cards.map((card) => {
+    const hasTarget = typeof card.targetAmount === 'number';
+    const isMet = card.performanceMet ?? (hasTarget && card.currentAmount >= card.targetAmount);
     return {
       ...card,
       isMet,
-      remaining: Math.max(card.targetAmount - card.currentAmount, 0),
-      percentage: Math.min((card.currentAmount / card.targetAmount) * 100, 100),
-      statusText: card.status === 'SUSPENDED' ? '정지됨'
-        : card.status === 'EXPIRED' ? '만료'
-        : card.status === 'UNLINKED' ? '연동 해제'
-        : card.status,
+      remaining: hasTarget ? Math.max(card.targetAmount - card.currentAmount, 0) : 0,
+      percentage: calcPercentage(card, hasTarget),
+      statusText: CARD_STATUS_TEXT[card.status] ?? card.status,
     };
   })
 );
 
 const goToCardDetail = (userCardId) => {
   const card = myCards.value.find((c) => c.userCardId === userCardId);
-  if (card && card.status !== 'ACTIVE') return; // 정지된 카드는 상세로 이동하지 않음
+  if (card && card.status !== 'ACTIVE') return;
   router.push(`/cards/${userCardId}`);
 };
 </script>
@@ -120,23 +144,50 @@ const goToCardDetail = (userCardId) => {
   padding: 18px 18px 24px;
 }
 
-.page-header {
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.page-title {
+  margin: 0 0 18px;
+  font-size: 22px;
+  letter-spacing: -.5px;
+  color: var(--charcoal, #24211d);
 }
-.page-header h2 { margin: 0; font-size: 18px; }
-.back-btn {
+
+.loading-text,
+.empty-text {
+  text-align: center;
+  padding: 60px 0 12px;
+  font-size: 0.9rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.sync-btn {
+  margin-top: 16px;
+  height: 48px;
+  padding: 0 24px;
+  border-radius: 14px;
   border: none;
-  background: none;
+  background: var(--orange, #ffbc00);
+  color: var(--charcoal, #24211d);
+  font-weight: 800;
   cursor: pointer;
-  color: var(--charcoal, #59554a);
-  display: grid;
-  place-items: center;
-  padding: 0;
 }
-.right-placeholder { width: 20px; }
+.sync-btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.sync-error {
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.loading-inline {
+  margin: 13px 0 0;
+  font-size: 12px;
+}
 
 .card-list {
   display: flex;
@@ -146,6 +197,12 @@ const goToCardDetail = (userCardId) => {
 
 .card-item {
   text-align: left;
+}
+
+:deep(.card-item.btn--box-outline) {
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 2px 16px rgba(46, 42, 36, 0.06);
 }
 
 .card-top-row {
@@ -162,46 +219,27 @@ const goToCardDetail = (userCardId) => {
 .card-top-row h3 {
   margin: 0 0 4px;
   font-size: 17px;
-  color: var(--charcoal, #151515);
+  color: var(--charcoal, #24211d);
 }
 
 .card-top-row p {
   margin: 0;
-  color: var(--muted, #918980);
+  color: var(--muted, #8f897f);
   font-size: 12px;
-}
-
-.badge {
-  display: inline-flex;
-  border-radius: 7px;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-weight: 800;
-  color: #00a47a;
-  background: #ddf6ee;
-}
-
-.badge-suspended {
-  color: var(--danger, #f05e58);
-  background: #fde7e6;
 }
 
 .card-glyph {
   width: 34px;
   height: 34px;
   border-radius: 9px;
-  background: var(--charcoal, #47433d);
+  background: var(--dark, #545045);
   color: #ffffff;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
 }
-.card-glyph.glyph-primary {
-  background: var(--charcoal, #2c2b27);
-}
-.card-glyph.glyph-disabled {
-  background: #c7c7c7;
-}
+.card-glyph.glyph-primary { background: var(--dark, #545045); }
+.card-glyph.glyph-disabled { background: #c7c7c7; }
 
 .status-row {
   display: flex;
@@ -213,32 +251,11 @@ const goToCardDetail = (userCardId) => {
   font-weight: 700;
 }
 
-.danger-text { color: var(--danger, #f05e58); }
-.success-text { color: var(--green, #00a97b); }
-.status-muted { color: var(--muted, #989086); font-weight: 400; }
-
-.progress-container {
-  width: 100%;
-  height: 5px;
-  background: #ebe8e2;
-  border-radius: 99px;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #ffad00, #ffc830);
-}
-.progress-bar-met {
-  background: linear-gradient(90deg, #00c48c, #00a97b);
-}
-
 .progress-target {
   width: 100%;
   text-align: right;
   margin: 7px 0 0;
-  color: var(--muted, #8d857b);
+  color: var(--muted, #8f897f);
   font-size: 11px;
 }
 </style>
