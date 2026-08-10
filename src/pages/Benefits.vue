@@ -53,8 +53,12 @@
       <p class="report-caption muted-text">이번 달 받은 혜택</p>
       <p class="report-total">{{ totalBenefit.toLocaleString() }}원</p>
 
-      <div class="donut-row">
-        <svg viewBox="0 0 120 120" class="donut-chart">
+      <div class="donut-row" :class="{ 'donut-row--collapsed': !showFullBreakdown }">
+        <svg
+          viewBox="0 0 120 120"
+          class="donut-chart"
+          :class="{ 'donut-chart--large': !showFullBreakdown }"
+        >
           <circle
             v-for="(seg, i) in donutSegments"
             :key="i"
@@ -65,13 +69,34 @@
             :stroke-dasharray="`${seg.length} ${circumference - seg.length}`"
             :stroke-dashoffset="seg.offset"
             transform="rotate(-90 60 60)"
+            class="donut-segment"
+            @mouseenter="activeSegment = seg.cat"
+            @mouseleave="activeSegment = null"
+            @click="activeSegment = activeSegment === seg.cat ? null : seg.cat"
           />
-          <text x="60" y="56" text-anchor="middle" class="donut-center-amount">{{ (totalBenefit / 1000).toFixed(0) }}k</text>
-          <text x="60" y="72" text-anchor="middle" class="donut-center-label">이번달{{ '\n' }}받은 혜택</text>
+
+          <template v-if="activeSegment">
+            <text x="60" y="56" text-anchor="middle" class="donut-center-amount" :fill="activeSegment.color">
+              {{ activeSegment.name }}
+            </text>
+            <text x="60" y="72" text-anchor="middle" class="donut-center-label">
+              {{ activeSegment.amount.toLocaleString() }}원 · {{ activeSegment.percent }}%
+            </text>
+          </template>
+          <template v-else>
+            <text x="60" y="56" text-anchor="middle" class="donut-center-amount">{{ (totalBenefit / 1000).toFixed(0) }}k</text>
+            <text x="60" y="72" text-anchor="middle" class="donut-center-label">이번달 받은 혜택</text>
+          </template>
         </svg>
 
-        <ul class="donut-legend">
-          <li v-for="cat in categoryBreakdown" :key="cat.name">
+        <ul v-if="showFullBreakdown" class="donut-legend">
+          <li
+            v-for="cat in categoryBreakdown"
+            :key="cat.name"
+            :class="{ active: activeSegment === cat }"
+            @mouseenter="activeSegment = cat"
+            @mouseleave="activeSegment = null"
+          >
             <span class="legend-dot" :style="{ background: cat.color }"></span>
             <span class="legend-name">{{ cat.name }}</span>
             <span class="legend-percent">{{ cat.percent }}%</span>
@@ -80,11 +105,11 @@
         </ul>
       </div>
 
-      <p class="report-summary muted-text">
+      <p v-if="!showFullBreakdown" class="report-summary muted-text">
         {{ topTwoCategoriesLabel }}
       </p>
 
-      <button class="expand-btn" @click="showFullBreakdown = !showFullBreakdown">
+      <button class="expand-btn" @click="showFullBreakdown = !showFullBreakdown; activeSegment = null">
         {{ showFullBreakdown ? '간단히 보기' : '전체 구성 보기' }}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="{ flipped: showFullBreakdown }">
           <polyline points="6 9 12 15 18 9"></polyline>
@@ -227,6 +252,7 @@ const categoryBreakdown = ref([
 ]);
 
 const showFullBreakdown = ref(false);
+const activeSegment = ref(null); // 마우스 오버/탭 중인 카테고리 (categoryBreakdown의 항목 그 자체)
 
 const topTwoCategoriesLabel = computed(() => {
   const sorted = [...categoryBreakdown.value].sort((a, b) => b.percent - a.percent);
@@ -236,12 +262,14 @@ const topTwoCategoriesLabel = computed(() => {
 });
 
 // 도넛 차트: SVG stroke-dasharray를 이용한 방식. r=45 기준 원둘레 계산.
+// 각 세그먼트에 원본 카테고리 객체(cat)를 같이 담아둬서, 클릭/호버 시
+// activeSegment랑 categoryBreakdown 항목을 그대로 비교(===)할 수 있게 합니다.
 const circumference = 2 * Math.PI * 45;
 const donutSegments = computed(() => {
   let cursor = 0;
   return categoryBreakdown.value.map((cat) => {
     const length = (cat.percent / 100) * circumference;
-    const seg = { color: cat.color, length, offset: -cursor };
+    const seg = { color: cat.color, length, offset: -cursor, cat };
     cursor += length;
     return seg;
   });
@@ -348,12 +376,21 @@ function linePoints(card) {
 .report-total { margin: 0 0 18px; font-size: 26px; font-weight: 800; color: var(--charcoal, #151515); }
 
 .donut-row { display: flex; align-items: center; gap: 18px; margin-bottom: 14px; }
-.donut-chart { width: 120px; height: 120px; flex: 0 0 auto; }
+.donut-row--collapsed { justify-content: center; }
+.donut-chart { width: 120px; height: 120px; flex: 0 0 auto; transition: width 200ms ease, height 200ms ease; }
+.donut-chart--large { width: 190px; height: 190px; }
+.donut-segment { cursor: pointer; transition: opacity 150ms ease; }
+.donut-segment:hover { opacity: .85; }
 .donut-center-amount { font-size: 15px; font-weight: 800; fill: var(--charcoal, #151515); }
 .donut-center-label { font-size: 8px; fill: var(--muted, #918a81); white-space: pre; }
 
 .donut-legend { list-style: none; margin: 0; padding: 0; flex: 1; display: flex; flex-direction: column; gap: 8px; }
-.donut-legend li { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.donut-legend li {
+  display: flex; align-items: center; gap: 6px; font-size: 12px;
+  cursor: pointer; border-radius: 8px; padding: 3px 4px; transition: background 150ms ease;
+}
+.donut-legend li.active,
+.donut-legend li:hover { background: var(--page, #f2f1ee); }
 .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
 .legend-name { font-weight: 700; color: var(--charcoal, #2c2b27); flex: 0 0 auto; }
 .legend-percent { color: var(--charcoal, #59554a); font-weight: 700; flex: 0 0 auto; }
@@ -375,6 +412,9 @@ function linePoints(card) {
 .section-header h3 { margin: 0; font-size: 15px; color: var(--charcoal, #151515); }
 .section-sub { margin: 0 0 14px; font-size: 11.5px; }
 .link-btn { border: none; background: none; color: var(--muted, #918a81); font-size: 12px; font-weight: 700; cursor: pointer; }
+
+.benefit-usage-loading,
+.benefit-usage-empty { text-align: center; padding: 24px 0; font-size: 12.5px; }
 
 .benefit-usage-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 6px; }
 .benefit-usage-item { display: flex; gap: 12px; }
