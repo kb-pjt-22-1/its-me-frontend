@@ -12,7 +12,7 @@
         <path d="M12 22s8-4.5 8-11a8 8 0 1 0-16 0c0 6.5 8 11 8 11z"></path>
         <circle cx="12" cy="11" r="3"></circle>
       </svg>
-      <span>주변</span>
+      <span>지도</span>
     </router-link>
     <router-link to="/pay" class="nav-item">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -27,16 +27,12 @@
       </svg>
       <span>결제</span>
     </router-link>
-    <router-link to="/benefit" class="nav-item">
+    <router-link to="/benefits" class="nav-item">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7" height="7" rx="1"></rect>
-        <rect x="14" y="3" width="7" height="7" rx="1"></rect>
-        <rect x="3" y="14" width="7" height="7" rx="1"></rect>
-        <line x1="14" y1="14" x2="14" y2="17"></line>
-        <line x1="17" y1="14" x2="17" y2="14.01"></line>
-        <line x1="20" y1="14" x2="20" y2="17"></line>
-        <line x1="14" y1="20" x2="17" y2="20"></line>
-        <line x1="20" y1="20" x2="20" y2="20.01"></line>
+        <rect x="3" y="8" width="18" height="4"></rect>
+        <path d="M12 8v13"></path>
+        <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path>
+        <path d="M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5"></path>
       </svg>
       <span>혜택</span>
     </router-link>
