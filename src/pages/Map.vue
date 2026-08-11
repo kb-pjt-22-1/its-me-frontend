@@ -20,7 +20,7 @@
           :key="cat"
           class="chip"
           :class="{ active: selectedCategory === cat }"
-          @click="selectedCategory = cat"
+          @click="selectedCategory = selectedCategory === cat ? null : cat"
         >
           {{ cat }}
         </button>
@@ -33,52 +33,120 @@
       </svg>
     </button>
 
-    <!-- 제휴 매장 바텀시트 -->
+    <!-- 제휴 매장 바텀시트 (매장 선택 시 같은 자리에서 상세로 전환) -->
     <div class="store-sheet" :class="{ expanded: sheetExpanded }">
       <button class="sheet-handle-area" @click="sheetExpanded = !sheetExpanded" aria-label="매장 목록 펼치기/접기">
         <span class="sheet-handle"></span>
         <div class="sheet-summary">
-          <p class="sheet-meta muted-text">현재 위치 기준</p>
-          <p class="sheet-title">반경 1km 내 제휴 매장</p>
+          <p class="sheet-meta muted-text">{{ selectedMerchant ? '매장 상세' : '현재 위치 기준' }}</p>
+          <p class="sheet-title">{{ selectedMerchant ? selectedMerchant.name : '반경 1km 내 제휴 매장' }}</p>
         </div>
       </button>
 
       <div class="sheet-body">
-        <div class="sheet-list-header">
-          <h3>주변 제휴 매장</h3>
-          <div class="sheet-list-right">
-            <span class="muted-text">{{ nearbyMerchants.length }}곳</span>
-            <button class="sort-btn" @click="sortByDistance = !sortByDistance">
-              거리순 <span class="sort-arrow">{{ sortByDistance ? '↓' : '↑' }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div v-if="nearbyMerchants.length === 0" class="sheet-empty muted-text">
-          반경 1km 안에 제휴 매장이 없어요.
-        </div>
-
-        <template v-else>
-          <button
-            v-for="shop in nearbyMerchants"
-            :key="shop.id"
-            class="sheet-item"
-            @click="goToStore(shop.id)"
-          >
-            <div class="sheet-item-icon">{{ getCategoryEmoji(shop.categoryCode) }}</div>
-            <div class="sheet-item-info">
-              <strong>{{ shop.name }}</strong>
-              <p class="muted-text">
-                {{ shop.categoryName }} · {{ shop.distanceLabel }}
-              </p>
-              <span v-if="shop.discountLabel" class="pill pill--gold">{{ shop.discountLabel }}</span>
-            </div>
-            <span class="sheet-bookmark" :class="{ active: bookmarksStore.isBookmarked(shop.id) }" @click.stop="toggleBookmark(shop)">
-              <svg width="18" height="18" viewBox="0 0 24 24" :fill="bookmarksStore.isBookmarked(shop.id) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path>
-              </svg>
-            </span>
+        <!-- 매장 상세: 새 페이지로 이동하지 않고 이 바텀시트 자리에서 그대로 보여줍니다 -->
+        <template v-if="selectedMerchant">
+          <button class="detail-back-btn" @click="closeMerchantDetail">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+            목록으로
           </button>
+
+          <div class="store-banner">
+            <span class="banner-icon">{{ getCategoryEmoji(selectedMerchant.categoryCode) }}</span>
+          </div>
+
+          <div class="store-info">
+            <span class="pill pill--gold">{{ selectedMerchant.categoryName }}</span>
+            <h1 class="store-name">{{ selectedMerchant.name }}</h1>
+            <p v-if="selectedMerchant.address" class="store-address muted-text">{{ selectedMerchant.address }}</p>
+
+            <div v-if="bestCardForSelected" class="benefit-strip">
+              제휴 혜택: 이 매장에서 <strong>{{ bestCardForSelected.cardName }}</strong>로 결제하면
+              <strong>{{ formatBenefit(bestMatchForSelected) }}</strong>
+            </div>
+            <div v-else class="benefit-strip benefit-strip--muted">
+              보유하신 카드 중 이 매장에 적용되는 혜택이 없어요.
+            </div>
+          </div>
+
+          <section class="recommend-section">
+            <h3 class="section-title">이 매장 추천 카드</h3>
+
+            <button
+              v-for="row in recommendedCardsForSelected"
+              :key="row.card.userCardId"
+              class="reco-card"
+              :class="{ 'reco-card--best': row.isBest, 'reco-card--selected': selectedCardId === row.card.userCardId }"
+              @click="selectedCardId = row.card.userCardId"
+            >
+              <span v-if="row.isBest" class="reco-badge">추천</span>
+              <div class="reco-top">
+                <span class="reco-icon" :style="{ background: row.card.color || '#24211d' }">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+                    <rect x="2" y="5" width="20" height="14" rx="3"></rect>
+                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                  </svg>
+                </span>
+                <div class="reco-name-block">
+                  <strong>{{ row.card.cardName }}</strong>
+                  <p>{{ row.description }}</p>
+                </div>
+                <span class="reco-rate" :class="{ 'reco-rate--none': !row.match }">
+                  {{ row.match ? formatBenefit(row.match) : '혜택 없음' }}
+                </span>
+              </div>
+            </button>
+          </section>
+
+          <button class="pay-btn" @click="goToPay">결제하기</button>
+        </template>
+
+        <!-- 목록: bounds 안 제휴 매장을 10개씩 페이징해서 보여줍니다 -->
+        <template v-else>
+          <div class="sheet-list-header">
+            <h3>주변 제휴 매장</h3>
+            <div class="sheet-list-right">
+              <span class="muted-text">{{ nearbyMerchants.length }}곳</span>
+              <button class="sort-btn" @click="sortByDistance = !sortByDistance">
+                거리순 <span class="sort-arrow">{{ sortByDistance ? '↓' : '↑' }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div v-if="nearbyMerchants.length === 0" class="sheet-empty muted-text">
+            반경 1km 안에 제휴 매장이 없어요.
+          </div>
+
+          <template v-else>
+            <button
+              v-for="shop in pagedNearbyMerchants"
+              :key="shop.id"
+              class="sheet-item"
+              @click="selectMerchant(shop.id)"
+            >
+              <div class="sheet-item-icon">{{ getCategoryEmoji(shop.categoryCode) }}</div>
+              <div class="sheet-item-info">
+                <strong>{{ shop.name }}</strong>
+                <p class="muted-text">
+                  {{ shop.categoryName }} · {{ shop.distanceLabel }}
+                </p>
+                <span v-if="shop.recommended" class="pill pill--gold">혜택 매장</span>
+              </div>
+              <span class="sheet-bookmark" :class="{ active: bookmarksStore.isBookmarked(shop.id) }" @click.stop="toggleBookmark(shop)">
+                <svg width="18" height="18" viewBox="0 0 24 24" :fill="bookmarksStore.isBookmarked(shop.id) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path>
+                </svg>
+              </span>
+            </button>
+
+            <div v-if="totalPages > 1" class="sheet-pagination">
+              <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">이전</button>
+              <span class="muted-text page-indicator">{{ currentPage }} / {{ totalPages }}</span>
+              <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">다음</button>
+            </div>
+          </template>
         </template>
       </div>
     </div>
@@ -92,7 +160,7 @@ import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { useCardsStore } from '@/stores/cards'
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
-import { fetchMerchantsWithinBounds, getCategoryEmoji } from '@/services/merchantsService'
+import { fetchRecommendedNearbyMerchants, getCategoryEmoji } from '@/services/merchantsService'
 
 const router = useRouter()
 const merchantsStore = useMerchantsStore()
@@ -116,18 +184,6 @@ function distanceMeters(lat1, lng1, lat2, lng2) {
   return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-function bestDiscountLabel(categoryCode) {
-  if (!categoryCode) return null
-  let best = null
-  for (const card of cardsStore.cards) {
-    const benefit = findBenefitForCategory(card.benefitsInfo, categoryCode, card.currentAmount ?? 0)
-    const rate = benefit?.discountRate ?? benefit?.discountAmount ?? -1
-    const bestRate = best?.discountRate ?? best?.discountAmount ?? -1
-    if (benefit && rate > bestRate) best = benefit
-  }
-  return best ? formatBenefit(best) : null
-}
-
 // 바텀시트("주변 제휴 매장")는 별도 /nearby 호출 없이, 지도 화면(bounds)에서
 // 이미 받아온 boundsMerchants를 그대로 재사용합니다 - 지도 핀과 항상 같은 데이터를 봅니다.
 // 반경 1km는 클라이언트에서 거리 계산 후 걸러냅니다.
@@ -143,7 +199,6 @@ const nearbyMerchants = computed(() => {
         ...m,
         distanceMeters: distance,
         distanceLabel: distance != null ? formatDistance(distance) : '거리 정보 없음',
-        discountLabel: bestDiscountLabel(m.categoryCode),
       }
     })
     .filter((m) => m.distanceMeters == null || m.distanceMeters <= NEARBY_RADIUS_M)
@@ -161,8 +216,6 @@ function formatDistance(meters) {
   if (meters < 1000) return `${Math.round(meters)}m`
   return `${(meters / 1000).toFixed(1)}km`
 }
-
-const goToStore = (merchantId) => router.push(`/stores/${merchantId}`)
 
 const toggleBookmark = async (shop) => {
   try {
@@ -184,17 +237,16 @@ const KAKAO_MAP_KEY = import.meta.env.VITE_KAKAO_MAP_KEY
 
 const searchQuery = ref('')
 // 매장 전체를 안 받으니, 칩 목록은 (개수 적은) 카테고리 사전 자체에서 뽑습니다.
-const categories = computed(() => {
-  const labels = merchantsStore.categories.map((c) => c.categoryName).filter(Boolean)
-  return ['전체', ...labels]
-})
-const selectedCategory = ref('전체')
+// '전체' 칩은 따로 두지 않고, 선택된 칩을 다시 누르면 해제되어 전체 보기로 돌아갑니다.
+const categories = computed(() => merchantsStore.categories.map((c) => c.categoryName).filter(Boolean))
+const selectedCategory = ref(null)
 
 // 지도 idle마다 화면(bounds) 안에서 받아온 매장들 - 검색/카테고리 필터는 전부
 // 이 화면 안 매장들을 대상으로만 동작합니다(화면 밖 매장은 애초에 검색 대상이 아님).
 const boundsMerchants = ref([])
 
-// categoryName을 여기서 한 번만 붙여서, 아래 merchants/nearbyMerchants 두 computed가 공유합니다.
+// 매장 응답엔 categoryCode만 오고 categoryName은 안 와서, 검색/필터/표시에 필요한
+// categoryName을 카테고리 사전(merchantsStore.categories)으로 붙여줍니다.
 const boundsMerchantsWithCategory = computed(() =>
   boundsMerchants.value.map((m) => ({
     ...m,
@@ -210,8 +262,77 @@ const merchants = computed(() => {
     list = list.filter((m) => m.name?.toLowerCase().includes(query) || m.categoryName?.toLowerCase().includes(query))
   }
 
-  if (selectedCategory.value === '전체') return list
+  if (!selectedCategory.value) return list
   return list.filter((m) => m.categoryName === selectedCategory.value)
+})
+
+// 매장 상세는 새 페이지로 이동하지 않고, 바텀시트가 목록 대신 상세를 보여주는 방식으로 뜹니다.
+const selectedMerchantId = ref(null)
+const selectedMerchant = computed(
+  () => boundsMerchantsWithCategory.value.find((m) => m.id === selectedMerchantId.value) ?? null,
+)
+
+function selectMerchant(merchantId) {
+  selectedMerchantId.value = merchantId
+  sheetExpanded.value = true
+}
+
+function closeMerchantDetail() {
+  selectedMerchantId.value = null
+}
+
+// 선택된 매장에 적용 가능한 보유 카드 혜택을 비교합니다 (Storedetail.vue와 동일한 로직).
+const recommendedCardsForSelected = computed(() => {
+  if (!selectedMerchant.value) return []
+
+  const rows = cardsStore.cards
+    .filter((card) => card.status === 'ACTIVE')
+    .map((card) => {
+      const match = findBenefitForCategory(card.benefitsInfo, selectedMerchant.value.categoryCode, card.currentAmount ?? 0)
+      return {
+        card,
+        match,
+        description: match
+          ? (match.description ?? `${selectedMerchant.value.categoryName ?? ''} 업종 혜택 적용 중`)
+          : '이 매장 카테고리에 적용 가능한 혜택이 없어요',
+      }
+    })
+    .sort((a, b) => {
+      const rateA = a.match?.discountRate ?? a.match?.discountAmount ?? -1
+      const rateB = b.match?.discountRate ?? b.match?.discountAmount ?? -1
+      return rateB - rateA
+    })
+
+  return rows.map((row, index) => ({ ...row, isBest: index === 0 && !!row.match }))
+})
+
+const bestCardForSelected = computed(() => recommendedCardsForSelected.value.find((r) => r.isBest)?.card ?? null)
+const bestMatchForSelected = computed(() => recommendedCardsForSelected.value.find((r) => r.isBest)?.match ?? null)
+
+const selectedCardId = ref(null)
+watch(recommendedCardsForSelected, (rows) => {
+  if (!rows.length) {
+    selectedCardId.value = null
+    return
+  }
+  selectedCardId.value = (rows.find((r) => r.isBest) ?? rows[0]).card.userCardId
+})
+
+function goToPay() {
+  router.push({ path: '/pay', query: { merchantId: selectedMerchant.value.id, userCardId: selectedCardId.value } })
+}
+
+// 주변 제휴 매장 목록 페이징 (10개씩)
+const PAGE_SIZE = 10
+const currentPage = ref(1)
+const totalPages = computed(() => Math.max(1, Math.ceil(nearbyMerchants.value.length / PAGE_SIZE)))
+const pagedNearbyMerchants = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return nearbyMerchants.value.slice(start, start + PAGE_SIZE)
+})
+// 목록 내용이 바뀌면(재조회, 정렬 변경 등) 이전 페이지 번호가 범위를 벗어날 수 있어 1페이지로 되돌립니다.
+watch(nearbyMerchants, () => {
+  currentPage.value = 1
 })
 
 let kakaoInstance = null
@@ -281,7 +402,9 @@ function initMap(kakao, center) {
   loadBoundsMerchants()
 }
 
-// 매장 전체를 미리 안 받고, 지금 화면(bounds)에 보이는 것만 백엔드에 요청합니다.
+// 매장 전체를 미리 안 받고, 지금 화면(bounds)에 보이는 매장을 전부 받아옵니다. 응답의
+// recommended(boolean)로 "사용자 보유 카드로 지금 당장 혜택 받을 수 있는 매장"만
+// 하이라이트하고, 나머지도 전부 핀으로 보여줍니다(추천 매장만 남기는 필터링이 아닙니다).
 async function loadBoundsMerchants() {
   if (!kakaoInstance || !mapInstance) return
 
@@ -295,7 +418,7 @@ async function loadBoundsMerchants() {
   const ne = bounds.getNorthEast()
 
   try {
-    boundsMerchants.value = await fetchMerchantsWithinBounds({
+    boundsMerchants.value = await fetchRecommendedNearbyMerchants({
       swLat: sw.getLat(),
       swLng: sw.getLng(),
       neLat: ne.getLat(),
@@ -309,9 +432,11 @@ async function loadBoundsMerchants() {
 
 // 카테고리별로 다른 핀을 그리기 위해 기본 Marker 대신 CustomOverlay를 씁니다.
 // textContent로만 넣어서 merchant.name에 이상한 문자가 들어와도 HTML로 해석되지 않게 합니다.
+// recommended=true인 매장만 강조 스타일(.merchant-pin--recommended)을 추가로 붙입니다 -
+// 나머지 매장도 똑같이 핀은 그려지고, 강조만 빠집니다(필터링이 아니라 하이라이트).
 function createMerchantPinElement(merchant) {
   const wrapper = document.createElement('div')
-  wrapper.className = 'merchant-pin'
+  wrapper.className = merchant.recommended ? 'merchant-pin merchant-pin--recommended' : 'merchant-pin'
   wrapper.title = merchant.name ?? ''
 
   const icon = document.createElement('span')
@@ -319,7 +444,7 @@ function createMerchantPinElement(merchant) {
   icon.textContent = getCategoryEmoji(merchant.categoryCode)
   wrapper.appendChild(icon)
 
-  wrapper.addEventListener('click', () => goToStore(merchant.id))
+  wrapper.addEventListener('click', () => selectMerchant(merchant.id))
 
   return wrapper
 }
@@ -365,6 +490,8 @@ function onChipsWheel(event) {
 
 onMounted(async () => {
   merchantsStore.fetchCategories()
+  // 매장 상세(추천 카드)에 쓸 보유 카드 - Storedetail.vue와 동일하게, 이미 있으면 다시 안 받습니다.
+  if (cardsStore.cards.length === 0) cardsStore.fetchCards()
 
   let kakao
   try {
@@ -557,6 +684,98 @@ onMounted(async () => {
   cursor: pointer;
 }
 .sheet-bookmark.active { color: var(--orange, #ffb800); }
+
+.sheet-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding-top: 14px;
+}
+.page-btn {
+  border: 1px solid var(--line, #e7e4de);
+  background: var(--surface, #ffffff);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--charcoal, #24211d);
+  cursor: pointer;
+}
+.page-btn:disabled { opacity: .4; cursor: not-allowed; }
+.page-indicator { font-size: 12px; }
+
+/* 매장 상세 - 바텀시트 안에서 목록 대신 뜨는 영역 (Storedetail.vue와 같은 구성) */
+.detail-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  padding: 0 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted, #8f897f);
+  cursor: pointer;
+}
+
+.store-banner {
+  height: 140px; border-radius: 18px; background: linear-gradient(135deg, #8a6a4a, #4a382a);
+  display: grid; place-items: center; margin-bottom: 16px;
+}
+.banner-icon {
+  width: 56px; height: 56px; border-radius: 50%; background: rgba(255, 255, 255, .25);
+  display: grid; place-items: center; font-size: 26px;
+}
+
+.store-info { margin-bottom: 20px; }
+.store-info .pill { margin-bottom: 8px; }
+.store-name { margin: 0 0 6px; font-size: 18px; color: var(--charcoal, #24211d); }
+.store-address { margin: 0 0 14px; font-size: 13px; }
+
+.benefit-strip {
+  background: #fff6dd; border-radius: 12px; padding: 12px 14px; font-size: 12.5px;
+  color: var(--charcoal, #24211d); line-height: 1.6;
+}
+.benefit-strip strong { color: #b67a00; }
+.benefit-strip--muted { background: var(--inactive, #f0efec); color: var(--muted, #8f897f); }
+.benefit-strip--muted strong { color: inherit; }
+
+.recommend-section { margin-bottom: 24px; }
+.section-title { font-size: 14px; margin: 0 0 12px; color: var(--charcoal, #24211d); }
+
+.reco-card {
+  position: relative;
+  width: 100%;
+  display: block;
+  border: 1px solid var(--line, #e7e4de);
+  background: var(--surface, #ffffff);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.reco-card--best { border: 2px solid var(--orange, #ffbc00); padding: 13px; }
+.reco-card--selected { border: 2px solid var(--orange, #ffbc00); padding: 13px; background: #fffaf0; }
+
+.reco-badge {
+  position: absolute; top: -9px; left: 12px; background: var(--orange, #ffbc00); color: var(--charcoal, #24211d);
+  font-size: 10px; font-weight: 800; border-radius: 6px; padding: 2px 7px;
+}
+
+.reco-top { display: flex; align-items: center; gap: 12px; width: 100%; }
+.reco-icon { width: 40px; height: 26px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 auto; }
+.reco-name-block { flex: 1; min-width: 0; }
+.reco-name-block strong { display: block; font-size: 13.5px; color: var(--charcoal, #24211d); margin-bottom: 3px; }
+.reco-name-block p { margin: 0; font-size: 11px; color: var(--muted, #8f897f); }
+.reco-rate { font-size: 12.5px; font-weight: 800; color: var(--orange, #d98d00); white-space: nowrap; flex: 0 0 auto; }
+.reco-rate--none { color: var(--muted, #8f897f); font-weight: 600; }
+
+.pay-btn {
+  width: 100%; height: 54px; border-radius: 14px; border: none;
+  background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900; font-size: 15px; cursor: pointer;
+}
 </style>
 
 <!--
@@ -570,13 +789,18 @@ onMounted(async () => {
   height: 32px;
   border-radius: 50% 50% 50% 0;
   background: var(--surface, #ffffff);
-  border: 2px solid var(--orange, #ffb800);
+  border: 2px solid var(--muted, #8f897f);
   box-shadow: 0 3px 8px rgba(0, 0, 0, .18);
   transform: rotate(-45deg);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+/* 사용자 보유 카드로 지금 당장 혜택 받을 수 있는 매장만 강조 - 나머지는 위 기본 스타일 그대로 노출 */
+.merchant-pin--recommended {
+  border-color: var(--orange, #ffb800);
+  box-shadow: 0 0 0 4px rgba(255, 184, 0, .25), 0 3px 8px rgba(0, 0, 0, .18);
 }
 .merchant-pin-icon {
   transform: rotate(45deg);
