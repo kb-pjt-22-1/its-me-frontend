@@ -39,7 +39,7 @@
         <span class="sheet-handle"></span>
         <div class="sheet-summary">
           <p class="sheet-meta muted-text">{{ selectedMerchant ? '매장 상세' : '현재 위치 기준' }}</p>
-          <p class="sheet-title">{{ selectedMerchant ? selectedMerchant.name : '반경 1km 내 제휴 매장' }}</p>
+          <p class="sheet-title">{{ selectedMerchant ? selectedMerchant.name : '제휴 매장' }}</p>
         </div>
       </button>
 
@@ -109,14 +109,27 @@
             <h3>주변 제휴 매장</h3>
             <div class="sheet-list-right">
               <span class="muted-text">{{ nearbyMerchants.length }}곳</span>
-              <button class="sort-btn" @click="sortByDistance = !sortByDistance">
-                거리순 <span class="sort-arrow">{{ sortByDistance ? '↓' : '↑' }}</span>
-              </button>
+              <div class="sort-toggle">
+                <button
+                  class="sort-btn"
+                  :class="{ active: sortMode === 'distance' }"
+                  @click="sortMode = 'distance'"
+                >
+                  거리순
+                </button>
+                <button
+                  class="sort-btn"
+                  :class="{ active: sortMode === 'benefit' }"
+                  @click="sortMode = 'benefit'"
+                >
+                  혜택순
+                </button>
+              </div>
             </div>
           </div>
 
           <div v-if="nearbyMerchants.length === 0" class="sheet-empty muted-text">
-            반경 1km 안에 제휴 매장이 없어요.
+            이 화면에 제휴 매장이 없어요.
           </div>
 
           <template v-else>
@@ -169,9 +182,9 @@ const cardsStore = useCardsStore()
 
 // 바텀시트 상태
 const sheetExpanded = ref(false)
-const sortByDistance = ref(true)
+// 'distance' | 'benefit' - '실적순'은 아직 매장 응답에 실적 관련 숫자 데이터가 없어 보류.
+const sortMode = ref('distance')
 const myLocation = ref(null) // { lat, lng }
-const NEARBY_RADIUS_M = 1000
 
 // 두 좌표 사이 거리(m). 별도 API 없이 바텀시트를 boundsMerchants로 정렬하기 위해 씁니다.
 function distanceMeters(lat1, lng1, lat2, lng2) {
@@ -185,8 +198,8 @@ function distanceMeters(lat1, lng1, lat2, lng2) {
 }
 
 // 바텀시트("주변 제휴 매장")는 별도 /nearby 호출 없이, 지도 화면(bounds)에서
-// 이미 받아온 boundsMerchants를 그대로 재사용합니다 - 지도 핀과 항상 같은 데이터를 봅니다.
-// 반경 1km는 클라이언트에서 거리 계산 후 걸러냅니다.
+// 이미 받아온 boundsMerchants를 그대로 재사용합니다 - 지도 핀과 항상 같은 매장을 보여줍니다
+// (거리로 걸러내지 않습니다 - 지도를 내 위치에서 멀리 옮겨도 목록이 비어버리면 안 됨).
 // 밀집 지역에서 목록이 과도하게 길어지지 않도록 지도 핀(MAX_PIN_COUNT)과 같은 취지로 상한을 둡니다.
 const MAX_SHEET_ITEMS = 100
 const nearbyMerchants = computed(() => {
@@ -201,10 +214,14 @@ const nearbyMerchants = computed(() => {
         distanceLabel: distance != null ? formatDistance(distance) : '거리 정보 없음',
       }
     })
-    .filter((m) => m.distanceMeters == null || m.distanceMeters <= NEARBY_RADIUS_M)
 
   const sorted = [...withDistance].sort((a, b) => {
-    if (!sortByDistance.value || a.distanceMeters == null || b.distanceMeters == null) {
+    if (sortMode.value === 'benefit') {
+      const benefitDiff = (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0)
+      if (benefitDiff !== 0) return benefitDiff
+      return a.name.localeCompare(b.name)
+    }
+    if (a.distanceMeters == null || b.distanceMeters == null) {
       return a.name.localeCompare(b.name)
     }
     return a.distanceMeters - b.distanceMeters
@@ -628,6 +645,7 @@ onMounted(async () => {
 }
 .sheet-list-header h3 { margin: 0; font-size: 14px; color: var(--charcoal, #24211d); }
 .sheet-list-right { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.sort-toggle { display: flex; gap: 6px; }
 .sort-btn {
   border: 1px solid var(--line, #e7e4de);
   background: var(--surface, #ffffff);
@@ -637,11 +655,12 @@ onMounted(async () => {
   font-weight: 700;
   color: var(--charcoal, #24211d);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 3px;
 }
-.sort-arrow { font-size: 10px; }
+.sort-btn.active {
+  background: var(--orange, #ffbc00);
+  border-color: var(--orange, #ffbc00);
+  color: var(--charcoal, #24211d);
+}
 
 .sheet-empty { text-align: center; padding: 30px 0; font-size: 13px; }
 

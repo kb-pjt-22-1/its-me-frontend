@@ -284,6 +284,29 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     expect(wrapper.findAll('.sheet-item-info p')[0].text()).toContain('거리 정보 없음')
   })
 
+  it('내 위치에서 1km 넘게 떨어진 매장도 목록에서 사라지지 않는다 (지도 핀과 같은 매장을 보여줌)', async () => {
+    const originalGeolocation = navigator.geolocation
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success) => success({ coords: { latitude: 37.5665, longitude: 126.978 } }),
+      },
+    })
+
+    try {
+      window.kakao = createKakaoMock().kakao
+      const FAR_MERCHANT = { id: 9, name: '먼 매장', categoryCode: '5813', lat: 38.5, lng: 128.5 } // 수백 km 떨어짐
+      fetchRecommendedNearbyMerchants.mockResolvedValue([FAR_MERCHANT])
+
+      const wrapper = mountMapPage()
+      await flushPromises()
+
+      expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['먼 매장'])
+    } finally {
+      Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
+    }
+  })
+
   it('recommended=true면 목록에서도 혜택 매장 pill로 보여주고, 아니면 pill을 그리지 않는다', async () => {
     window.kakao = createKakaoMock().kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([
@@ -300,6 +323,33 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
 
     expect(cafeItem.find('.pill--gold').text()).toBe('혜택 매장')
     expect(martItem.find('.pill--gold').exists()).toBe(false)
+  })
+
+  it('혜택순 버튼을 누르면 recommended=true인 매장이 먼저 오고, 거리순으로 되돌리면 원래 순서로 돌아간다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      MART_MERCHANT,
+      { ...CAFE_MERCHANT, recommended: true },
+    ])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    // 기본(거리순, 내 위치 없어 이름순 폴백) - 마트가 먼저
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
+
+    const benefitBtn = wrapper.findAll('.sort-btn').find((btn) => btn.text() === '혜택순')
+    await benefitBtn.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페', '동네 마트'])
+    expect(benefitBtn.classes()).toContain('active')
+
+    const distanceBtn = wrapper.findAll('.sort-btn').find((btn) => btn.text() === '거리순')
+    await distanceBtn.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
   })
 
   it('매장이 10개 이하면 페이지 버튼을 보여주지 않는다', async () => {
