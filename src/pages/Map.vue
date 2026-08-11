@@ -27,14 +27,17 @@
       </div>
     </div>
 
-    <button class="locate-btn" :class="{ 'locate-btn--raised': sheetExpanded }" @click="recenterToMyLocation" aria-label="내 위치로 이동">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-      </svg>
-    </button>
-
     <!-- 제휴 매장 바텀시트 (매장 선택 시 같은 자리에서 상세로 전환) -->
     <div class="store-sheet" :class="{ expanded: sheetExpanded }">
+      <!-- store-sheet의 자식으로 둬서, 시트가 펼쳐지든 접히든(transform) 시트와 함께
+           같은 좌표계로 움직입니다 - 시트 높이가 내용에 따라 달라져도(매장이 적으면 50%보다
+           작게 렌더링됨) 항상 시트 맨 위 12px 위에 붙어있습니다. -->
+      <button class="locate-btn" @click="recenterToMyLocation" aria-label="내 위치로 이동">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+        </svg>
+      </button>
+
       <button class="sheet-handle-area" @click="sheetExpanded = !sheetExpanded" aria-label="매장 목록 펼치기/접기">
         <span class="sheet-handle"></span>
         <div class="sheet-summary">
@@ -606,8 +609,7 @@ onMounted(async () => {
 
 <style scoped>
 .map-page {
-  /* store-sheet가 펼쳐졌을 때 최대 높이 - locate-btn--raised도 같은 값을 참조해서
-     항상 store-sheet 바로 위에 붙도록 한다(값이 따로 놀면 버튼이 시트보다 높이 뜬다). */
+  /* store-sheet가 펼쳐졌을 때 최대 높이. */
   --sheet-expanded-height: 50%;
   position: relative;
   width: 100%;
@@ -649,14 +651,13 @@ onMounted(async () => {
 }
 .chip.active { background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); }
 
+/* store-sheet의 자식이라 top이 store-sheet 자신의 (변환 전) 박스 기준입니다 - 버튼 높이(46px)
+   + 간격(12px)만큼 위에 두면, store-sheet에 걸린 transform(펼침/접힘)이 부모-자식을 함께
+   움직여서 시트 실제 높이(내용에 따라 50%보다 작을 수도 있음)와 무관하게 항상 시트 바로 위에 있습니다. */
 .locate-btn {
-  position: absolute; right: 18px; bottom: 108px; width: 46px; height: 46px; border-radius: 50%;
+  position: absolute; right: 18px; top: -58px; width: 46px; height: 46px; border-radius: 50%;
   border: none; background: var(--surface, #ffffff); box-shadow: 0 6px 16px rgba(0, 0, 0, .15);
   display: grid; place-items: center; color: var(--charcoal, #24211d); z-index: 20; cursor: pointer;
-  transition: bottom 280ms cubic-bezier(.2, .8, .2, 1);
-}
-.locate-btn--raised {
-  bottom: calc(var(--sheet-expanded-height) + 12px);
 }
 
 /* 제휴 매장 바텀시트 - 평소엔 손잡이+제목 한 줄만 보이다가, 누르면 위로 올라옵니다 */
