@@ -60,13 +60,24 @@ describe('fetchMerchantList', () => {
 })
 
 describe('fetchRecommendedNearbyMerchants', () => {
-  it('bounds 네 좌표를 params로 넘기고, recommended 플래그를 포함해 정규화해서 반환한다', async () => {
+  it('bounds 네 좌표와 center를 params로 넘기고, recommended 플래그를 포함해 정규화해서 반환한다', async () => {
     api.get.mockResolvedValueOnce({ data: [{ ...rawMerchant, recommended: true }] })
 
-    const result = await fetchRecommendedNearbyMerchants({ swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 })
+    const result = await fetchRecommendedNearbyMerchants(
+      { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 },
+      { lat: 37.5, lng: 127.1 },
+    )
 
     expect(api.get).toHaveBeenCalledWith('/v1/merchants/recommendations', {
-      params: { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2, categoryCode: undefined },
+      params: {
+        swLat: 37.4,
+        swLng: 127.0,
+        neLat: 37.6,
+        neLng: 127.2,
+        centerLat: 37.5,
+        centerLng: 127.1,
+        categoryCode: undefined,
+      },
     })
     expect(result).toEqual([{ ...normalizedMerchant, recommended: true }])
   })
@@ -74,10 +85,22 @@ describe('fetchRecommendedNearbyMerchants', () => {
   it('categoryCode를 넘기면 그대로 params에 포함한다', async () => {
     api.get.mockResolvedValueOnce({ data: [] })
 
-    await fetchRecommendedNearbyMerchants({ swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 }, '5812')
+    await fetchRecommendedNearbyMerchants(
+      { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 },
+      { lat: 37.5, lng: 127.1 },
+      '5812',
+    )
 
     expect(api.get).toHaveBeenCalledWith('/v1/merchants/recommendations', {
-      params: { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2, categoryCode: '5812' },
+      params: {
+        swLat: 37.4,
+        swLng: 127.0,
+        neLat: 37.6,
+        neLng: 127.2,
+        centerLat: 37.5,
+        centerLng: 127.1,
+        categoryCode: '5812',
+      },
     })
   })
 })

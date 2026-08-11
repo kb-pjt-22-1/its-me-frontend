@@ -105,6 +105,11 @@
 
         <!-- 목록: bounds 안 제휴 매장을 10개씩 페이징해서 보여줍니다 -->
         <template v-else>
+          <div v-if="clusterFilterMerchantIds" class="cluster-filter-banner">
+            <span>선택한 클러스터의 매장만 보는 중이에요</span>
+            <button @click="clusterFilterMerchantIds = null">전체 보기</button>
+          </div>
+
           <div class="sheet-list-header">
             <h3>주변 제휴 매장</h3>
             <div class="sheet-list-right">
@@ -200,10 +205,17 @@ function distanceMeters(lat1, lng1, lat2, lng2) {
 // 바텀시트("주변 제휴 매장")는 별도 /nearby 호출 없이, 지도 화면(bounds)에서
 // 이미 받아온 boundsMerchants를 그대로 재사용합니다 - 지도 핀과 항상 같은 매장을 보여줍니다
 // (거리로 걸러내지 않습니다 - 지도를 내 위치에서 멀리 옮겨도 목록이 비어버리면 안 됨).
-// 밀집 지역에서 목록이 과도하게 길어지지 않도록 지도 핀(MAX_PIN_COUNT)과 같은 취지로 상한을 둡니다.
+// 밀집 지역에서 목록이 과도하게 길어지지 않도록 상한을 둡니다.
 const MAX_SHEET_ITEMS = 100
+// 클러스터 핀을 클릭하면 그 안에 뭉쳐있던 매장 id만 담아, 목록을 그 매장들로 좁혀 보여줍니다.
+// null이면 필터 없음(화면 안 전체). bounds가 새로 갱신되면(팬/줌) 초기화합니다.
+const clusterFilterMerchantIds = ref(null)
 const nearbyMerchants = computed(() => {
-  const withDistance = boundsMerchantsWithCategory.value
+  const source = clusterFilterMerchantIds.value
+    ? boundsMerchantsWithCategory.value.filter((m) => clusterFilterMerchantIds.value.has(m.id))
+    : boundsMerchantsWithCategory.value
+
+  const withDistance = source
     .map((m) => {
       const distance = myLocation.value
         ? distanceMeters(myLocation.value.lat, myLocation.value.lng, m.lat, m.lng)
@@ -354,6 +366,7 @@ watch(nearbyMerchants, () => {
 
 let kakaoInstance = null
 let mapInstance = null
+let clusterer = null
 let markers = []
 
 function loadKakaoMapScript() {
@@ -378,7 +391,8 @@ function loadKakaoMapScript() {
     }
     const script = document.createElement('script')
     script.dataset.kakaoMap = 'true'
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_MAP_KEY}&autoload=false`
+    // libraries=clusterer: 핀이 많을 때 MarkerClusterer로 묶어서 보여주는 데 필요합니다.
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_MAP_KEY}&autoload=false&libraries=clusterer`
     script.onload = () => {
       window.kakao.maps.load(() => resolve(window.kakao))
     }
@@ -388,14 +402,10 @@ function loadKakaoMapScript() {
   })
 }
 
-// 이 레벨보다 축소하면(숫자가 커질수록 축소) 매장이 하도 많아서(2만개+) bounds 안에도
-// 몇천 개가 잡힐 수 있어 아예 조회를 안 합니다. 카카오맵 레벨 3이 초기 기본값.
-const MAX_PIN_LEVEL = 6
-// bounds 조회는 서버에서 걸러서 오지만, 혹시나 응답이 많을 때를 대비해 마커 생성
-// 개수 자체도 상한선으로 막아둡니다.
-const MAX_PIN_COUNT = 300
-
 let boundsLoadTimer = null
+// loadBoundsMerchants 호출마다 증가시켜, 응답이 요청 순서와 다르게 도착해도
+// "마지막으로 보낸 요청"의 응답만 반영하기 위한 토큰.
+let boundsRequestId = 0
 
 // 줌 스크롤/드래그 중엔 idle 이벤트가 짧은 간격으로 여러 번 발생해서, 매번 새로 요청하면
 // 그 자체가 버벅임의 원인이 됩니다. 제스처가 끝나고 나서 한 번만 요청하도록 디바운스.
@@ -414,74 +424,118 @@ function initMap(kakao, center) {
   const centerMarker = new kakao.maps.Marker({ map, position: new kakao.maps.LatLng(center.lat, center.lng) })
   kakaoInstance = kakao
   mapInstance = map
+
+  // 매장이 몰려있으면 핀을 하나로 뭉쳐서 보여줍니다. MarkerClusterer는 CustomOverlay를
+  // 받지 못하고 kakao.maps.Marker만 받을 수 있어(SDK 제약) 핀을 Marker+MarkerImage로 그립니다.
+  clusterer = new kakao.maps.MarkerClusterer({
+    map,
+    averageCenter: true,
+    disableClickZoom: true, // 클릭 시 확대하는 대신, 안에 뭉친 매장들을 하단 목록에 보여줍니다.
+  })
+  kakao.maps.event.addListener(clusterer, 'clusterclick', onClusterClick)
+
   // 줌/드래그가 끝날 때마다(idle) 화면에 보이는 영역의 매장만 새로 받아옵니다.
   kakao.maps.event.addListener(map, 'idle', scheduleLoadBoundsMerchants)
   loadBoundsMerchants()
 }
 
-// 매장 전체를 미리 안 받고, 지금 화면(bounds)에 보이는 매장을 전부 받아옵니다. 응답의
-// recommended(boolean)로 "사용자 보유 카드로 지금 당장 혜택 받을 수 있는 매장"만
+// 클러스터 핀 클릭 시, 그 안에 뭉쳐있던 매장들만 하단 "제휴 매장" 목록에 보여줍니다.
+function onClusterClick(cluster) {
+  const clusterMerchantIds = cluster
+    .getMarkers()
+    .map((marker) => marker.merchantRef?.id)
+    .filter((id) => id != null)
+  if (clusterMerchantIds.length === 0) return
+  clusterFilterMerchantIds.value = new Set(clusterMerchantIds)
+  sheetExpanded.value = true
+}
+
+// 매장 전체를 미리 안 받고, 지금 화면(bounds)에 보이는 매장을 지도 중심에서 가까운 순으로
+// 최대 500개(백엔드 LIMIT) 받아옵니다. 축소해서 매장이 몰려도 검색 자체는 항상 동작하고,
+// 화면이 빽빽해지는 문제는 클러스터링(renderMerchantMarkers)이 시각적으로 해결합니다.
+// 응답의 recommended(boolean)로 "사용자 보유 카드로 지금 당장 혜택 받을 수 있는 매장"만
 // 하이라이트하고, 나머지도 전부 핀으로 보여줍니다(추천 매장만 남기는 필터링이 아닙니다).
 async function loadBoundsMerchants() {
   if (!kakaoInstance || !mapInstance) return
 
-  if (mapInstance.getLevel() > MAX_PIN_LEVEL) {
-    boundsMerchants.value = []
-    return
-  }
-
   const bounds = mapInstance.getBounds()
   const sw = bounds.getSouthWest()
   const ne = bounds.getNorthEast()
+  const center = mapInstance.getCenter()
+
+  // 지도 컨테이너가 아직 실제 크기로 자리잡기 전(레이아웃 트랜지션 등)엔 idle이
+  // SW===NE인 크기 0짜리 bounds를 보고할 때가 있다. 이 상태로 조회하면 항상 빈
+  // 배열을 받아서, 방금 정상적으로 그려진 매장을 지워버리므로 아예 요청하지 않는다.
+  if (sw.getLat() === ne.getLat() && sw.getLng() === ne.getLng()) {
+    return
+  }
+
+  // idle이 짧은 간격으로 여러 번 발생하면 요청도 여러 번 나가는데, 네트워크 응답은
+  // 요청을 보낸 순서대로 도착한다는 보장이 없다. 더 나중에 보낸 요청이 있다면 이번
+  // 응답은 낡은 것이니 반영하지 않는다(안 그러면 최신 화면이 예전 결과로 덮어써짐).
+  const requestId = ++boundsRequestId
 
   try {
-    boundsMerchants.value = await fetchRecommendedNearbyMerchants({
-      swLat: sw.getLat(),
-      swLng: sw.getLng(),
-      neLat: ne.getLat(),
-      neLng: ne.getLng(),
-    })
+    const result = await fetchRecommendedNearbyMerchants(
+      { swLat: sw.getLat(), swLng: sw.getLng(), neLat: ne.getLat(), neLng: ne.getLng() },
+      { lat: center.getLat(), lng: center.getLng() },
+    )
+    if (requestId !== boundsRequestId) return
+    boundsMerchants.value = result
+    clusterFilterMerchantIds.value = null // 화면이 갱신됐으니 이전 클러스터 선택은 해제
   } catch (err) {
+    if (requestId !== boundsRequestId) return
     console.warn('지도 영역 매장 조회 실패', err)
     boundsMerchants.value = []
+    clusterFilterMerchantIds.value = null
   }
 }
 
-// 카테고리별로 다른 핀을 그리기 위해 기본 Marker 대신 CustomOverlay를 씁니다.
-// textContent로만 넣어서 merchant.name에 이상한 문자가 들어와도 HTML로 해석되지 않게 합니다.
-// recommended=true인 매장만 강조 스타일(.merchant-pin--recommended)을 추가로 붙입니다 -
+// 핀 모양(물방울 + 카테고리 이모지)을 SVG로 그려서 MarkerImage로 씁니다. MarkerClusterer가
+// CustomOverlay를 못 받고 Marker만 받아서(SDK 제약) DOM 대신 이 방식을 씁니다.
+// recommended=true인 매장만 테두리 색과 은은한 후광으로 강조합니다 -
 // 나머지 매장도 똑같이 핀은 그려지고, 강조만 빠집니다(필터링이 아니라 하이라이트).
-function createMerchantPinElement(merchant) {
-  const wrapper = document.createElement('div')
-  wrapper.className = merchant.recommended ? 'merchant-pin merchant-pin--recommended' : 'merchant-pin'
-  wrapper.title = merchant.name ?? ''
+const PIN_WIDTH = 32
+const PIN_HEIGHT = 40
+function buildMerchantMarkerImage(kakao, merchant) {
+  const recommended = !!merchant.recommended
+  const borderColor = recommended ? '#ffb800' : '#8f897f'
+  const emoji = getCategoryEmoji(merchant.categoryCode)
+  const glow = recommended ? '<circle cx="16" cy="15" r="15" fill="#ffb800" fill-opacity="0.22"/>' : ''
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_WIDTH}" height="${PIN_HEIGHT}" viewBox="0 0 32 40">` +
+    glow +
+    `<path d="M16 39C16 39 4 23.6 4 15A12 12 0 1 1 28 15C28 23.6 16 39 16 39Z" fill="#ffffff" stroke="${borderColor}" stroke-width="2.5"/>` +
+    `<text x="16" y="20" font-size="14" text-anchor="middle" dominant-baseline="middle">${emoji}</text>` +
+    '</svg>'
+  const src = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+  return new kakao.maps.MarkerImage(src, new kakao.maps.Size(PIN_WIDTH, PIN_HEIGHT), {
+    offset: new kakao.maps.Point(PIN_WIDTH / 2, PIN_HEIGHT),
+  })
+}
 
-  const icon = document.createElement('span')
-  icon.className = 'merchant-pin-icon'
-  icon.textContent = getCategoryEmoji(merchant.categoryCode)
-  wrapper.appendChild(icon)
-
-  wrapper.addEventListener('click', () => selectMerchant(merchant.id))
-
-  return wrapper
+function createMerchantMarker(kakao, merchant) {
+  const marker = new kakao.maps.Marker({
+    position: new kakao.maps.LatLng(merchant.lat, merchant.lng),
+    image: buildMerchantMarkerImage(kakao, merchant),
+    title: merchant.name ?? '',
+  })
+  // 클러스터 클릭 시 그 안에 뭉친 매장이 무엇인지 되짚어 찾기 위해 마커에 직접 붙여둡니다.
+  marker.merchantRef = merchant
+  kakao.maps.event.addListener(marker, 'click', () => selectMerchant(merchant.id))
+  return marker
 }
 
 function renderMerchantMarkers() {
-  if (!kakaoInstance || !mapInstance) return
-  markers.forEach((marker) => marker.setMap(null))
+  if (!kakaoInstance || !mapInstance || !clusterer) return
+  clusterer.clear()
   markers = []
 
   for (const merchant of merchants.value) {
-    if (markers.length >= MAX_PIN_COUNT) break
     if (merchant.lat == null || merchant.lng == null) continue
-    const marker = new kakaoInstance.maps.CustomOverlay({
-      map: mapInstance,
-      position: new kakaoInstance.maps.LatLng(merchant.lat, merchant.lng),
-      content: createMerchantPinElement(merchant),
-      yAnchor: 1,
-    })
-    markers.push(marker)
+    markers.push(createMerchantMarker(kakaoInstance, merchant))
   }
+  clusterer.addMarkers(markers)
 }
 
 watch(merchants, renderMerchantMarkers)
@@ -795,35 +849,26 @@ onMounted(async () => {
   width: 100%; height: 54px; border-radius: 14px; border: none;
   background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900; font-size: 15px; cursor: pointer;
 }
-</style>
 
-<!--
-  카카오맵 CustomOverlay의 content는 Vue 템플릿이 아니라 순수 document.createElement로 만든
-  DOM이라 scoped 스타일의 data-v-* 속성이 안 붙습니다. 그래서 이 규칙만 스코프 없는
-  일반 style 블록에 둡니다.
--->
-<style>
-.merchant-pin {
-  width: 32px;
-  height: 32px;
-  border-radius: 50% 50% 50% 0;
-  background: var(--surface, #ffffff);
-  border: 2px solid var(--muted, #8f897f);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, .18);
-  transform: rotate(-45deg);
+.cluster-filter-banner {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #fff6dd;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--charcoal, #24211d);
+}
+.cluster-filter-banner button {
+  border: none;
+  background: none;
+  color: #b67a00;
+  font-weight: 700;
+  font-size: 12px;
   cursor: pointer;
-}
-/* 사용자 보유 카드로 지금 당장 혜택 받을 수 있는 매장만 강조 - 나머지는 위 기본 스타일 그대로 노출 */
-.merchant-pin--recommended {
-  border-color: var(--orange, #ffb800);
-  box-shadow: 0 0 0 4px rgba(255, 184, 0, .25), 0 3px 8px rgba(0, 0, 0, .18);
-}
-.merchant-pin-icon {
-  transform: rotate(45deg);
-  font-size: 15px;
-  line-height: 1;
+  white-space: nowrap;
 }
 </style>

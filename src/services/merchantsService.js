@@ -7,20 +7,24 @@ export async function fetchMerchantList() {
 }
 
 /**
- * 지도 화면(bounds) 안의 매장을 전부 조회한다 [GET /api/v1/merchants/recommendations?swLat=&swLng=&neLat=&neLng=&categoryCode=]
- * 매장 전체(2만 건+)를 한 번에 안 받고, 지도에 지금 보이는 영역만 요청합니다.
+ * 지도 화면(bounds) 안의 매장을 지도 중심에서 가까운 순으로 최대 500개 조회한다
+ * [GET /api/v1/merchants/recommendations?swLat=&swLng=&neLat=&neLng=&centerLat=&centerLng=&categoryCode=]
+ * 매장 전체(2만 건+)를 한 번에 안 받고, 지도에 지금 보이는 영역만 요청합니다. bounds가
+ * 넓어져도 응답이 무한정 커지지 않도록 백엔드가 centerLat/centerLng 기준 거리순으로
+ * 500개까지만 잘라서 내려줍니다 - 나머지는 화면에서 마커 클러스터링으로 뭉쳐 보여줍니다.
  * 필터링이 아니라 전체 목록 + 표시용 플래그입니다: 응답(MerchantRecommendationResponseDto[])은
  * 일반 매장 조회와 필드가 같고 recommended(boolean)만 추가로 옵니다 - 사용자 보유 카드로
- * 지금 당장 혜택 받을 수 있는 매장만 true. 화면에서는 매장을 전부 핀으로 보여주되,
- * recommended=true인 매장만 하이라이트합니다.
+ * 지금 당장 혜택 받을 수 있는 매장만 true.
  */
-export async function fetchRecommendedNearbyMerchants(bounds, categoryCode) {
+export async function fetchRecommendedNearbyMerchants(bounds, center, categoryCode) {
   const { data } = await api.get('/v1/merchants/recommendations', {
     params: {
       swLat: bounds.swLat,
       swLng: bounds.swLng,
       neLat: bounds.neLat,
       neLng: bounds.neLng,
+      centerLat: center.lat,
+      centerLng: center.lng,
       categoryCode,
     },
   })

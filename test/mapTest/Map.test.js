@@ -21,11 +21,27 @@ import MapPage from '@/pages/Map.vue'
 import { useMerchantsStore } from '@/stores/merchants'
 import { fetchRecommendedNearbyMerchants, fetchMerchantCategories } from '@/services/merchantsService'
 
-// 카카오맵 SDK 대신 CustomOverlay 생성 호출을 가로채서 검증하기 위한 최소 mock.
+// 카카오맵 SDK 대신 Marker/MarkerClusterer 생성과 이벤트 등록을 가로채서 검증하기 위한 최소 mock.
 // Map.vue의 loadKakaoMapScript()는 window.kakao.maps가 이미 있으면 그대로 resolve하므로
 // 실제 스크립트를 로드하지 않고도 initMap -> loadBoundsMerchants -> renderMerchantMarkers까지 탈 수 있다.
+// MarkerClusterer는 CustomOverlay를 못 받고 Marker만 받을 수 있어(SDK 제약) 매장 핀은
+// kakao.maps.Marker + MarkerImage(SVG data URI)로 그려진다 - 사용자 위치 마커(centerMarker)는
+// map 옵션으로 바로 지도에 올라가고 clusterer.addMarkers()를 거치지 않으므로,
+// clusterer.markers로 보면 매장 핀만 자연스럽게 구분된다.
 function createKakaoMock({ level = 3 } = {}) {
-  const customOverlayInstances = []
+  const markerInstances = []
+  const listenerMap = new Map() // target -> { eventName: handler[] }
+  let clustererInstance = null
+
+  function addListener(target, eventName, handler) {
+    if (!listenerMap.has(target)) listenerMap.set(target, {})
+    const events = listenerMap.get(target)
+    ;(events[eventName] ??= []).push(handler)
+  }
+  function trigger(target, eventName, ...args) {
+    const events = listenerMap.get(target)
+    ;(events?.[eventName] ?? []).forEach((handler) => handler(...args))
+  }
 
   class LatLng {
     constructor(lat, lng) {
@@ -33,11 +49,45 @@ function createKakaoMock({ level = 3 } = {}) {
       this.lng = lng
     }
   }
-  class CustomOverlay {
+  class Size {
+    constructor(width, height) {
+      this.width = width
+      this.height = height
+    }
+  }
+  class Point {
+    constructor(x, y) {
+      this.x = x
+      this.y = y
+    }
+  }
+  class MarkerImage {
+    constructor(src, size, options) {
+      this.src = src
+      this.size = size
+      this.options = options
+    }
+  }
+  class Marker {
+    constructor(options = {}) {
+      this.options = options
+      this.position = options.position
+      this.title = options.title
+      this.image = options.image
+      markerInstances.push(this)
+    }
+  }
+  class MarkerClusterer {
     constructor(options) {
       this.options = options
-      this.setMap = vi.fn()
-      customOverlayInstances.push(this)
+      this.markers = []
+      clustererInstance = this
+    }
+    addMarkers(markers) {
+      this.markers.push(...markers)
+    }
+    clear() {
+      this.markers = []
     }
   }
 
@@ -48,6 +98,7 @@ function createKakaoMock({ level = 3 } = {}) {
   const mapInstance = {
     getLevel: vi.fn(() => level),
     getBounds: vi.fn(() => bounds),
+    getCenter: vi.fn(() => ({ getLat: () => 37.5, getLng: () => 127.1 })),
     panTo: vi.fn(),
   }
   class KakaoMap {
@@ -60,14 +111,26 @@ function createKakaoMock({ level = 3 } = {}) {
     kakao: {
       maps: {
         Map: KakaoMap,
-        Marker: class {},
-        CustomOverlay,
+        Marker,
+        MarkerImage,
+        MarkerClusterer,
+        Size,
+        Point,
         LatLng,
-        event: { addListener: vi.fn() },
+        event: { addListener },
       },
     },
-    customOverlayInstances,
+    markerInstances,
+    getClusterer: () => clustererInstance,
+    trigger,
+    mapInstance,
   }
+}
+
+// data:image/svg+xml;charset=UTF-8,<encoded> 형태의 MarkerImage src를 원래 SVG 문자열로 되돌린다.
+function decodedPinSvg(marker) {
+  const commaIndex = marker.image.src.indexOf(',')
+  return decodeURIComponent(marker.image.src.slice(commaIndex + 1))
 }
 
 function mountMapPage() {
@@ -105,28 +168,25 @@ afterEach(() => {
 })
 
 describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
-  it('마운트 시 지도 화면 범위로 매장을 조회해서 핀을 그리고, 클릭하면 바텀시트 자리에 매장 상세를 보여준다', async () => {
-    const { kakao, customOverlayInstances } = createKakaoMock()
+  it('마운트 시 지도 화면 범위와 중심 좌표로 매장을 조회해서 핀을 그리고, 클릭하면 바텀시트 자리에 매장 상세를 보여준다', async () => {
+    const { kakao, getClusterer, trigger } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
 
     const wrapper = mountMapPage()
     await flushPromises()
 
-    expect(fetchRecommendedNearbyMerchants).toHaveBeenCalledWith({
-      swLat: 37.4,
-      swLng: 127.0,
-      neLat: 37.6,
-      neLng: 127.2,
-    })
-    expect(customOverlayInstances).toHaveLength(1)
+    expect(fetchRecommendedNearbyMerchants).toHaveBeenCalledWith(
+      { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 },
+      { lat: 37.5, lng: 127.1 },
+    )
+    expect(getClusterer().markers).toHaveLength(1)
 
-    const pinEl = customOverlayInstances[0].options.content
-    expect(pinEl.className).toBe('merchant-pin')
-    expect(pinEl.title).toBe('동네 카페')
-    expect(pinEl.querySelector('.merchant-pin-icon').textContent).toBe('☕')
+    const pin = getClusterer().markers[0]
+    expect(pin.title).toBe('동네 카페')
+    expect(decodedPinSvg(pin)).toContain('☕')
 
-    pinEl.click()
+    trigger(pin, 'click')
     await flushPromises()
 
     // 새 페이지로 이동하지 않고, 같은 바텀시트 안에서 목록 대신 상세가 뜬다.
@@ -139,8 +199,8 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(wrapper.find('.sheet-list-header').exists()).toBe(true)
   })
 
-  it('recommended=true인 매장만 핀에 강조 클래스가 붙고, 나머지는 그냥 핀만 뜬다', async () => {
-    const { kakao, customOverlayInstances } = createKakaoMock()
+  it('recommended=true인 매장만 핀 테두리가 강조 색상으로 그려지고, 나머지는 기본 색상 핀만 뜬다', async () => {
+    const { kakao, getClusterer } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([
       { ...CAFE_MERCHANT, recommended: true },
@@ -150,11 +210,11 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     mountMapPage()
     await flushPromises()
 
-    expect(customOverlayInstances).toHaveLength(2) // 추천 여부와 무관하게 둘 다 핀으로 뜬다
-    const cafePin = customOverlayInstances.find((o) => o.options.content.title === '동네 카페').options.content
-    const martPin = customOverlayInstances.find((o) => o.options.content.title === '동네 마트').options.content
-    expect(cafePin.className).toBe('merchant-pin merchant-pin--recommended')
-    expect(martPin.className).toBe('merchant-pin')
+    expect(getClusterer().markers).toHaveLength(2) // 추천 여부와 무관하게 둘 다 핀으로 뜬다
+    const cafePin = getClusterer().markers.find((m) => m.title === '동네 카페')
+    const martPin = getClusterer().markers.find((m) => m.title === '동네 마트')
+    expect(decodedPinSvg(cafePin)).toContain('stroke="#ffb800"')
+    expect(decodedPinSvg(martPin)).toContain('stroke="#8f897f"')
   })
 
   it('마운트 시 전체 매장이 아니라 카테고리 목록만 가볍게 불러온다', async () => {
@@ -167,7 +227,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
   })
 
   it('매장 이름이 없으면 빈 title을, 모르는 카테고리면 기본 이모지(📍)를 쓴다', async () => {
-    const { kakao, customOverlayInstances } = createKakaoMock()
+    const { kakao, getClusterer, trigger } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([
       { id: 2, name: undefined, categoryCode: '9999', lat: 37.6, lng: 127.1 },
@@ -176,12 +236,12 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     const wrapper = mountMapPage()
     await flushPromises()
 
-    expect(customOverlayInstances).toHaveLength(1)
-    const pinEl = customOverlayInstances[0].options.content
-    expect(pinEl.title).toBe('')
-    expect(pinEl.querySelector('.merchant-pin-icon').textContent).toBe('📍')
+    expect(getClusterer().markers).toHaveLength(1)
+    const pin = getClusterer().markers[0]
+    expect(pin.title).toBe('')
+    expect(decodedPinSvg(pin)).toContain('📍')
 
-    pinEl.click()
+    trigger(pin, 'click')
     await flushPromises()
 
     expect(routerMock.push).not.toHaveBeenCalled()
@@ -189,7 +249,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
   })
 
   it('lat/lng이 없는 매장은 핀을 만들지 않는다', async () => {
-    const { kakao, customOverlayInstances } = createKakaoMock()
+    const { kakao, getClusterer } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([
       { id: 3, name: '좌표 없음', categoryCode: '5813', lat: null, lng: null },
@@ -198,12 +258,28 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     mountMapPage()
     await flushPromises()
 
-    expect(customOverlayInstances).toHaveLength(0)
+    expect(getClusterer().markers).toHaveLength(0)
   })
 
-  it('지도가 MAX_PIN_LEVEL(6)보다 축소된 상태면 조회 자체를 하지 않는다', async () => {
-    const { kakao } = createKakaoMock({ level: 7 })
+  it('지도를 아무리 축소해도(레벨이 높아도) 조회는 계속 동작한다 - 화면이 빽빽해지는 문제는 클러스터링이 해결한다', async () => {
+    const { kakao } = createKakaoMock({ level: 10 })
     window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
+
+    mountMapPage()
+    await flushPromises()
+
+    expect(fetchRecommendedNearbyMerchants).toHaveBeenCalled()
+  })
+
+  it('bounds가 SW===NE로 찌그러져 있으면(레이아웃 확정 전 등) 조회 자체를 하지 않는다', async () => {
+    const { kakao, mapInstance } = createKakaoMock()
+    window.kakao = kakao
+    // 지도 컨테이너가 아직 실제 크기를 잡기 전 idle이 보고할 수 있는 크기 0짜리 bounds.
+    mapInstance.getBounds.mockReturnValueOnce({
+      getSouthWest: () => ({ getLat: () => 37.5, getLng: () => 127.0 }),
+      getNorthEast: () => ({ getLat: () => 37.5, getLng: () => 127.0 }),
+    })
 
     mountMapPage()
     await flushPromises()
@@ -212,27 +288,77 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
   })
 })
 
-describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라이언트에서 동작', () => {
-  it('검색어를 입력하면 서버 재요청 없이, 화면 안 매장 중 이름/카테고리명이 일치하는 것만 남긴다', async () => {
-    const { kakao, customOverlayInstances } = createKakaoMock()
+describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보여준다', () => {
+  it('클러스터 클릭 시 그 안의 매장만 목록에 남고, 전체 보기를 누르면 원래대로 돌아온다', async () => {
+    const { kakao, getClusterer, trigger } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
 
     const wrapper = mountMapPage()
     await flushPromises()
-    expect(customOverlayInstances).toHaveLength(2)
 
-    customOverlayInstances.length = 0 // 마운트 시 렌더링분 정리, 검색 후 새로 그려진 것만 확인
+    const clusterer = getClusterer()
+    const cafePin = clusterer.markers.find((m) => m.title === '동네 카페')
+
+    trigger(clusterer, 'clusterclick', { getMarkers: () => [cafePin] })
+    await flushPromises()
+
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
+    expect(wrapper.find('.cluster-filter-banner').exists()).toBe(true)
+
+    await wrapper.find('.cluster-filter-banner button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.cluster-filter-banner').exists()).toBe(false)
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
+  })
+
+  it('지도가 다시 갱신되면(팬/줌) 이전 클러스터 선택은 초기화된다', async () => {
+    const { kakao, getClusterer, trigger, mapInstance } = createKakaoMock()
+    window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const clusterer = getClusterer()
+    const cafePin = clusterer.markers.find((m) => m.title === '동네 카페')
+    trigger(clusterer, 'clusterclick', { getMarkers: () => [cafePin] })
+    await flushPromises()
+    expect(wrapper.find('.cluster-filter-banner').exists()).toBe(true)
+
+    // idle(팬/줌 종료)이 다시 발생하면 loadBoundsMerchants가 150ms 디바운스 후 재조회하고,
+    // 새 결과가 반영되면서 이전 클러스터 선택은 해제된다.
+    fetchRecommendedNearbyMerchants.mockResolvedValue([MART_MERCHANT])
+    trigger(mapInstance, 'idle')
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    await flushPromises()
+
+    expect(wrapper.find('.cluster-filter-banner').exists()).toBe(false)
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
+  })
+})
+
+describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라이언트에서 동작', () => {
+  it('검색어를 입력하면 서버 재요청 없이, 화면 안 매장 중 이름/카테고리명이 일치하는 것만 남긴다', async () => {
+    const { kakao, getClusterer } = createKakaoMock()
+    window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+    expect(getClusterer().markers).toHaveLength(2)
+
     await wrapper.find('input').setValue('카페')
     await flushPromises()
 
     expect(fetchRecommendedNearbyMerchants).toHaveBeenCalledTimes(1) // 검색은 추가 네트워크 요청을 만들지 않는다
-    expect(customOverlayInstances).toHaveLength(1)
-    expect(customOverlayInstances[0].options.content.title).toBe('동네 카페')
+    expect(getClusterer().markers).toHaveLength(1)
+    expect(getClusterer().markers[0].title).toBe('동네 카페')
   })
 
   it("'전체' 칩은 더 이상 없고, 카테고리 칩을 고르면 해당 카테고리 매장만 남긴다", async () => {
-    const { kakao, customOverlayInstances } = createKakaoMock()
+    const { kakao, getClusterer } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
 
@@ -241,33 +367,30 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
 
     expect(wrapper.findAll('.chip').map((c) => c.text())).toEqual(['카페', '마트'])
 
-    customOverlayInstances.length = 0
     const martChip = wrapper.findAll('.chip').find((btn) => btn.text() === '마트')
     await martChip.trigger('click')
     await flushPromises()
 
-    expect(customOverlayInstances).toHaveLength(1)
-    expect(customOverlayInstances[0].options.content.title).toBe('동네 마트')
+    expect(getClusterer().markers).toHaveLength(1)
+    expect(getClusterer().markers[0].title).toBe('동네 마트')
   })
 
   it('선택된 카테고리 칩을 다시 누르면 필터가 해제되어 전체 매장이 다시 보인다', async () => {
-    const { kakao, customOverlayInstances } = createKakaoMock()
+    const { kakao, getClusterer } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
 
     const wrapper = mountMapPage()
     await flushPromises()
 
-    customOverlayInstances.length = 0
     const martChip = wrapper.findAll('.chip').find((btn) => btn.text() === '마트')
     await martChip.trigger('click')
     await flushPromises()
-    expect(customOverlayInstances).toHaveLength(1)
+    expect(getClusterer().markers).toHaveLength(1)
 
-    customOverlayInstances.length = 0
     await martChip.trigger('click')
     await flushPromises()
-    expect(customOverlayInstances).toHaveLength(2)
+    expect(getClusterer().markers).toHaveLength(2)
   })
 })
 
