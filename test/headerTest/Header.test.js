@@ -1,46 +1,94 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-
-const routeMock = { name: 'home' }
-const routerMock = { push: vi.fn() }
-vi.mock('vue-router', () => ({
-  useRoute: () => routeMock,
-  useRouter: () => routerMock,
-}))
-
+import { createRouter, createMemoryHistory } from 'vue-router'
 import Header from '@/layouts/menu/Header.vue'
 
-beforeEach(() => {
-  vi.clearAllMocks()
-})
+// toggleMenu는 composable 함수라 실제 사이드메뉴 상태를 안 건드리고 호출 여부만 검증하도록 목 처리합니다.
+vi.mock('@/composables/useMenu', () => ({
+  toggleMenu: vi.fn(),
+}))
+import { toggleMenu } from '@/composables/useMenu'
 
-describe('현재 라우트에 맞는 헤더 제목 (pageTitle)', () => {
-  it.each([
-    ['home', '홈'],
-    ['map', '주변'],
-    ['pay', '결제'],
-    ['cards', '카드'],
-    ['bookmarks', '저장한 매장'],
-  ])('route.name이 %s면 "%s"를 보여준다', (name, expected) => {
-    routeMock.name = name
-    const wrapper = mount(Header)
+function createTestRouter() {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', name: 'home', component: { template: '<div />' } },
+      { path: '/bookmarks', name: 'bookmarks', component: { template: '<div />' } },
+    ],
+  })
+}
 
-    expect(wrapper.find('.page-title').text()).toBe(expected)
+describe('Header.vue', () => {
+  let alertSpy
+
+  beforeEach(() => {
+    alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    toggleMenu.mockClear()
   })
 
-  it('알 수 없는 라우트면 빈 문자열을 보여준다', () => {
-    routeMock.name = 'unknown-route'
-    const wrapper = mount(Header)
-
-    expect(wrapper.find('.page-title').text()).toBe('')
+  afterEach(() => {
+    alertSpy.mockRestore()
   })
 
-  it('북마크 아이콘을 누르면 /bookmarks로 이동한다', async () => {
-    routeMock.name = 'home'
-    const wrapper = mount(Header)
+  it('"BenePay" 로고 텍스트가 렌더링된다', async () => {
+    const router = createTestRouter()
+    await router.isReady()
+    const wrapper = mount(Header, { global: { plugins: [router] } })
 
-    await wrapper.find('[aria-label="북마크"]').trigger('click')
+    expect(wrapper.find('.logo-text').text()).toBe('BenePay')
+  })
 
-    expect(routerMock.push).toHaveBeenCalledWith('/bookmarks')
+  it('로고를 클릭하면 홈("/")으로 가는 링크다', async () => {
+    const router = createTestRouter()
+    await router.isReady()
+    const wrapper = mount(Header, { global: { plugins: [router] } })
+
+    expect(wrapper.find('.logo-link').attributes('href')).toBe('/')
+  })
+
+  it('알림 아이콘을 클릭하면 알림 이동 안내 alert가 뜬다', async () => {
+    const router = createTestRouter()
+    await router.isReady()
+    const wrapper = mount(Header, { global: { plugins: [router] } })
+
+    const icons = wrapper.findAll('.icon')
+    await icons[0].trigger('click') // 🔔 알림
+
+    expect(alertSpy).toHaveBeenCalledWith('알림 페이지로 이동')
+  })
+
+  it('북마크(별) 아이콘을 클릭하면 /bookmarks로 이동한다', async () => {
+    const router = createTestRouter()
+    await router.isReady()
+    const pushSpy = vi.spyOn(router, 'push')
+    const wrapper = mount(Header, { global: { plugins: [router] } })
+
+    const icons = wrapper.findAll('.icon')
+    await icons[1].trigger('click') // ⭐ 북마크
+
+    expect(pushSpy).toHaveBeenCalledWith('/bookmarks')
+  })
+
+  it('메뉴(햄버거) 아이콘을 클릭하면 toggleMenu가 호출된다', async () => {
+    const router = createTestRouter()
+    await router.isReady()
+    const wrapper = mount(Header, { global: { plugins: [router] } })
+
+    const icons = wrapper.findAll('.icon')
+    await icons[2].trigger('click') // ☰ 메뉴
+
+    expect(toggleMenu).toHaveBeenCalledTimes(1)
+  })
+
+  it('북마크 아이콘이 별 모양 SVG(fill 채워진 path)로 렌더링된다', async () => {
+    const router = createTestRouter()
+    await router.isReady()
+    const wrapper = mount(Header, { global: { plugins: [router] } })
+
+    const bookmarkIcon = wrapper.findAll('.icon')[1]
+    const svg = bookmarkIcon.find('svg')
+    expect(svg.exists()).toBe(true)
+    expect(svg.attributes('fill')).toBe('currentColor')
   })
 })
