@@ -1,12 +1,5 @@
 import { defineStore } from 'pinia'
-import {
-  fetchMerchantList,
-  fetchMerchantDetail,
-  fetchMerchantCategories,
-  createMerchant,
-  updateMerchant,
-  deleteMerchant,
-} from '@/services/merchantsService'
+import { fetchMerchantList, fetchMerchantDetail, fetchMerchantCategories } from '@/services/merchantsService'
 import { useAuthStore } from './auth'
 
 export const useMerchantsStore = defineStore('merchants', {
@@ -71,24 +64,6 @@ export const useMerchantsStore = defineStore('merchants', {
       const detail = await fetchMerchantDetail(merchantId)
       this.merchants.push(detail)
       return detail
-    },
-
-    async createMerchant(payload) {
-      const merchant = await createMerchant(payload)
-      this.merchants.push(merchant)
-      return merchant
-    },
-
-    async updateMerchant(merchantId, payload) {
-      const updated = await updateMerchant(merchantId, payload)
-      const index = this.merchants.findIndex((m) => m.id === Number(merchantId))
-      if (index !== -1) this.merchants[index] = updated
-      return updated
-    },
-
-    async deleteMerchant(merchantId) {
-      await deleteMerchant(merchantId)
-      this.merchants = this.merchants.filter((m) => m.id !== Number(merchantId))
     },
   },
 })
