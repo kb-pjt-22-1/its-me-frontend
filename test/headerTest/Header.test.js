@@ -10,13 +10,15 @@ vi.mock('@/composables/useMenu', () => ({
 import { toggleMenu } from '@/composables/useMenu'
 
 function createTestRouter() {
-  return createRouter({
+  const router = createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/', name: 'home', component: { template: '<div />' } },
       { path: '/bookmarks', name: 'bookmarks', component: { template: '<div />' } },
     ],
   })
+  router.push('/')
+  return router
 }
 
 describe('Header.vue', () => {
