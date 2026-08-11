@@ -20,7 +20,7 @@
           :key="cat"
           class="chip"
           :class="{ active: selectedCategory === cat }"
-          @click="selectedCategory = selectedCategory === cat ? null : cat"
+          @click="selectCategory(cat)"
         >
           {{ cat }}
         </button>
@@ -310,6 +310,18 @@ function closeMerchantDetail() {
   selectedMerchantId.value = null
 }
 
+// 카테고리 칩을 고르면 목록(merchants)이 바뀌는데, 매장 상세를 보던 중이었다면
+// selectedMerchantId가 그대로 남아 상세 화면이 계속 떠 있었다(클러스터 클릭과 같은 원인) - 같이 닫는다.
+function selectCategory(cat) {
+  selectedCategory.value = selectedCategory.value === cat ? null : cat
+  selectedMerchantId.value = null
+}
+
+// 검색어 입력도 카테고리 칩과 같은 이유로 목록을 바꾸므로, 매장 상세는 같이 닫는다.
+watch(searchQuery, () => {
+  selectedMerchantId.value = null
+})
+
 // 선택된 매장에 적용 가능한 보유 카드 혜택을 비교합니다 (Storedetail.vue와 동일한 로직).
 const recommendedCardsForSelected = computed(() => {
   if (!selectedMerchant.value) return []
@@ -446,6 +458,9 @@ function onClusterClick(cluster) {
     .map((marker) => marker.merchantRef?.id)
     .filter((id) => id != null)
   if (clusterMerchantIds.length === 0) return
+  // 이전에 다른 매장 상세를 보고 있다가(뒤로가기 없이 시트만 접은 채) 클러스터를 클릭하면,
+  // selectedMerchantId가 남아있어 목록 대신 그 매장 상세가 계속 떠 있었다 - 여기서 닫아준다.
+  selectedMerchantId.value = null
   clusterFilterMerchantIds.value = new Set(clusterMerchantIds)
   sheetExpanded.value = true
 }

@@ -313,6 +313,32 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
   })
 
+  it('매장 상세를 보다가(목록으로 돌아가지 않고) 클러스터를 클릭하면, 이전 매장 상세 대신 클러스터 목록이 뜬다', async () => {
+    const { kakao, getClusterer, trigger } = createKakaoMock()
+    window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const clusterer = getClusterer()
+    const cafePin = clusterer.markers.find((m) => m.title === '동네 카페')
+    const martPin = clusterer.markers.find((m) => m.title === '동네 마트')
+
+    // 카페 핀을 클릭해 상세를 연다 - "목록으로"를 누르지 않고 그대로 둔다.
+    trigger(cafePin, 'click')
+    await flushPromises()
+    expect(wrapper.find('.store-name').text()).toBe('동네 카페')
+
+    // 이 상태에서 마트가 속한 클러스터를 클릭하면, 남아있던 카페 상세가 아니라
+    // 클러스터(마트)의 목록이 떠야 한다.
+    trigger(clusterer, 'clusterclick', { getMarkers: () => [martPin] })
+    await flushPromises()
+
+    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
+  })
+
   it('지도가 다시 갱신되면(팬/줌) 이전 클러스터 선택은 초기화된다', async () => {
     const { kakao, getClusterer, trigger, mapInstance } = createKakaoMock()
     window.kakao = kakao
@@ -391,6 +417,43 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
     await martChip.trigger('click')
     await flushPromises()
     expect(getClusterer().markers).toHaveLength(2)
+  })
+
+  it('매장 상세를 보다가 카테고리 칩을 고르면, 이전 매장 상세 대신 목록이 뜬다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    await wrapper.find('.sheet-item').trigger('click') // 첫 매장(이름순 정렬상 '동네 마트') 상세로 진입
+    await flushPromises()
+    expect(wrapper.find('.store-name').exists()).toBe(true)
+
+    const cafeChip = wrapper.findAll('.chip').find((btn) => btn.text() === '카페')
+    await cafeChip.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.find('.sheet-list-header').exists()).toBe(true)
+  })
+
+  it('매장 상세를 보다가 검색어를 입력하면, 이전 매장 상세 대신 목록이 뜬다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    await wrapper.find('.sheet-item').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.store-name').exists()).toBe(true)
+
+    await wrapper.find('input').setValue('카페')
+    await flushPromises()
+
+    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.find('.sheet-list-header').exists()).toBe(true)
   })
 })
 
