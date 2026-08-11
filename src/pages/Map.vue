@@ -606,6 +606,9 @@ onMounted(async () => {
 
 <style scoped>
 .map-page {
+  /* store-sheet가 펼쳐졌을 때 최대 높이 - locate-btn--raised도 같은 값을 참조해서
+     항상 store-sheet 바로 위에 붙도록 한다(값이 따로 놀면 버튼이 시트보다 높이 뜬다). */
+  --sheet-expanded-height: 50%;
   position: relative;
   width: 100%;
   height: 100%;
@@ -653,7 +656,7 @@ onMounted(async () => {
   transition: bottom 280ms cubic-bezier(.2, .8, .2, 1);
 }
 .locate-btn--raised {
-  bottom: calc(78% + 12px);
+  bottom: calc(var(--sheet-expanded-height) + 12px);
 }
 
 /* 제휴 매장 바텀시트 - 평소엔 손잡이+제목 한 줄만 보이다가, 누르면 위로 올라옵니다 */
@@ -666,7 +669,7 @@ onMounted(async () => {
   border-radius: 20px 20px 0 0;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, .14);
   z-index: 15;
-  max-height: 78%;
+  max-height: var(--sheet-expanded-height);
   display: flex;
   flex-direction: column;
   transform: translateY(calc(100% - 92px));
