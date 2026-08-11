@@ -366,7 +366,7 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
 })
 
 describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라이언트에서 동작', () => {
-  it('검색어를 입력하면 서버 재요청 없이, 화면 안 매장 중 이름/카테고리명이 일치하는 것만 남긴다', async () => {
+  it('검색어를 입력하면 서버 재요청 없이, 화면 안 매장 중 이름/카테고리명이 일치하는 것만 핀과 하단 목록 양쪽에서 남긴다', async () => {
     const { kakao, getClusterer } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
@@ -381,9 +381,10 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
     expect(fetchRecommendedNearbyMerchants).toHaveBeenCalledTimes(1) // 검색은 추가 네트워크 요청을 만들지 않는다
     expect(getClusterer().markers).toHaveLength(1)
     expect(getClusterer().markers[0].title).toBe('동네 카페')
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
   })
 
-  it("'전체' 칩은 더 이상 없고, 카테고리 칩을 고르면 해당 카테고리 매장만 남긴다", async () => {
+  it("'전체' 칩은 더 이상 없고, 카테고리 칩을 고르면 해당 카테고리 매장만 핀과 하단 목록 양쪽에서 남긴다", async () => {
     const { kakao, getClusterer } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
@@ -399,9 +400,10 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
 
     expect(getClusterer().markers).toHaveLength(1)
     expect(getClusterer().markers[0].title).toBe('동네 마트')
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
   })
 
-  it('선택된 카테고리 칩을 다시 누르면 필터가 해제되어 전체 매장이 다시 보인다', async () => {
+  it('선택된 카테고리 칩을 다시 누르면 필터가 해제되어 핀과 하단 목록 모두 전체 매장으로 돌아온다', async () => {
     const { kakao, getClusterer } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
@@ -413,13 +415,15 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
     await martChip.trigger('click')
     await flushPromises()
     expect(getClusterer().markers).toHaveLength(1)
+    expect(wrapper.findAll('.sheet-item-info strong')).toHaveLength(1)
 
     await martChip.trigger('click')
     await flushPromises()
     expect(getClusterer().markers).toHaveLength(2)
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
   })
 
-  it('매장 상세를 보다가 카테고리 칩을 고르면, 이전 매장 상세 대신 목록이 뜬다', async () => {
+  it('매장 상세를 보다가 카테고리 칩을 고르면, 이전 매장 상세 대신 필터링된 목록이 뜬다', async () => {
     window.kakao = createKakaoMock().kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
 
@@ -435,10 +439,10 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
     await flushPromises()
 
     expect(wrapper.find('.store-name').exists()).toBe(false)
-    expect(wrapper.find('.sheet-list-header').exists()).toBe(true)
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
   })
 
-  it('매장 상세를 보다가 검색어를 입력하면, 이전 매장 상세 대신 목록이 뜬다', async () => {
+  it('매장 상세를 보다가 검색어를 입력하면, 이전 매장 상세 대신 필터링된 목록이 뜬다', async () => {
     window.kakao = createKakaoMock().kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
 
@@ -453,7 +457,7 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
     await flushPromises()
 
     expect(wrapper.find('.store-name').exists()).toBe(false)
-    expect(wrapper.find('.sheet-list-header').exists()).toBe(true)
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
   })
 })
 

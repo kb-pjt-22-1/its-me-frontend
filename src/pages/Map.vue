@@ -203,8 +203,9 @@ function distanceMeters(lat1, lng1, lat2, lng2) {
 }
 
 // 바텀시트("주변 제휴 매장")는 별도 /nearby 호출 없이, 지도 화면(bounds)에서
-// 이미 받아온 boundsMerchants를 그대로 재사용합니다 - 지도 핀과 항상 같은 매장을 보여줍니다
-// (거리로 걸러내지 않습니다 - 지도를 내 위치에서 멀리 옮겨도 목록이 비어버리면 안 됨).
+// 이미 받아온 매장을 그대로 재사용합니다 - merchants(검색어/카테고리 칩 필터가 적용된 결과,
+// 지도 핀과 같은 소스)를 그대로 이어받아, 칩을 고르면 핀뿐 아니라 이 목록도 같이 좁혀집니다
+// (거리로는 걸러내지 않습니다 - 지도를 내 위치에서 멀리 옮겨도 목록이 비어버리면 안 됨).
 // 밀집 지역에서 목록이 과도하게 길어지지 않도록 상한을 둡니다.
 const MAX_SHEET_ITEMS = 100
 // 클러스터 핀을 클릭하면 그 안에 뭉쳐있던 매장 id만 담아, 목록을 그 매장들로 좁혀 보여줍니다.
@@ -212,8 +213,8 @@ const MAX_SHEET_ITEMS = 100
 const clusterFilterMerchantIds = ref(null)
 const nearbyMerchants = computed(() => {
   const source = clusterFilterMerchantIds.value
-    ? boundsMerchantsWithCategory.value.filter((m) => clusterFilterMerchantIds.value.has(m.id))
-    : boundsMerchantsWithCategory.value
+    ? merchants.value.filter((m) => clusterFilterMerchantIds.value.has(m.id))
+    : merchants.value
 
   const withDistance = source
     .map((m) => {
