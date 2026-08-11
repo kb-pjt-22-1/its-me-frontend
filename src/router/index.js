@@ -42,6 +42,8 @@ const router = createRouter({
                 {path: '', name: 'home', component: Home},
                 {path: 'map', name: 'map', component: Map},
                 {path: 'pay', name: 'pay', component: Payments},
+                // 결제(pay)와 카드(cards) 사이 하단 탭에 들어가는 혜택 화면
+                {path: 'benefits', name: 'benefits', component: () => import('@/pages/Benefits.vue')},
                 {path: 'cards', name: 'cards', component: Cards},
                 {path: 'bookmarks', name: 'bookmarks', component: () => import('@/pages/Bookmarks.vue')},
             ],
