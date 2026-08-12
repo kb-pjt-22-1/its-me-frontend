@@ -518,8 +518,19 @@ function buildClusterBadgeContent(count, hasRecommended) {
 // 화면이 빽빽해지는 문제는 클러스터링(renderMerchantMarkers)이 시각적으로 해결합니다.
 // 응답의 recommended(boolean)로 "사용자 보유 카드로 지금 당장 혜택 받을 수 있는 매장"만
 // 하이라이트하고, 나머지도 전부 핀으로 보여줍니다(추천 매장만 남기는 필터링이 아닙니다).
+// 카카오맵은 숫자가 클수록 더 축소된 상태입니다(1이 가장 확대). 6 이상으로 축소하면
+// 화면에 잡히는 매장이 너무 많아져서 클러스터 숫자만 잔뜩 떠 있는 상태가 되고, 조회도
+// 무거워지니 아예 요청도 안 보내고 핀도 다 지웁니다 - 사용자가 다시 확대해야 보입니다.
+const MAX_VISIBLE_LEVEL = 6
+
 async function loadBoundsMerchants() {
   if (!kakaoInstance || !mapInstance) return
+
+  if (mapInstance.getLevel() >= MAX_VISIBLE_LEVEL) {
+    boundsMerchants.value = []
+    clusterFilterMerchantIds.value = null
+    return
+  }
 
   const bounds = mapInstance.getBounds()
   const sw = bounds.getSouthWest()
