@@ -27,13 +27,23 @@ const CARD_GRADIENTS = [
  * 응답(MonthlyBenefitReportResponseDto): yearMonth, totalBenefitAmount, deltaVsLastMonth,
  *   categoryBreakdown: [{ categoryCode, categoryName, amount, percent }] (금액 내림차순)
  *
- * @param {string} [yearMonth] - 'yyyy-MM' 형식. 생략 시 백엔드가 이번 달 기준으로 조회.
+ * 주의: 응답의 yearMonth는 'yyyy-MM'(하이픈 O)로 오지만, 쿼리 파라미터는
+ * 'yyyyMM'(하이픈 X)만 허용합니다(BenefitServiceImpl.parseYearMonth 참고 -
+ * 하이픈 붙은 값을 보내면 InvalidBenefitPeriodException 400 에러남).
+ * 이 함수는 호출부 편의를 위해 'yyyy-MM'로 받아서 내부에서 변환합니다.
+ *
+ * @param {string} [yearMonth] - 'yyyy-MM' 형식 (예: '2026-07'). 생략 시 백엔드가 이번 달 기준으로 조회.
  */
 export async function fetchMonthlyBenefitReport(yearMonth) {
   const { data } = await api.get('/v1/benefits/report', {
-    params: yearMonth ? { yearMonth } : undefined,
+    params: yearMonth ? { yearMonth: toApiYearMonth(yearMonth) } : undefined,
   })
   return normalizeReport(data)
+}
+
+// 'yyyy-MM' -> 'yyyyMM' (백엔드 쿼리 파라미터 형식)
+function toApiYearMonth(yearMonth) {
+  return yearMonth.replace('-', '')
 }
 
 /**
