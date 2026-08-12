@@ -1,60 +1,62 @@
 <template>
   <div class="layout-container">
-    <header class="page-header">
-      <button class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-      </button>
-    </header>
-
-    <div class="date-nav">
-      <button class="date-arrow" @click="shiftMonth(-1)" aria-label="이전 달">&lt;</button>
-      <h3>{{ currentMonthLabel }}</h3>
-      <button class="date-arrow" @click="shiftMonth(1)" aria-label="다음 달">&gt;</button>
-    </div>
-
-    <div v-if="paymentStore.isLoading" class="loading-text muted-text">불러오는 중...</div>
-
-    <template v-else>
-      <Button tag="div" variant="box" class="summary-card" style="flex-direction: row; justify-content: space-between; align-items: center; min-height: auto;">
-        <div class="summary-text">
-          <p>{{ monthShort }} 총 결제</p>
-          <h2>{{ totalPayment.toLocaleString() }}원</h2>
-        </div>
-        <div class="summary-benefit">
-          <p>받은 혜택</p>
-          <h2>{{ totalBenefit.toLocaleString() }}원</h2>
-        </div>
-      </Button>
-
-      <div v-if="groupedHistory.length === 0" class="empty-text muted-text">
-        이 달엔 결제 내역이 없어요.
-      </div>
-
-      <div v-for="group in groupedHistory" :key="group.date" class="history-group">
-        <h4>{{ group.label }}</h4>
-        <button
-          v-for="item in group.items"
-          :key="item.paymentId"
-          class="history-item"
-          @click="goToDetail(item.paymentId)"
-        >
-          <div class="item-icon">{{ getCategoryEmoji(item.categoryCode) }}</div>
-          <div class="item-info">
-            <p class="name">{{ item.merchantName }}</p>
-            <p class="desc muted-text">{{ item.time }} · {{ item.cardName }}</p>
-          </div>
-          <div class="item-price">
-            <p class="price">-{{ item.finalAmount.toLocaleString() }}원</p>
-            <p class="benefit">할인 {{ item.discountAmount.toLocaleString() }}원</p>
-          </div>
-          <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9 6 15 12 9 18"></polyline>
+    <div class="scroll-area">
+      <header class="page-header">
+        <button class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </button>
+      </header>
+
+      <div class="date-nav">
+        <button class="date-arrow" @click="shiftMonth(-1)" aria-label="이전 달">&lt;</button>
+        <h3>{{ currentMonthLabel }}</h3>
+        <button class="date-arrow" @click="shiftMonth(1)" aria-label="다음 달">&gt;</button>
       </div>
-    </template>
+
+      <div v-if="paymentStore.isLoading" class="loading-text muted-text">불러오는 중...</div>
+
+      <template v-else>
+        <Button tag="div" variant="box" class="summary-card" style="flex-direction: row; justify-content: space-between; align-items: center; min-height: auto;">
+          <div class="summary-text">
+            <p>{{ monthShort }} 총 결제</p>
+            <h2>{{ totalPayment.toLocaleString() }}원</h2>
+          </div>
+          <div class="summary-benefit">
+            <p>받은 혜택</p>
+            <h2>{{ totalBenefit.toLocaleString() }}원</h2>
+          </div>
+        </Button>
+
+        <div v-if="groupedHistory.length === 0" class="empty-text muted-text">
+          이 달엔 결제 내역이 없어요.
+        </div>
+
+        <div v-for="group in groupedHistory" :key="group.date" class="history-group">
+          <h4>{{ group.label }}</h4>
+          <button
+            v-for="item in group.items"
+            :key="item.paymentId"
+            class="history-item"
+            @click="goToDetail(item.paymentId)"
+          >
+            <div class="item-icon">{{ getCategoryEmoji(item.categoryCode) }}</div>
+            <div class="item-info">
+              <p class="name">{{ item.merchantName }}</p>
+              <p class="desc muted-text">{{ item.time }} · {{ item.cardName }}</p>
+            </div>
+            <div class="item-price">
+              <p class="price">-{{ item.finalAmount.toLocaleString() }}원</p>
+              <p class="benefit">할인 {{ item.discountAmount.toLocaleString() }}원</p>
+            </div>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 6 15 12 9 18"></polyline>
+            </svg>
+          </button>
+        </div>
+      </template>
+    </div>
 
     <Footer />
   </div>
@@ -153,10 +155,20 @@ onMounted(() => {
   width: 100%;
   max-width: 440px;
   height: 100vh;
+  box-sizing: border-box;
+  background: var(--page, #f7f7f5);
+}
+/* 스크롤은 이 안에서만 일어난다. Footer(position:fixed)를 스크롤되는 요소 밖에 둬야
+   하는 이유: 조상에 transform이 걸려있으면 그 조상이 fixed 자식의 기준점이 되는데,
+   .layout-container가 transform도 걸려있고 예전엔 overflow-y까지 같이 갖고 있어서
+   Footer가 뷰포트가 아니라 이 스크롤 컨테이너 기준으로 고정돼버렸다(그래서 스크롤할 때
+   같이 딸려 올라갔음). Header/NavBar도 각자 position:fixed라 같은 문제였다면 겪었을
+   텐데, DefaultLayout.vue처럼 Footer를 스크롤 요소의 형제로 빼는 게 해법. */
+.scroll-area {
+  height: 100%;
   overflow-y: auto;
   box-sizing: border-box;
   padding: 0 18px 84px;
-  background: var(--page, #f7f7f5);
 }
 .page-header { height: 60px; }
 
