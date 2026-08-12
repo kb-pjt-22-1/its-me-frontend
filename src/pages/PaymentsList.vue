@@ -1,12 +1,13 @@
 <template>
   <div class="layout-container">
-    <div class="scroll-area">
+    <div class="fixed-top">
       <header class="page-header">
         <button class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </button>
+        <h2>결제내역</h2>
       </header>
 
       <div class="date-nav">
@@ -14,11 +15,16 @@
         <h3>{{ currentMonthLabel }}</h3>
         <button class="date-arrow" @click="shiftMonth(1)" aria-label="다음 달">&gt;</button>
       </div>
+    </div>
 
+    <div class="scroll-area">
       <div v-if="paymentStore.isLoading" class="loading-text muted-text">불러오는 중...</div>
 
       <template v-else>
-        <Button tag="div" variant="box" class="summary-card" style="flex-direction: row; justify-content: space-between; align-items: center; min-height: auto;">
+        <Button
+          tag="div" variant="box" class="summary-card"
+          style="flex-direction: row; justify-content: space-between; align-items: center; min-height: auto;"
+        >
           <div class="summary-text">
             <p>{{ monthShort }} 총 결제</p>
             <h2>{{ totalPayment.toLocaleString() }}원</h2>
@@ -35,25 +41,27 @@
 
         <div v-for="group in groupedHistory" :key="group.date" class="history-group">
           <h4>{{ group.label }}</h4>
-          <button
-            v-for="item in group.items"
-            :key="item.paymentId"
-            class="history-item"
-            @click="goToDetail(item.paymentId)"
-          >
-            <div class="item-icon">{{ getCategoryEmoji(item.categoryCode) }}</div>
-            <div class="item-info">
-              <p class="name">{{ item.merchantName }}</p>
-              <p class="desc muted-text">{{ item.time }} · {{ item.cardName }}</p>
-            </div>
-            <div class="item-price">
-              <p class="price">-{{ item.finalAmount.toLocaleString() }}원</p>
-              <p class="benefit">할인 {{ item.discountAmount.toLocaleString() }}원</p>
-            </div>
-            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="9 6 15 12 9 18"></polyline>
-            </svg>
-          </button>
+          <div class="history-card">
+            <button
+              v-for="item in group.items"
+              :key="item.paymentId"
+              class="history-item"
+              @click="goToDetail(item.paymentId)"
+            >
+              <div class="item-icon">{{ getCategoryEmoji(item.categoryCode) }}</div>
+              <div class="item-info">
+                <p class="name">{{ item.merchantName }}</p>
+                <p class="desc muted-text">{{ item.time }} · {{ item.cardName }}</p>
+              </div>
+              <div class="item-price">
+                <p class="price">-{{ item.finalAmount.toLocaleString() }}원</p>
+                <p class="benefit">할인 {{ item.discountAmount.toLocaleString() }}원</p>
+              </div>
+              <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 6 15 12 9 18"></polyline>
+              </svg>
+            </button>
+          </div>
         </div>
       </template>
     </div>
@@ -157,20 +165,45 @@ onMounted(() => {
   height: 100vh;
   box-sizing: border-box;
   background: var(--page, #f7f7f5);
+  display: flex;
+  flex-direction: column;
 }
-/* 스크롤은 이 안에서만 일어난다. Footer(position:fixed)를 스크롤되는 요소 밖에 둬야
-   하는 이유: 조상에 transform이 걸려있으면 그 조상이 fixed 자식의 기준점이 되는데,
-   .layout-container가 transform도 걸려있고 예전엔 overflow-y까지 같이 갖고 있어서
-   Footer가 뷰포트가 아니라 이 스크롤 컨테이너 기준으로 고정돼버렸다(그래서 스크롤할 때
-   같이 딸려 올라갔음). Header/NavBar도 각자 position:fixed라 같은 문제였다면 겪었을
-   텐데, DefaultLayout.vue처럼 Footer를 스크롤 요소의 형제로 빼는 게 해법. */
+/* Footer(position:fixed)를 스크롤되는 요소 밖에 둬야 하는 이유: 조상에 transform이
+   걸려있으면 그 조상이 fixed 자식의 기준점이 되는데, .layout-container가 transform도
+   걸려있고 예전엔 overflow-y까지 같이 갖고 있어서 Footer가 뷰포트가 아니라 스크롤
+   컨테이너 기준으로 고정돼버렸다(스크롤할 때 같이 딸려 올라갔음). DefaultLayout.vue처럼
+   Footer를 스크롤 요소의 형제로 빼는 게 해법. */
+
+/* 뒤로가기 헤더 + 월 이동(date-nav)까지만 스크롤해도 그 자리에 고정. 요약 카드(summary-card)는
+   이제 스크롤 영역 쪽으로 옮겨서 목록과 함께 스크롤된다. flex:0 0 auto라 .scroll-area가
+   남은 높이를 전부 가져간다. */
+.fixed-top {
+  flex: 0 0 auto;
+  padding: 0 18px;
+  box-sizing: border-box;
+}
 .scroll-area {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0; /* flex 자식이 내용 크기만큼 늘어나지 않고 실제로 줄어들어 스크롤되게 함 */
   overflow-y: auto;
   box-sizing: border-box;
   padding: 0 18px 84px;
 }
-.page-header { height: 60px; }
+/* 전역 .page-header는 뒤로가기 버튼-제목-우측 여백을 양끝 정렬(space-between)하는데,
+   이 페이지는 제목을 가운데가 아니라 뒤로가기 버튼 바로 옆에 붙인다. 배경은 흰색으로
+   해서 아래 date-nav(아이보리 배경)와 구분되게 하고, .fixed-top의 좌우 패딩을
+   음수 마진으로 상쇄해 화면 끝까지 흰색이 번지게(bleed) 한 뒤 자체 패딩으로 다시 채운다. */
+.page-header {
+  height: 60px;
+  justify-content: flex-start;
+  gap: 10px;
+  background: var(--surface, #ffffff);
+  margin: 0 -18px 14px;
+  padding: 0 18px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--line, #e7e4de);
+}
+.page-header h2 { font-size: 17px; } /* 전역 기본값(16px)보다 1px 크게 */
 
 .date-nav { display: flex; justify-content: center; align-items: center; gap: 20px; padding: 10px 0 20px; }
 .date-nav h3 { margin: 0; font-size: 15px; color: var(--charcoal, #24211d); }
@@ -184,16 +217,26 @@ onMounted(() => {
 .summary-benefit { text-align: right; }
 .summary-benefit h2 { margin: 0; font-size: 20px; color: var(--orange, #ffbc00); }
 
-.history-group h4 { color: var(--muted, #8f897f); font-size: 0.85rem; font-weight: 700; margin: 0 0 12px; }
-.history-group + .history-group { margin-top: 22px; }
+.history-group h4 { color: var(--muted, #8f897f); font-size: 0.85rem; font-weight: 700; margin: 0 0 8px; padding-left: 2px; }
+.history-group + .history-group { margin-top: 20px; }
+
+/* 피그마처럼 날짜별 항목들을 라운드 처리된 흰색 카드 하나로 감싼다 - 항목 사이만
+   구분선을 두고, 카드 자체에 배경/그림자를 준다. */
+.history-card {
+  background: var(--surface, #ffffff);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(46, 42, 36, .06);
+}
 
 .history-item {
-  width: 100%; display: flex; align-items: center; gap: 12px; padding: 13px 0;
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px;
   border-bottom: 1px solid var(--line, #e7e4de); background: none; border-left: none;
   border-right: none; border-top: none; cursor: pointer; text-align: left;
 }
+.history-item:last-child { border-bottom: none; }
 .item-icon {
-  width: 40px; height: 40px; border-radius: 10px; background: var(--inactive, #f0efec);
+  width: 42px; height: 42px; border-radius: 12px; background: var(--page, #f7f7f5);
   display: grid; place-items: center; font-size: 1.2rem; flex: 0 0 auto;
 }
 .item-info { flex: 1; min-width: 0; }
