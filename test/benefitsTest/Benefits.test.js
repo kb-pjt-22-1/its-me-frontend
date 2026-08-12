@@ -3,12 +3,9 @@ import { mount } from '@vue/test-utils'
 import Benefits from '@/pages/Benefits.vue'
 
 // Benefits.vue는 지금 store를 안 쓰고 있어서(하드코딩 데이터), Pinia 목킹 없이 바로 마운트합니다.
+// 페이지 제목 "혜택"은 더 이상 이 컴포넌트가 자체 렌더링하지 않는다 - 전역 Header.vue가
+// route name('benefits')을 보고 표시한다(Header.vue의 PAGE_TITLES 참고).
 describe('Benefits.vue', () => {
-  it('페이지 제목 "혜택"이 렌더링된다', () => {
-    const wrapper = mount(Benefits)
-    expect(wrapper.find('.page-header h1').text()).toBe('혜택')
-  })
-
   it('AI 혜택 코치 팁이 aiTips 개수만큼 렌더링된다', () => {
     const wrapper = mount(Benefits)
     const tips = wrapper.findAll('.ai-tips li')
