@@ -102,7 +102,7 @@
   font-weight: 600;
 }
 .pill--mint { color: var(--green, #00a878); background: #ebf7f3; }
-.pill--gold { color: #b67a00; background: #fff6dd; }
+.pill--gold { color: var(--gold, #b67a00); background: var(--gold-bg, #fff6dd); }
 .pill--muted { color: var(--muted, #8f897f); background: var(--inactive, #f0efec); }
 .pill--danger { color: var(--danger, #d94343); background: #fde7e6; }
 
@@ -134,11 +134,11 @@
   font-size: 12px;
 }
 .info-strip--highlight {
-  background: #fff6dd;
+  background: var(--gold-bg, #fff6dd);
   color: var(--charcoal, #24211d);
 }
 .info-strip--highlight strong {
-  color: #b67a00;
+  color: var(--gold, #b67a00);
 }
 
 .danger-text { color: var(--danger, #d94343); font-weight: 700; }

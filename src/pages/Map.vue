@@ -518,9 +518,9 @@ const PIN_WIDTH = 32
 const PIN_HEIGHT = 40
 function buildMerchantMarkerImage(kakao, merchant) {
   const recommended = !!merchant.recommended
-  const borderColor = recommended ? '#ffb800' : '#8f897f'
+  const borderColor = recommended ? '#ffbc00' : '#8f897f'
   const emoji = getCategoryEmoji(merchant.categoryCode)
-  const glow = recommended ? '<circle cx="16" cy="15" r="15" fill="#ffb800" fill-opacity="0.22"/>' : ''
+  const glow = recommended ? '<circle cx="16" cy="15" r="15" fill="#ffbc00" fill-opacity="0.22"/>' : ''
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_WIDTH}" height="${PIN_HEIGHT}" viewBox="0 0 32 40">` +
     glow +
@@ -776,7 +776,7 @@ onMounted(async () => {
   flex: 0 0 auto;
   cursor: pointer;
 }
-.sheet-bookmark.active { color: var(--orange, #ffb800); }
+.sheet-bookmark.active { color: var(--orange, #ffbc00); }
 
 .sheet-pagination {
   display: flex;

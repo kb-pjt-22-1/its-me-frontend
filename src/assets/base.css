@@ -14,11 +14,15 @@
   font-family: "KBFGText", var(--font-default);
   color: #24211d;
   background: #f7f7f5;
-  font-synthesis: none;
+  /* KBFGText는 Medium(500) 한 글자체만 로드돼 있다. weight 합성을 끄면 700/800 지정이
+     전부 500로 납작하게 렌더링돼 버튼/헤딩의 강조가 사라지므로, 합성은 켜둔다. */
+  font-synthesis: weight;
   text-rendering: optimizeLegibility;
 
-  --orange: #ffbc00;       /* KB_YELLOW */
+  --orange: #ffbc00;       /* KB_YELLOW - KB국민은행 시그니처 옐로우 */
   --orange-deep: #e6aa00;  /* PrimaryButton 눌림 상태 색 */
+  --gold: #b67a00;         /* 하이라이트 텍스트(적립/혜택 강조) */
+  --gold-bg: #fff6dd;      /* 하이라이트 배경 (pill--gold, info-strip--highlight) */
   --surface: #ffffff;
   --page: #f7f7f5;         /* KB_BG */
   --line: #e7e4de;         /* KB_BORDER */
@@ -28,6 +32,19 @@
   --inactive: #f0efec;     /* KB_INACTIVE - primary 버튼 비활성 배경 */
   --green: #00a878;        /* KB_SUCCESS */
   --danger: #d94343;       /* KB_ERROR */
+
+  /* 타이포 스케일 - 화면 전반에서 쓰는 폰트 크기를 이 이름으로 통일한다 */
+  --text-caption: 11px;   /* section-hint, pill, usage-desc */
+  --text-sm: 12px;        /* info-strip, expand-btn */
+  --text-body: 14px;      /* 본문 기본 */
+  --text-md: 15px;        /* section-title, 카드 제목 */
+  --text-lg: 16px;        /* page-header h2 */
+  --text-title: 22.5px;   /* 헤더 페이지 타이틀(Header.vue) */
+
+  /* weight 토큰 - KBFGText 실제 로드 weight는 500뿐이라 "regular"도 500이다 */
+  --weight-regular: 500;
+  --weight-emphasis: 700;  /* 버튼, 카드 제목 등 강조 */
+  --weight-strong: 800;    /* 헤더 타이틀, 금액 등 최상위 강조 */
 }
 
 *,
