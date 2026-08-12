@@ -38,13 +38,39 @@
         </svg>
       </button>
 
-      <button class="sheet-handle-area" @click="sheetExpanded = !sheetExpanded" aria-label="매장 목록 펼치기/접기">
+      <div
+        class="sheet-handle-area"
+        role="button"
+        tabindex="0"
+        aria-label="매장 목록 펼치기/접기"
+        @click="sheetExpanded = !sheetExpanded"
+        @keydown.enter="sheetExpanded = !sheetExpanded"
+        @keydown.space.prevent="sheetExpanded = !sheetExpanded"
+      >
         <span class="sheet-handle"></span>
-        <div class="sheet-summary">
-          <p class="sheet-meta muted-text">{{ selectedMerchant ? '매장 상세' : '현재 위치 기준' }}</p>
-          <p class="sheet-title">{{ selectedMerchant ? selectedMerchant.name : '제휴 매장' }}</p>
+        <div class="sheet-peek-row">
+          <div class="sheet-summary">
+            <p class="sheet-meta muted-text">{{ selectedMerchant ? '매장 상세' : `현재 위치 기준 · ${nearbyMerchants.length}곳` }}</p>
+            <p class="sheet-title">{{ selectedMerchant ? selectedMerchant.name : '주변 제휴 매장' }}</p>
+          </div>
+          <div v-if="!selectedMerchant" class="sort-toggle" @click.stop>
+            <button
+              class="sort-btn"
+              :class="{ active: sortMode === 'distance' }"
+              @click="sortMode = 'distance'"
+            >
+              거리순
+            </button>
+            <button
+              class="sort-btn"
+              :class="{ active: sortMode === 'benefit' }"
+              @click="sortMode = 'benefit'"
+            >
+              혜택순
+            </button>
+          </div>
         </div>
-      </button>
+      </div>
 
       <div class="sheet-body">
         <!-- 매장 상세: 새 페이지로 이동하지 않고 이 바텀시트 자리에서 그대로 보여줍니다 -->
@@ -111,29 +137,6 @@
           <div v-if="clusterFilterMerchantIds" class="cluster-filter-banner">
             <span>선택한 클러스터의 매장만 보는 중이에요</span>
             <button @click="clusterFilterMerchantIds = null">전체 보기</button>
-          </div>
-
-          <div class="sheet-list-header">
-            <h3>주변 제휴 매장</h3>
-            <div class="sheet-list-right">
-              <span class="muted-text">{{ nearbyMerchants.length }}곳</span>
-              <div class="sort-toggle">
-                <button
-                  class="sort-btn"
-                  :class="{ active: sortMode === 'distance' }"
-                  @click="sortMode = 'distance'"
-                >
-                  거리순
-                </button>
-                <button
-                  class="sort-btn"
-                  :class="{ active: sortMode === 'benefit' }"
-                  @click="sortMode = 'benefit'"
-                >
-                  혜택순
-                </button>
-              </div>
-            </div>
           </div>
 
           <div v-if="nearbyMerchants.length === 0" class="sheet-empty muted-text">
@@ -462,6 +465,10 @@ function initMap(kakao, center) {
     }],
   })
   kakao.maps.event.addListener(clusterer, 'clusterclick', onClusterClick)
+  // 클러스터 안에 지금 혜택 받을 수 있는(recommended) 매장이 하나라도 섞여있으면
+  // 배지 테두리를 KB 옐로우로 표시합니다 - 개수 정보(styles)는 그대로 두고, 개별 핀의
+  // 추천 강조(테두리+후광)와 같은 시각 언어를 클러스터에도 얹는 것뿐입니다.
+  kakao.maps.event.addListener(clusterer, 'clustered', onClustered)
 
   // 줌/드래그가 끝날 때마다(idle) 화면에 보이는 영역의 매장만 새로 받아옵니다.
   kakao.maps.event.addListener(map, 'idle', scheduleLoadBoundsMerchants)
@@ -480,6 +487,30 @@ function onClusterClick(cluster) {
   selectedMerchantId.value = null
   clusterFilterMerchantIds.value = new Set(clusterMerchantIds)
   sheetExpanded.value = true
+}
+
+// 매 클러스터링 결과마다(줌/이동으로 다시 뭉칠 때도) 클러스터별로 혜택 매장 포함 여부를
+// 확인해서 배지 스타일을 다시 그립니다. getClusterMarker()가 돌려주는 오버레이는
+// styles 옵션으로 그려진 기본 배지와 같은 CustomOverlay라 setContent로 덮어쓸 수 있습니다.
+function onClustered(clusters) {
+  clusters.forEach((cluster) => {
+    const clusterMarkers = cluster.getMarkers()
+    const hasRecommended = clusterMarkers.some((marker) => marker.merchantRef?.recommended)
+    const clusterMarker = cluster.getClusterMarker()
+    if (!clusterMarker) return
+    clusterMarker.setContent(buildClusterBadgeContent(clusterMarkers.length, hasRecommended))
+  })
+}
+
+function buildClusterBadgeContent(count, hasRecommended) {
+  // border-box라 테두리 두께만큼 line-height를 줄여야 숫자가 수직 중앙에 남는다.
+  const border = hasRecommended ? '2px solid #ffbc00' : '2px solid transparent'
+  return (
+    '<div style="cursor: pointer; width: 36px; height: 36px; box-sizing: border-box; ' +
+    `border: ${border}; background: rgba(84, 80, 69, 0.9); border-radius: 18px; ` +
+    'color: #ffffff; text-align: center; line-height: 32px; font-weight: bold; font-size: 13px;">' +
+    `${count}</div>`
+  )
 }
 
 // 매장 전체를 미리 안 받고, 지금 화면(bounds)에 보이는 매장을 지도 중심에서 가까운 순으로
@@ -683,11 +714,18 @@ onMounted(async () => {
   border-radius: 20px 20px 0 0;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, .14);
   z-index: 15;
-  max-height: var(--sheet-expanded-height);
+  /* max-height(내용에 따라 그보다 작아짐)였던 걸 고정 height로 바꿨다. 리스트↔상세
+     전환처럼 내용 길이가 크게 다른 화면을 오갈 때, 박스 자체 크기가 안 바뀌고
+     sheet-body 안에서만 스크롤되니까 "갑자기 확 커지는" 점프가 원천적으로 없어진다. */
+  height: var(--sheet-expanded-height);
   display: flex;
   flex-direction: column;
-  transform: translateY(calc(100% - 92px));
+  /* 80px = 접힌 상태에서 보이는 handle-area 실측 높이. 정렬 토글을 제목 옆으로
+     옮기면서 기존 92px 하드코딩값과 어긋나 접혔을 때 아래쪽에 빈 여백이 살짝
+     보이던 걸 같이 맞췄다. will-change로 트랜지션 중 리페인트를 컴포지터에 맡긴다. */
+  transform: translateY(calc(100% - 80px));
   transition: transform 280ms cubic-bezier(.2, .8, .2, 1);
+  will-change: transform;
 }
 .store-sheet.expanded {
   transform: translateY(0);
@@ -711,8 +749,16 @@ onMounted(async () => {
   border-radius: 99px;
   background: var(--line, #e7e4de);
 }
-.sheet-summary {
+.sheet-peek-row {
   width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+}
+.sheet-summary {
+  flex: 1 1 auto;
+  min-width: 0;
   text-align: left;
 }
 .sheet-meta { margin: 0; font-size: 11px; }
@@ -724,15 +770,7 @@ onMounted(async () => {
   flex: 1 1 auto;
 }
 
-.sheet-list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.sheet-list-header h3 { margin: 0; font-size: 14px; color: var(--charcoal, #24211d); }
-.sheet-list-right { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-.sort-toggle { display: flex; gap: 6px; }
+.sort-toggle { display: flex; gap: 6px; flex: 0 0 auto; }
 .sort-btn {
   border: 1px solid var(--line, #e7e4de);
   background: var(--surface, #ffffff);
