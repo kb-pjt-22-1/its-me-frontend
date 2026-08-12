@@ -447,6 +447,19 @@ function initMap(kakao, center) {
     map,
     averageCenter: true,
     disableClickZoom: true, // 클릭 시 확대하는 대신, 안에 뭉친 매장들을 하단 목록에 보여줍니다.
+    // styles를 안 주면 카카오 SDK 기본값(파란 배지)이 나가서 KB 옐로우 톤과 어긋난다.
+    // --dark(간편결제 박스와 동일 톤)로 통일 - 추천 매장 핀의 --orange 후광과도 겹치지 않게.
+    styles: [{
+      width: '36px',
+      height: '36px',
+      background: 'rgba(84, 80, 69, 0.9)',
+      borderRadius: '18px',
+      color: '#ffffff',
+      textAlign: 'center',
+      lineHeight: '36px',
+      fontWeight: 'bold',
+      fontSize: '13px',
+    }],
   })
   kakao.maps.event.addListener(clusterer, 'clusterclick', onClusterClick)
 
@@ -633,7 +646,7 @@ onMounted(async () => {
   box-shadow: 0 4px 14px rgba(0, 0, 0, .08); display: flex; align-items: center; gap: 10px;
   padding: 0 16px; color: var(--muted, #8f897f); margin-bottom: 12px;
 }
-.search-bar input { flex: 1; border: none; outline: none; background: transparent; font-size: 14px; color: var(--charcoal, #24211d); }
+.search-bar input { flex: 1; border: none; background: transparent; font-size: 14px; color: var(--charcoal, #24211d); }
 .search-bar input::placeholder { color: var(--muted, #8f897f); }
 
 .category-chips {
