@@ -14,13 +14,23 @@
         <input v-model="searchQuery" type="text" placeholder="지금 화면에 보이는 매장명 또는 카테고리 검색" />
       </div>
 
-      <div ref="chipsContainer" class="category-chips" @wheel="onChipsWheel">
+      <div
+        ref="chipsContainer"
+        class="category-chips"
+        :class="{ dragging: isDraggingChips }"
+        @wheel="onChipsWheel"
+        @pointerdown="onChipsPointerDown"
+        @pointermove="onChipsPointerMove"
+        @pointerup="onChipsPointerUp"
+        @pointercancel="onChipsPointerUp"
+        @pointerleave="onChipsPointerUp"
+      >
         <button
           v-for="cat in categories"
           :key="cat"
           class="chip"
           :class="{ active: selectedCategory === cat }"
-          @click="selectCategory(cat)"
+          @click="onChipClick(cat)"
         >
           {{ cat }}
         </button>
@@ -578,6 +588,49 @@ function onChipsWheel(event) {
   el.scrollLeft += event.deltaY
 }
 
+// 모바일에서는 overflow-x: auto만으로 터치 슬라이드가 되지만, 마우스는 휠 말고는
+// 드래그로 가로 스크롤할 방법이 없다. pointer 이벤트로 마우스도 손가락 슬라이드처럼
+// 드래그-스크롤되게 한다(터치는 이미 브라우저 네이티브 스크롤이 동작하므로 그대로 둔다).
+const isDraggingChips = ref(false)
+let chipsDragStartX = 0
+let chipsDragStartScrollLeft = 0
+let chipsDragMoved = false
+
+function onChipsPointerDown(event) {
+  const el = chipsContainer.value
+  if (!el) return
+  isDraggingChips.value = true
+  chipsDragMoved = false
+  chipsDragStartX = event.clientX
+  chipsDragStartScrollLeft = el.scrollLeft
+  el.setPointerCapture?.(event.pointerId)
+}
+
+function onChipsPointerMove(event) {
+  if (!isDraggingChips.value) return
+  const el = chipsContainer.value
+  if (!el) return
+  const delta = event.clientX - chipsDragStartX
+  if (Math.abs(delta) > 4) chipsDragMoved = true
+  el.scrollLeft = chipsDragStartScrollLeft - delta
+}
+
+function onChipsPointerUp(event) {
+  if (!isDraggingChips.value) return
+  isDraggingChips.value = false
+  chipsContainer.value?.releasePointerCapture?.(event.pointerId)
+}
+
+// 드래그로 살짝이라도 움직인 뒤 손을 떼면 pointerup 다음에 click도 따라와서, 드래그
+// 끝나는 위치에 있던 칩이 의도치 않게 선택돼버린다 - 움직임이 있었으면 클릭을 무시한다.
+function onChipClick(cat) {
+  if (chipsDragMoved) {
+    chipsDragMoved = false
+    return
+  }
+  selectCategory(cat)
+}
+
 onMounted(async () => {
   merchantsStore.fetchCategories()
   // 매장 상세(추천 카드)에 쓸 보유 카드 - Storedetail.vue와 동일하게, 이미 있으면 다시 안 받습니다.
@@ -638,11 +691,13 @@ onMounted(async () => {
 
 .category-chips {
   display: flex; gap: 8px; overflow-x: auto; padding-bottom: 14px; padding-right: 24px;
-  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch; touch-action: pan-x;
+  cursor: grab;
   mask-image: linear-gradient(to right, black calc(100% - 36px), transparent 100%);
   -webkit-mask-image: linear-gradient(to right, black calc(100% - 36px), transparent 100%);
 }
 .category-chips::-webkit-scrollbar { display: none; }
+.category-chips.dragging { cursor: grabbing; user-select: none; }
 
 .chip {
   flex: 0 0 auto; height: 34px; padding: 0 16px; border-radius: 999px; border: none;
