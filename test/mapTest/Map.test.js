@@ -192,11 +192,11 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     // 새 페이지로 이동하지 않고, 같은 바텀시트 안에서 목록 대신 상세가 뜬다.
     expect(routerMock.push).not.toHaveBeenCalled()
     expect(wrapper.find('.store-name').text()).toBe('동네 카페')
-    expect(wrapper.find('.sheet-list-header').exists()).toBe(false)
+    expect(wrapper.find('.sort-toggle').exists()).toBe(false)
 
     await wrapper.find('.detail-back-btn').trigger('click')
     expect(wrapper.find('.store-name').exists()).toBe(false)
-    expect(wrapper.find('.sheet-list-header').exists()).toBe(true)
+    expect(wrapper.find('.sort-toggle').exists()).toBe(true)
   })
 
   it('recommended=true인 매장만 핀 테두리가 강조 색상으로 그려지고, 나머지는 기본 색상 핀만 뜬다', async () => {
@@ -213,7 +213,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(getClusterer().markers).toHaveLength(2) // 추천 여부와 무관하게 둘 다 핀으로 뜬다
     const cafePin = getClusterer().markers.find((m) => m.title === '동네 카페')
     const martPin = getClusterer().markers.find((m) => m.title === '동네 마트')
-    expect(decodedPinSvg(cafePin)).toContain('stroke="#ffb800"')
+    expect(decodedPinSvg(cafePin)).toContain('stroke="#ffbc00"')
     expect(decodedPinSvg(martPin)).toContain('stroke="#8f897f"')
   })
 
@@ -261,8 +261,20 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(getClusterer().markers).toHaveLength(0)
   })
 
-  it('지도를 아무리 축소해도(레벨이 높아도) 조회는 계속 동작한다 - 화면이 빽빽해지는 문제는 클러스터링이 해결한다', async () => {
-    const { kakao } = createKakaoMock({ level: 10 })
+  it('지도를 레벨 6 이상으로 심하게 축소하면 조회 자체를 하지 않고 기존 핀도 지운다', async () => {
+    const { kakao, getClusterer } = createKakaoMock({ level: 6 })
+    window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
+
+    mountMapPage()
+    await flushPromises()
+
+    expect(fetchRecommendedNearbyMerchants).not.toHaveBeenCalled()
+    expect(getClusterer().markers).toHaveLength(0)
+  })
+
+  it('레벨 6 미만이면(많이 축소되지 않았으면) 그대로 조회해서 핀을 그린다', async () => {
+    const { kakao, getClusterer } = createKakaoMock({ level: 5 })
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
 
@@ -270,6 +282,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     await flushPromises()
 
     expect(fetchRecommendedNearbyMerchants).toHaveBeenCalled()
+    expect(getClusterer().markers).toHaveLength(1)
   })
 
   it('bounds가 SW===NE로 찌그러져 있으면(레이아웃 확정 전 등) 조회 자체를 하지 않는다', async () => {
