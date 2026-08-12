@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 const routerMock = { push: vi.fn(), back: vi.fn() }
@@ -52,5 +52,17 @@ describe('Menu.vue (라우팅되는 메뉴 페이지)', () => {
     await wrapper.find('.icon-btn-outline').trigger('click')
 
     expect(routerMock.back).toHaveBeenCalledTimes(1)
+  })
+
+  it('로그아웃 버튼을 누르면 세션을 정리하고 로그인 화면으로 이동한다', async () => {
+    const wrapper = mountMenu()
+    const authStore = useAuthStore()
+    authStore.logout = vi.fn().mockResolvedValue()
+
+    await wrapper.find('.logout-btn').trigger('click')
+    await flushPromises()
+
+    expect(authStore.logout).toHaveBeenCalledTimes(1)
+    expect(routerMock.push).toHaveBeenCalledWith('/login')
   })
 })
