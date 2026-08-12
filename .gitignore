@@ -43,3 +43,4 @@ __screenshots__/
 *.timestamp-*-*.mjs
 
 .claude
+CLAUDE.md

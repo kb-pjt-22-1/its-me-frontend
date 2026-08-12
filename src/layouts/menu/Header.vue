@@ -37,6 +37,7 @@ const PAGE_TITLES = {
   home: '홈',
   map: '주변',
   pay: '결제',
+  benefits: '혜택',
   cards: '카드',
   bookmarks: '저장한 매장',
 };
