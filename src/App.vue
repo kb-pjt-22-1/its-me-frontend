@@ -10,8 +10,6 @@
     </div>
 
     <template v-else>
-      <!-- 로그인 화면에서는 사이드 메뉴가 뜰 이유가 없습니다. -->
-      <SidebarMenu v-if="authStore.isAuthenticated" />
       <main class="page-container app-page has-bottom-nav">
         <router-view />
       </main>
@@ -22,8 +20,8 @@
 <script setup>
 // Header/NavBar는 '/' 하위 라우트에서 DefaultLayout이 직접 렌더링합니다.
 // 세션 복원은 라우터 가드(router/index.js)가 첫 라우팅 전에 처리하므로 여기서 하지 않습니다.
+// 메뉴는 예전엔 여기서 SidebarMenu를 오버레이로 띄웠는데, /menu 라우트 페이지로 바뀌었습니다.
 import { onMounted, watch } from 'vue';
-import SidebarMenu from '@/components/SidebarMenu.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';

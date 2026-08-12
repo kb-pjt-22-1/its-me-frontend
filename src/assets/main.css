@@ -65,12 +65,15 @@
   width: 30px;
 }
 
+/* 배경색을 투명으로 둬서 어느 페이지(아이보리 배경, 흰 헤더 등)에 놓이든 항상 그
+   배경과 같은 색으로 녹아든다 - 아이콘/글자만 보이고 버튼 박스는 안 보인다.
+   width/height는 그대로라 터치 판정 영역은 줄어들지 않는다. */
 .icon-btn-outline {
   width: 32px;
   height: 32px;
-  border: 1px solid var(--line, #e7e4de);
+  border: none;
   border-radius: 8px;
-  background: var(--surface, #ffffff);
+  background: transparent;
   display: grid;
   place-items: center;
   cursor: pointer;
