@@ -3,13 +3,13 @@
     <header class="page-header">
       <h1>혜택</h1>
       <div class="header-icons">
-        <button class="icon-btn-outline" aria-label="알림">
+        <button type="button" class="icon-btn-outline" aria-label="알림">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
           </svg>
         </button>
-        <button class="icon-btn-outline" aria-label="메뉴">
+        <button type="button" class="icon-btn-outline" aria-label="메뉴">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
             <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
@@ -20,7 +20,7 @@
       </div>
     </header>
 
-    <!-- AI 혜택 코치 -->
+    <!-- AI 혜택 코치 (하드코딩 유지 - 백엔드 API 없음, 사용자 요청) -->
     <section class="surface-card ai-card">
       <span class="pill pill--gold ai-badge">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"></path></svg>
@@ -42,86 +42,119 @@
 
     <!-- 월간 리포트 -->
     <section class="surface-card report-card">
-      <div class="report-top">
-        <div>
-          <p class="report-label">{{ reportMonthLabel }} 혜택 리포트</p>
-          <p class="report-sub muted-text">할인 및 적립 포함</p>
+      <div v-if="reportLoading" class="benefit-usage-loading muted-text">불러오는 중...</div>
+
+      <div v-else-if="reportError" class="benefit-usage-empty muted-text">
+        혜택 리포트를 불러오지 못했어요.
+        <button type="button" class="link-btn" @click="loadReport">다시 시도</button>
+      </div>
+
+      <template v-else>
+        <div class="card-nav-row">
+          <button type="button" class="month-nav-btn" aria-label="이전 달" @click="goToPrevMonth">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <button type="button" class="month-nav-btn" aria-label="다음 달" :disabled="isCurrentMonth" @click="goToNextMonth">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
         </div>
-        <span class="report-delta success-text">▲ 지난달보다 +{{ deltaVsLastMonth.toLocaleString() }}원</span>
-      </div>
 
-      <p class="report-caption muted-text">이번 달 받은 혜택</p>
-      <p class="report-total">{{ totalBenefit.toLocaleString() }}원</p>
-
-      <div class="donut-row" :class="{ 'donut-row--collapsed': !showFullBreakdown }">
-        <svg
-          viewBox="0 0 120 120"
-          class="donut-chart"
-          :class="{ 'donut-chart--large': !showFullBreakdown }"
-        >
-          <circle
-            v-for="(seg, i) in donutSegments"
-            :key="i"
-            cx="60" cy="60" r="45"
-            fill="none"
-            :stroke="seg.color"
-            stroke-width="16"
-            :stroke-dasharray="`${seg.length} ${circumference - seg.length}`"
-            :stroke-dashoffset="seg.offset"
-            transform="rotate(-90 60 60)"
-            class="donut-segment"
-            @mouseenter="activeSegment = seg.cat"
-            @mouseleave="activeSegment = null"
-            @click="activeSegment = activeSegment === seg.cat ? null : seg.cat"
-          />
-
-          <template v-if="activeSegment">
-            <text x="60" y="56" text-anchor="middle" class="donut-center-amount" :fill="activeSegment.color">
-              {{ activeSegment.name }}
-            </text>
-            <text x="60" y="72" text-anchor="middle" class="donut-center-label">
-              {{ activeSegment.amount.toLocaleString() }}원 · {{ activeSegment.percent }}%
-            </text>
-          </template>
-          <template v-else>
-            <text x="60" y="56" text-anchor="middle" class="donut-center-amount">{{ (totalBenefit / 1000).toFixed(0) }}k</text>
-            <text x="60" y="72" text-anchor="middle" class="donut-center-label">이번달 받은 혜택</text>
-          </template>
-        </svg>
-
-        <ul v-if="showFullBreakdown" class="donut-legend">
-          <li
-            v-for="cat in categoryBreakdown"
-            :key="cat.name"
-            :class="{ active: activeSegment === cat }"
-            @mouseenter="activeSegment = cat"
-            @mouseleave="activeSegment = null"
+        <div class="report-top">
+          <div>
+            <p class="report-label">{{ reportMonthLabel }} 혜택 리포트</p>
+            <p class="report-sub muted-text">할인 및 적립 포함</p>
+          </div>
+          <span
+            class="report-delta"
+            :class="deltaVsLastMonth >= 0 ? 'success-text' : 'danger-text'"
           >
-            <span class="legend-dot" :style="{ background: cat.color }"></span>
-            <span class="legend-name">{{ cat.name }}</span>
-            <span class="legend-percent">{{ cat.percent }}%</span>
-            <span class="legend-amount muted-text">{{ cat.amount.toLocaleString() }}원</span>
-          </li>
-        </ul>
-      </div>
+            {{ deltaVsLastMonth >= 0 ? '▲' : '▼' }} 지난달보다 {{ deltaVsLastMonth >= 0 ? '+' : '' }}{{ deltaVsLastMonth.toLocaleString() }}원
+          </span>
+        </div>
 
-      <p v-if="!showFullBreakdown" class="report-summary muted-text">
-        {{ topTwoCategoriesLabel }}
-      </p>
+        <p class="report-caption muted-text">{{ reportMonthLabel }}에 받은 혜택</p>
+        <p class="report-total">{{ totalBenefit.toLocaleString() }}원</p>
 
-      <button class="expand-btn" @click="showFullBreakdown = !showFullBreakdown; activeSegment = null">
-        {{ showFullBreakdown ? '간단히 보기' : '전체 구성 보기' }}
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="{ flipped: showFullBreakdown }">
-          <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
-      </button>
+        <div v-if="categoryBreakdown.length === 0" class="benefit-usage-empty muted-text">
+          {{ reportMonthLabel }}에 받은 혜택이 아직 없어요.
+        </div>
+
+        <template v-else>
+          <div class="donut-row" :class="{ 'donut-row--collapsed': !showFullBreakdown }">
+            <svg
+              viewBox="0 0 120 120"
+              class="donut-chart"
+              :class="{ 'donut-chart--large': !showFullBreakdown }"
+            >
+              <circle
+                v-for="(seg, i) in donutSegments"
+                :key="i"
+                cx="60" cy="60" r="45"
+                fill="none"
+                :stroke="seg.color"
+                stroke-width="16"
+                :stroke-dasharray="`${seg.length} ${circumference - seg.length}`"
+                :stroke-dashoffset="seg.offset"
+                transform="rotate(-90 60 60)"
+                class="donut-segment"
+                @mouseenter="activeSegment = seg.cat"
+                @mouseleave="activeSegment = null"
+                @click="activeSegment = activeSegment === seg.cat ? null : seg.cat"
+              />
+
+              <template v-if="activeSegment">
+                <text x="60" y="56" text-anchor="middle" class="donut-center-amount" :fill="activeSegment.color">
+                  {{ activeSegment.name }}
+                </text>
+                <text x="60" y="72" text-anchor="middle" class="donut-center-label">
+                  {{ activeSegment.amount.toLocaleString() }}원 · {{ activeSegment.percent }}%
+                </text>
+              </template>
+              <template v-else>
+                <text x="60" y="56" text-anchor="middle" class="donut-center-amount">{{ (totalBenefit / 1000).toFixed(0) }}k</text>
+                <text x="60" y="72" text-anchor="middle" class="donut-center-label">받은 혜택</text>
+              </template>
+            </svg>
+
+            <ul v-if="showFullBreakdown" class="donut-legend">
+              <li
+                v-for="cat in categoryBreakdown"
+                :key="cat.categoryCode"
+                :class="{ active: activeSegment === cat }"
+                @mouseenter="activeSegment = cat"
+                @mouseleave="activeSegment = null"
+              >
+                <span class="legend-dot" :style="{ background: cat.color }"></span>
+                <span class="legend-name">{{ cat.name }}</span>
+                <span class="legend-percent">{{ cat.percent }}%</span>
+                <span class="legend-amount muted-text">{{ cat.amount.toLocaleString() }}원</span>
+              </li>
+            </ul>
+          </div>
+
+          <p v-if="!showFullBreakdown" class="report-summary muted-text">
+            {{ topTwoCategoriesLabel }}
+          </p>
+
+          <button type="button" class="expand-btn" @click="showFullBreakdown = !showFullBreakdown; activeSegment = null">
+            {{ showFullBreakdown ? '간단히 보기' : '전체 구성 보기' }}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="{ flipped: showFullBreakdown }">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        </template>
+      </template>
     </section>
 
-    <!-- 이번 달 받을 수 있는 혜택 -->
+    <!-- 이번 달 받을 수 있는 혜택 (하드코딩 유지 - 백엔드 API 없음, 사용자 요청) -->
     <section class="available-section">
       <div class="section-header">
         <h3>이번 달 받을 수 있는 혜택</h3>
-        <button class="link-btn">전체 카드</button>
+        <button type="button" class="link-btn">전체 카드</button>
       </div>
       <p class="section-sub muted-text">보유한 전체 카드의 카테고리별 혜택 현황이에요.</p>
 
@@ -131,7 +164,7 @@
           <div class="usage-main">
             <div class="usage-top-row">
               <strong>{{ item.category }}</strong>
-              <button class="usage-link">이 혜택 사용하기 &gt;</button>
+              <button type="button" class="usage-link">이 혜택 사용하기 &gt;</button>
             </div>
             <p class="usage-desc muted-text">{{ item.used.toLocaleString() }}원 사용 / 총 {{ item.limit.toLocaleString() }}원</p>
             <div class="progress-track">
@@ -142,7 +175,7 @@
         </div>
       </div>
 
-      <button v-if="!showAllAvailable && availableBenefits.length > 3" class="expand-btn" @click="showAllAvailable = true">
+      <button type="button" v-if="!showAllAvailable && availableBenefits.length > 3" class="expand-btn" @click="showAllAvailable = true">
         혜택 {{ availableBenefits.length - 3 }}개 더보기
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="6 9 12 15 18 9"></polyline>
@@ -152,85 +185,177 @@
 
     <!-- 카드별 연회비 본전 -->
     <section class="breakeven-section">
-      <h3 class="section-title">카드별 연회비 본전</h3>
-
-      <div v-for="card in breakevenCards" :key="card.userCardId" class="surface-card breakeven-card">
-        <div class="be-card-visual" :style="{ background: card.color }">
-          <div class="be-card-top">
-            <span class="be-card-icon">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
-                <rect x="2" y="5" width="20" height="14" rx="3"></rect>
-                <line x1="2" y1="10" x2="22" y2="10"></line>
-              </svg>
-            </span>
-          </div>
-          <p class="be-card-name">{{ card.cardName }}</p>
-          <p class="be-card-owner">본인 · {{ card.panLast4 }}</p>
-        </div>
-
-        <div class="be-status" :class="card.isBreakEven ? 'be-status--met' : 'be-status--pending'">
-          <p class="be-status-title">
-            {{ card.isBreakEven ? `본전 달성 ${card.breakEvenDateLabel}, 연회비 본전을 뽑았어요` : '아직 연회비 본전 전이에요' }}
-          </p>
-          <p class="be-status-desc muted-text">
-            {{ card.isBreakEven
-              ? `현재까지 연회비보다 ${(card.cumulativeBenefit - card.annualFee).toLocaleString()}원 더 받았어요`
-              : `연회비까지 ${(card.annualFee - card.cumulativeBenefit).toLocaleString()}원 남았어요` }}
-          </p>
-        </div>
-
-        <div class="be-stats-row">
-          <div><span class="be-stat-label muted-text">연회비</span><strong>{{ card.annualFee.toLocaleString() }}원</strong></div>
-          <div><span class="be-stat-label muted-text">누적 혜택</span><strong>{{ card.cumulativeBenefit.toLocaleString() }}원</strong></div>
-          <div>
-            <span class="be-stat-label muted-text">순혜택</span>
-            <strong :class="card.netBenefit >= 0 ? 'success-text' : 'danger-text'">
-              {{ card.netBenefit >= 0 ? '+' : '' }}{{ card.netBenefit.toLocaleString() }}원
-            </strong>
-          </div>
-        </div>
-
-        <svg viewBox="0 0 300 130" class="be-chart">
-          <line
-            x1="0" :y1="scaleY(card.annualFee, card)" x2="300" :y2="scaleY(card.annualFee, card)"
-            stroke="var(--line, #e9e5df)" stroke-width="1" stroke-dasharray="4 4"
-          />
-          <text x="4" :y="scaleY(card.annualFee, card) - 6" class="be-chart-threshold-label">{{ (card.annualFee / 1000) }}k</text>
-
-          <polyline
-            :points="linePoints(card)"
-            fill="none" stroke="var(--orange, #ffb800)" stroke-width="2.5"
-          />
-
-          <circle
-            v-if="card.isBreakEven"
-            :cx="scaleX(card.breakEvenIndex, card)" :cy="scaleY(card.annualFee, card)" r="4"
-            fill="var(--green, #00a97b)"
-          />
-
-          <text
-            v-for="(m, i) in card.months" :key="m"
-            :x="scaleX(i, card)" y="126" text-anchor="middle" class="be-chart-month-label"
-          >{{ m }}</text>
-        </svg>
+      <div class="section-header">
+        <h3 class="section-title">카드별 연회비 본전</h3>
       </div>
+
+      <div v-if="breakevenCards.length > 1" class="card-nav-row">
+        <button type="button"
+          class="month-nav-btn"
+          aria-label="이전 카드"
+          :disabled="activeCardIndex === 0"
+          @click="scrollToCard(activeCardIndex - 1)"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <button type="button"
+          class="month-nav-btn"
+          aria-label="다음 카드"
+          :disabled="activeCardIndex === breakevenCards.length - 1"
+          @click="scrollToCard(activeCardIndex + 1)"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+
+      <div v-if="breakevenLoading" class="surface-card benefit-usage-loading muted-text">불러오는 중...</div>
+
+      <div v-else-if="breakevenError" class="surface-card benefit-usage-empty muted-text">
+        연회비 본전 정보를 불러오지 못했어요.
+        <button type="button" class="link-btn" @click="loadBreakEven">다시 시도</button>
+      </div>
+
+      <div v-else-if="breakevenCards.length === 0" class="surface-card benefit-usage-empty muted-text">
+        연회비가 있는 카드가 없어요.
+      </div>
+
+      <template v-else>
+        <div ref="sliderRef" class="breakeven-slider" @scroll="onSliderScroll">
+          <div v-for="card in breakevenCards" :key="card.userCardId" class="surface-card breakeven-card breakeven-slide">
+            <div class="be-card-visual" :style="{ background: card.color }">
+              <div class="be-card-top">
+                <span class="be-card-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+                    <rect x="2" y="5" width="20" height="14" rx="3"></rect>
+                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                  </svg>
+                </span>
+              </div>
+              <p class="be-card-name">{{ card.cardName }}</p>
+              <p class="be-card-owner">본인 · {{ card.panLast4 }}</p>
+            </div>
+
+            <div class="be-status" :class="card.isBreakEven ? 'be-status--met' : 'be-status--pending'">
+              <p class="be-status-title">
+                {{ card.isBreakEven ? `본전 달성 ${card.breakEvenDateLabel}, 연회비 본전을 뽑았어요` : '아직 연회비 본전 전이에요' }}
+              </p>
+              <p class="be-status-desc muted-text">
+                {{ card.isBreakEven
+                  ? `현재까지 연회비보다 ${(card.cumulativeBenefit - card.annualFee).toLocaleString()}원 더 받았어요`
+                  : `연회비까지 ${(card.annualFee - card.cumulativeBenefit).toLocaleString()}원 남았어요` }}
+              </p>
+            </div>
+
+            <div class="be-stats-row">
+              <div><span class="be-stat-label muted-text">연회비</span><strong>{{ card.annualFee.toLocaleString() }}원</strong></div>
+              <div><span class="be-stat-label muted-text">누적 혜택</span><strong>{{ card.cumulativeBenefit.toLocaleString() }}원</strong></div>
+              <div>
+                <span class="be-stat-label muted-text">순혜택</span>
+                <strong :class="card.netBenefit >= 0 ? 'success-text' : 'danger-text'">
+                  {{ card.netBenefit >= 0 ? '+' : '' }}{{ card.netBenefit.toLocaleString() }}원
+                </strong>
+              </div>
+            </div>
+
+            <svg v-if="card.months.length > 1" viewBox="0 0 300 130" class="be-chart">
+              <line
+                x1="0" :y1="scaleY(card.annualFee, card)" x2="300" :y2="scaleY(card.annualFee, card)"
+                stroke="var(--line, #e9e5df)" stroke-width="1" stroke-dasharray="4 4"
+              />
+              <text x="4" :y="scaleY(card.annualFee, card) - 6" class="be-chart-threshold-label">{{ (card.annualFee / 1000) }}k</text>
+
+              <polyline
+                :points="linePoints(card)"
+                fill="none" stroke="var(--orange, #ffb800)" stroke-width="2.5"
+              />
+
+              <circle
+                v-if="card.isBreakEven && card.breakEvenIndex >= 0"
+                :cx="scaleX(card.breakEvenIndex, card)" :cy="scaleY(card.annualFee, card)" r="4"
+                fill="var(--green, #00a97b)"
+              />
+
+              <text
+                v-for="(m, i) in card.months" :key="i"
+                :x="scaleX(i, card)" y="126" text-anchor="middle" class="be-chart-month-label"
+              >{{ m }}</text>
+            </svg>
+          </div>
+        </div>
+      </template>
     </section>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
+import { fetchMonthlyBenefitReport, fetchAnnualFeeBreakEven } from '@/services/benefitService';
 
 // ---------------------------------------------------------
-// TODO: 아래 데이터는 전부 임시 데이터예요. 실제 화면에 붙일 때는
-// paymentStore(월별 혜택 합계) / cardsStore(카드별 연회비·누적혜택) 등에서
-// 계산해서 채워주면 됩니다. computed 아래쪽 로직(usagePercent, scaleX/scaleY,
-// donutSegments 등)은 데이터만 실제 걸로 바뀌면 그대로 재사용 가능해요.
+// 월간 리포트 [GET /api/v1/benefits/report]
 // ---------------------------------------------------------
+const reportMonthLabel = ref('');
+const totalBenefit = ref(0);
+const deltaVsLastMonth = ref(0);
+const categoryBreakdown = ref([]);
+const reportLoading = ref(true);
+const reportError = ref(false);
 
-const reportMonthLabel = ref('8월');
-const totalBenefit = ref(42500);
-const deltaVsLastMonth = ref(7200);
+// 조회 중인 달, 'yyyy-MM' 형식. 기본값은 이번 달.
+const selectedYearMonth = ref(getCurrentYearMonth());
+const isCurrentMonth = computed(() => selectedYearMonth.value === getCurrentYearMonth());
+
+function getCurrentYearMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function goToPrevMonth() {
+  shiftSelectedMonth(-1);
+}
+
+function goToNextMonth() {
+  if (isCurrentMonth.value) return; // 백엔드가 미래 달 조회를 막음
+  shiftSelectedMonth(1);
+}
+
+function shiftSelectedMonth(delta) {
+  const [year, month] = selectedYearMonth.value.split('-').map(Number);
+  const next = new Date(year, month - 1 + delta, 1);
+  selectedYearMonth.value = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+  showFullBreakdown.value = false;
+  activeSegment.value = null;
+  loadReport();
+}
+
+async function loadReport() {
+  reportLoading.value = true;
+  reportError.value = false;
+  try {
+    const report = await fetchMonthlyBenefitReport(selectedYearMonth.value);
+    reportMonthLabel.value = formatYearMonthLabel(report.yearMonth);
+    totalBenefit.value = report.totalBenefit;
+    deltaVsLastMonth.value = report.deltaVsLastMonth;
+    categoryBreakdown.value = report.categoryBreakdown;
+  } catch (e) {
+    console.error('[Benefits] 월간 리포트 조회 실패', e);
+    reportError.value = true;
+  } finally {
+    reportLoading.value = false;
+  }
+}
+
+// 연도가 올해와 다르면 '2025년 12월'처럼 연도를 붙여서 표시
+function formatYearMonthLabel(yearMonth) {
+  if (!yearMonth) return '';
+  const [year, month] = yearMonth.split('-').map(Number);
+  const currentYear = new Date().getFullYear();
+  return year === currentYear ? `${month}월` : `${year}년 ${month}월`;
+}
 
 const aiTips = ref([
   {
@@ -243,20 +368,13 @@ const aiTips = ref([
   },
 ]);
 
-const categoryBreakdown = ref([
-  { name: '카페', amount: 16000, percent: 38, color: 'var(--orange, #ffb800)' },
-  { name: '편의점', amount: 9000, percent: 21, color: 'var(--green, #00a97b)' },
-  { name: '대형마트', amount: 7000, percent: 16, color: '#4a7fd4' },
-  { name: '주유소', amount: 5000, percent: 12, color: 'var(--danger, #f05e58)' },
-  { name: '기타', amount: 5500, percent: 13, color: 'var(--muted, #c7c2b8)' },
-]);
-
 const showFullBreakdown = ref(false);
 const activeSegment = ref(null); // 마우스 오버/탭 중인 카테고리 (categoryBreakdown의 항목 그 자체)
 
 const topTwoCategoriesLabel = computed(() => {
   const sorted = [...categoryBreakdown.value].sort((a, b) => b.percent - a.percent);
   const [a, b] = sorted;
+  if (!a || !b) return '';
   const sum = a.percent + b.percent;
   return `${a.name}와 ${b.name} 혜택이 전체의 ${sum}%를 차지해요.`;
 });
@@ -276,7 +394,7 @@ const donutSegments = computed(() => {
 });
 
 // ---------------------------------------------------------
-// 이번 달 받을 수 있는 혜택 (카테고리별 사용/한도)
+// 이번 달 받을 수 있는 혜택 (카테고리별 사용/한도) - 하드코딩 유지 (백엔드 API 없음)
 // ---------------------------------------------------------
 const availableBenefits = ref([
   { category: '음식점', icon: '🍽️', used: 7500, limit: 15000 },
@@ -293,24 +411,49 @@ function usagePercent(item) {
 }
 
 // ---------------------------------------------------------
-// 카드별 연회비 본전 그래프
+// 카드별 연회비 본전 [GET /api/v1/benefits/annual-fee-break-even]
 // ---------------------------------------------------------
-const breakevenCards = ref([
-  {
-    userCardId: 1,
-    cardName: 'KB국민 청춘대로 톡톡카드',
-    panLast4: '1234',
-    color: 'linear-gradient(135deg, #35322b, #211f1a)',
-    annualFee: 15000,
-    cumulativeBenefit: 28400,
-    netBenefit: 13400,
-    isBreakEven: true,
-    breakEvenDateLabel: '4월 12일',
-    breakEvenIndex: 3,
-    months: ['1월', '2월', '3월', '4월', '5월', '6월', '7월'],
-    monthlyValues: [2000, 6000, 10500, 15400, 19800, 24200, 28400],
-  },
-]);
+const breakevenCards = ref([]);
+const breakevenLoading = ref(true);
+const breakevenError = ref(false);
+
+// 가로 슬라이더 (카드 여러 장 - 백엔드 BenefitController 주석에도
+// "응답 배열을 슬라이드 형태로 표시한다"고 명시되어 있음)
+const sliderRef = ref(null);
+const activeCardIndex = ref(0);
+
+async function loadBreakEven() {
+  breakevenLoading.value = true;
+  breakevenError.value = false;
+  try {
+    breakevenCards.value = await fetchAnnualFeeBreakEven();
+    activeCardIndex.value = 0;
+    nextTick(() => {
+      if (sliderRef.value) sliderRef.value.scrollTo({ left: 0 });
+    });
+  } catch (e) {
+    console.error('[Benefits] 연회비 본전 조회 실패', e);
+    breakevenError.value = true;
+  } finally {
+    breakevenLoading.value = false;
+  }
+}
+
+// 스와이프로 스크롤했을 때 현재 몇 번째 카드인지 갱신 (점/카운터 표시용)
+function onSliderScroll() {
+  if (!sliderRef.value) return;
+  const el = sliderRef.value;
+  const index = Math.round(el.scrollLeft / el.clientWidth);
+  activeCardIndex.value = Math.min(Math.max(index, 0), breakevenCards.value.length - 1);
+}
+
+// 화살표/점 클릭으로 특정 카드까지 부드럽게 스크롤
+function scrollToCard(index) {
+  if (!sliderRef.value) return;
+  const clamped = Math.min(Math.max(index, 0), breakevenCards.value.length - 1);
+  sliderRef.value.scrollTo({ left: clamped * sliderRef.value.clientWidth, behavior: 'smooth' });
+  activeCardIndex.value = clamped;
+}
 
 // 라인차트 좌표 변환 (0~300 x, 0~130 y, 위쪽 여백 10px)
 function scaleX(index, card) {
@@ -318,13 +461,18 @@ function scaleX(index, card) {
   return index * step;
 }
 function scaleY(value, card) {
-  const maxValue = Math.max(...card.monthlyValues, card.annualFee) * 1.1;
+  const maxValue = Math.max(...card.monthlyValues, card.annualFee, 1) * 1.1;
   const chartHeight = 110; // 아래쪽 20px는 월 라벨용으로 비움
   return 10 + chartHeight - (value / maxValue) * chartHeight;
 }
 function linePoints(card) {
   return card.monthlyValues.map((v, i) => `${scaleX(i, card)},${scaleY(v, card)}`).join(' ');
 }
+
+onMounted(() => {
+  loadReport();
+  loadBreakEven();
+});
 </script>
 
 <style scoped>
@@ -365,10 +513,20 @@ function linePoints(card) {
 .ai-tip-headline { margin: 0 0 3px; font-size: 13px; font-weight: 700; color: var(--charcoal, #2c2b27); line-height: 1.5; }
 .ai-tip-detail { margin: 0; font-size: 11.5px; }
 
+/* 상단 이전/다음 화살표 (월간 리포트, 연회비 본전 공용) */
+.card-nav-row { display: flex; justify-content: flex-end; gap: 2px; margin-bottom: 6px; }
+
 /* 월간 리포트 */
 .report-card { padding: 22px; margin-bottom: 22px; }
 .report-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
 .report-label { margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--charcoal, #151515); }
+.month-nav-btn {
+  border: none; background: none; padding: 2px; cursor: pointer;
+  color: var(--muted, #918a81); display: grid; place-items: center;
+  border-radius: 6px; transition: background 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+.month-nav-btn:hover:not(:disabled) { background: var(--page, #f2f1ee); color: var(--charcoal, #151515); }
+.month-nav-btn:disabled { opacity: .35; cursor: not-allowed; }
 .report-sub { margin: 0; font-size: 11px; }
 .report-delta { font-size: 12px; font-weight: 700; white-space: nowrap; }
 
@@ -431,7 +589,26 @@ function linePoints(card) {
 
 /* 카드별 연회비 본전 */
 .breakeven-section { display: flex; flex-direction: column; gap: 14px; }
-.section-title { margin: 0 0 2px; font-size: 15px; color: var(--charcoal, #151515); }
+.section-title { margin: 0; font-size: 15px; color: var(--charcoal, #151515); }
+
+.section-header { display: flex; justify-content: space-between; align-items: center; }
+
+.breakeven-slider {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin: 0 -18px;
+  padding: 0 18px;
+}
+.breakeven-slider::-webkit-scrollbar { display: none; }
+.breakeven-slide {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  margin-right: 14px;
+}
+.breakeven-slide:last-child { margin-right: 0; }
 
 .breakeven-card { padding: 18px; }
 .be-card-visual {
