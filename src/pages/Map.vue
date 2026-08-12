@@ -185,7 +185,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch, computed } from 'vue'
+import { onMounted, onUnmounted, ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
@@ -440,6 +440,21 @@ function scheduleLoadBoundsMerchants() {
   boundsLoadTimer = setTimeout(loadBoundsMerchants, 150)
 }
 
+// 카카오맵은 생성 시점의 컨테이너 크기로 내부 캔버스를 그려두고, 이후 컨테이너 크기가
+// 바뀌어도 스스로 다시 그리지 않는다. 이 페이지가 다른 탭에서 라우트 전환 애니메이션
+// 중에(또는 직후에) 마운트되면, 지도가 최종 크기로 자리잡기 전 중간 크기에서 초기화될 수
+// 있어서 - 전환이 끝나고 나면 지도가 회색으로 비거나 실제 화면보다 작게 그려진 채로
+// 남는다. ResizeObserver로 컨테이너 크기가 바뀔 때마다 relayout()을 불러서 항상
+// 최신 크기에 맞춰 다시 그리게 한다.
+let mapResizeObserver = null
+function observeMapContainerResize() {
+  if (mapResizeObserver || !mapContainer.value || typeof ResizeObserver === 'undefined') return
+  mapResizeObserver = new ResizeObserver(() => {
+    mapInstance?.relayout()
+  })
+  mapResizeObserver.observe(mapContainer.value)
+}
+
 function initMap(kakao, center) {
   const map = new kakao.maps.Map(mapContainer.value, {
     center: new kakao.maps.LatLng(center.lat, center.lng),
@@ -450,6 +465,7 @@ function initMap(kakao, center) {
   const centerMarker = new kakao.maps.Marker({ map, position: new kakao.maps.LatLng(center.lat, center.lng) })
   kakaoInstance = kakao
   mapInstance = map
+  observeMapContainerResize()
 
   // 매장이 몰려있으면 핀을 하나로 뭉쳐서 보여줍니다. MarkerClusterer는 CustomOverlay를
   // 받지 못하고 kakao.maps.Marker만 받을 수 있어(SDK 제약) 핀을 Marker+MarkerImage로 그립니다.
@@ -657,6 +673,10 @@ onMounted(async () => {
   } else {
     initMap(kakao, defaultCenter)
   }
+})
+
+onUnmounted(() => {
+  mapResizeObserver?.disconnect()
 })
 </script>
 

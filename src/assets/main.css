@@ -24,8 +24,82 @@
   margin: 0 auto;
 }
 
-.app-page { min-height: 100vh; background: var(--page); position: relative; }
+/* .app-page의 유일한 자식(.route-transition-wrap)이 이제 항상 position:absolute;inset:0이라
+   (전환 애니메이션과 무관하게 항상), 이 자식은 더 이상 부모의 내재적 높이에 기여하지 않는다 -
+   .app-page 자신이 확정된(definite) 박스를 가져야 한다.
+
+   height:100vh로 먼저 고쳤었는데, 모바일 브라우저(특히 주소창이 보였다 숨었다 하면서
+   실제 뷰포트 높이가 바뀌는 환경)에서 100vh가 flex 부모(#app) 안에서 안정적으로
+   해석되지 않아 이 요소가 다시 0 높이로 무너지는 경우가 있었다 - 바탕색(body 배경)만
+   보이고 내용이 아예 안 뜨는 증상으로 나타났다.
+
+   그래서 vh 퍼센트 계산에 기대는 대신 position:fixed + top/bottom으로 뷰포트에 직접
+   고정한다. 가운데 정렬은 Header.vue 등이 쓰는 left:50%+transform 방식 대신
+   left:0;right:0;margin:0 auto를 쓴다 - transform을 쓰면 이 요소가 자기 자손 중
+   position:fixed인 것들(Header, Footer 등)의 새 기준점이 돼버리는데, 실기기(특히
+   iOS/모바일 브라우저)에서 "transform 걸린 조상 안에 있는 fixed 요소"가 터치 이벤트를
+   제대로 못 받는 경우가 있다 - 화면은 정상으로 그려지는데 버튼을 눌러도 반응이 없던
+   원인이 이것이었다. left/right + margin:auto는 transform 없이도 똑같이 가운데
+   정렬되면서 이 부작용이 없다. */
+.app-page {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 440px;
+  background: var(--page);
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
 .app-page.has-bottom-nav { padding-bottom: 76px; }
+
+/* ===========================================================
+   페이지 전환 애니메이션 (피그마 프로토타입의 motion/react 슬라이드 참고)
+
+   전환 중인 두 페이지(나가는 것/들어오는 것)를 같은 자리에 겹쳐 보이게 하는
+   공통 래퍼. App.vue(최상위 라우트 전환)와 DefaultLayout.vue(탭 전환) 양쪽이
+   같이 쓴다. Vue가 전환 클래스를 붙이는 대상도 이 래퍼(각 페이지 컴포넌트를
+   감싼 별도 <div>)다 - 페이지 컴포넌트 자신의 루트에 바로 주면, 그 컴포넌트의
+   scoped 규칙(예: position:fixed)이 우선순위로 이겨버리는 경우가 있어서다.
+
+   z-index:0은 각 래퍼가 자기만의 stacking context를 갖게 한다 - Header/Footer가
+   페이지마다 각자 z-index:1000짜리 position:fixed라서, 이게 없으면 나가는
+   페이지와 들어오는 페이지의 헤더/푸터가 서로 뒤섞여 경쟁한다. */
+.route-transition-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* 탭 전환(DefaultLayout.vue 내부, 홈/지도/결제/혜택/카드/북마크) - 좌우 슬라이드.
+   이 페이지들은 전부 자기 루트가 position:fixed가 아니라(static/relative)
+   래퍼의 transform을 그대로 잘 따라온다. */
+.page-slide-enter-active,
+.page-slide-leave-active {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.page-slide-enter-from { transform: translateX(100%); }
+.page-slide-leave-to { transform: translateX(-100%); }
+
+/* 최상위 라우트 전환(App.vue, 탭 화면 <-> /menu·/payments·/member-profile 등) -
+   페이드. Menu.vue/PaymentsList.vue는 자기 루트가 position:fixed라서 슬라이드로
+   시도했더니(transform을 준 래퍼 안에 fixed 자식을 넣는 방식) 애니메이션 구간에
+   화면이 아예 안 그려지고 끝난 뒤에야 툭 나타나는 문제가 있었다 - will-change로
+   레이어를 미리 승격시켜봐도 동일했다. 정확한 원인은 특정하지 못했지만
+   position:fixed 루트 + transform 조합 자체를 피하면(=슬라이드 대신 페이드)
+   이 문제가 구조적으로 발생할 수 없다. opacity는 위치/컨테이닝 블록과
+   무관하게 항상 정상 동작한다. */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+}
 .page-content { padding: 0 18px 24px; }
 .surface-card { background: var(--surface); border-radius: 20px; box-shadow: 0 8px 25px rgba(55, 48, 39, .06); }
 

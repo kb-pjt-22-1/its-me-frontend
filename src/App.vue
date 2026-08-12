@@ -11,7 +11,20 @@
 
     <template v-else>
       <main class="page-container app-page has-bottom-nav">
-        <router-view />
+        <!-- 최상위 라우트(예: 탭 화면들 <-> /menu, /member-profile, /payments 등)가
+             바뀔 때만 전체 화면이 슬라이드됩니다. 탭 사이 이동은 DefaultLayout.vue의
+             내부 router-view가 담당하므로 여기서는 안 움직입니다 -
+             route.matched[0]가 탭 라우트끼리는 전부 '/'로 같기 때문입니다.
+             Menu.vue/PaymentsList.vue가 더 이상 자기 루트를 position:fixed로 직접
+             뷰포트에 붙이지 않고 이 래퍼를 꽉 채우는 방식으로 바뀌어서(각 페이지
+             파일의 .layout-container 주석 참고), 이제 슬라이드가 제대로 그려진다. -->
+        <router-view v-slot="{ Component, route }">
+          <transition name="page-slide">
+            <div :key="route.matched[0]?.path ?? route.path" class="route-transition-wrap">
+              <component :is="Component" />
+            </div>
+          </transition>
+        </router-view>
       </main>
     </template>
   </div>

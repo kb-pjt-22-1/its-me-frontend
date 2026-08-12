@@ -155,14 +155,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* .layout-container 자신은 position:fixed로 직접 뷰포트에 붙지 않는다 - 이 페이지는
+   항상 App.vue의 .route-transition-wrap(position:absolute, 이미 440px로 가운데
+   정렬된 박스) 안에서만 렌더링되므로, 부모를 꽉 채우기만 하면(inset:0) 저절로 같은
+   자리에 온다. 예전엔 여기도 position:fixed였는데, 그러면 라우트 전환 슬라이드
+   애니메이션 중에 "래퍼의 transform" 기준과 "이 요소 자신의 position:fixed" 기준이
+   같이 얽혀서 화면이 안 그려지는 문제가 있었다. */
 .layout-container {
-  position: fixed;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 440px;
-  height: 100vh;
+  position: absolute;
+  inset: 0;
   box-sizing: border-box;
   background: var(--page, #f7f7f5);
   display: flex;
