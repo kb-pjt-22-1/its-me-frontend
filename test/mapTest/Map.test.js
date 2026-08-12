@@ -184,7 +184,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
 
     const pin = getClusterer().markers[0]
     expect(pin.title).toBe('동네 카페')
-    expect(decodedPinSvg(pin)).toContain('☕')
+    expect(decodedPinSvg(pin)).toContain('<image href="☕"')
 
     trigger(pin, 'click')
     await flushPromises()
@@ -226,7 +226,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(fetchMerchantCategories).toHaveBeenCalledTimes(1)
   })
 
-  it('매장 이름이 없으면 빈 title을, 모르는 카테고리면 기본 이모지(📍)를 쓴다', async () => {
+  it('매장 이름이 없으면 빈 title을, 모르는 카테고리면 아이콘 없이 핀만 그린다', async () => {
     const { kakao, getClusterer, trigger } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([
@@ -239,7 +239,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(getClusterer().markers).toHaveLength(1)
     const pin = getClusterer().markers[0]
     expect(pin.title).toBe('')
-    expect(decodedPinSvg(pin)).toContain('📍')
+    expect(decodedPinSvg(pin)).not.toContain('<image')
 
     trigger(pin, 'click')
     await flushPromises()

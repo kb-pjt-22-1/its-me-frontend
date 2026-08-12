@@ -57,7 +57,7 @@
           </button>
 
           <div class="store-banner">
-            <span class="banner-icon">{{ getCategoryEmoji(selectedMerchant.categoryCode) }}</span>
+            <span class="banner-icon"><img :src="selectedMerchant.categoryIcon" alt="" /></span>
           </div>
 
           <div class="store-info">
@@ -147,7 +147,7 @@
               class="sheet-item"
               @click="selectMerchant(shop.id)"
             >
-              <div class="sheet-item-icon">{{ getCategoryEmoji(shop.categoryCode) }}</div>
+              <div class="sheet-item-icon"><img :src="shop.categoryIcon" alt="" /></div>
               <div class="sheet-item-info">
                 <strong>{{ shop.name }}</strong>
                 <p class="muted-text">
@@ -181,7 +181,7 @@ import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { useCardsStore } from '@/stores/cards'
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
-import { fetchRecommendedNearbyMerchants, getCategoryEmoji } from '@/services/merchantsService'
+import { fetchRecommendedNearbyMerchants } from '@/services/merchantsService'
 
 const router = useRouter()
 const merchantsStore = useMerchantsStore()
@@ -284,6 +284,7 @@ const boundsMerchantsWithCategory = computed(() =>
   boundsMerchants.value.map((m) => ({
     ...m,
     categoryName: merchantsStore.getCategoryByCode(m.categoryCode)?.categoryName,
+    categoryIcon: merchantsStore.getCategoryByCode(m.categoryCode)?.categoryIcon,
   })),
 )
 
@@ -447,6 +448,7 @@ function initMap(kakao, center) {
     map,
     averageCenter: true,
     disableClickZoom: true, // 클릭 시 확대하는 대신, 안에 뭉친 매장들을 하단 목록에 보여줍니다.
+    minClusterSize: 5, // 5개 미만이면 클러스터로 안 뭉치고 핀을 개별로 보여줍니다.
   })
   kakao.maps.event.addListener(clusterer, 'clusterclick', onClusterClick)
 
@@ -510,8 +512,10 @@ async function loadBoundsMerchants() {
   }
 }
 
-// 핀 모양(물방울 + 카테고리 이모지)을 SVG로 그려서 MarkerImage로 씁니다. MarkerClusterer가
+// 핀 모양(물방울 + 카테고리 아이콘)을 SVG로 그려서 MarkerImage로 씁니다. MarkerClusterer가
 // CustomOverlay를 못 받고 Marker만 받아서(SDK 제약) DOM 대신 이 방식을 씁니다.
+// 카테고리 아이콘은 merchant_categories.category_icon(실제 CDN URL)을 SVG <image>로
+// 그대로 참조합니다 - 하드코딩 이모지 매핑은 더 이상 안 씁니다.
 // recommended=true인 매장만 테두리 색과 은은한 후광으로 강조합니다 -
 // 나머지 매장도 똑같이 핀은 그려지고, 강조만 빠집니다(필터링이 아니라 하이라이트).
 const PIN_WIDTH = 32
@@ -519,13 +523,15 @@ const PIN_HEIGHT = 40
 function buildMerchantMarkerImage(kakao, merchant) {
   const recommended = !!merchant.recommended
   const borderColor = recommended ? '#ffb800' : '#8f897f'
-  const emoji = getCategoryEmoji(merchant.categoryCode)
   const glow = recommended ? '<circle cx="16" cy="15" r="15" fill="#ffb800" fill-opacity="0.22"/>' : ''
+  const iconTag = merchant.categoryIcon
+    ? `<image href="${merchant.categoryIcon}" x="9" y="8" width="14" height="14"/>`
+    : ''
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_WIDTH}" height="${PIN_HEIGHT}" viewBox="0 0 32 40">` +
     glow +
     `<path d="M16 39C16 39 4 23.6 4 15A12 12 0 1 1 28 15C28 23.6 16 39 16 39Z" fill="#ffffff" stroke="${borderColor}" stroke-width="2.5"/>` +
-    `<text x="16" y="20" font-size="14" text-anchor="middle" dominant-baseline="middle">${emoji}</text>` +
+    iconTag +
     '</svg>'
   const src = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
   return new kakao.maps.MarkerImage(src, new kakao.maps.Size(PIN_WIDTH, PIN_HEIGHT), {
@@ -760,8 +766,11 @@ onMounted(async () => {
   background: var(--inactive, #f0efec);
   display: grid;
   place-items: center;
-  font-size: 1.3rem;
   flex: 0 0 auto;
+}
+.sheet-item-icon img {
+  width: 22px;
+  height: 22px;
 }
 .sheet-item-info { flex: 1; min-width: 0; }
 .sheet-item-info strong { font-size: 14px; color: var(--charcoal, #24211d); }
@@ -818,8 +827,9 @@ onMounted(async () => {
 }
 .banner-icon {
   width: 56px; height: 56px; border-radius: 50%; background: rgba(255, 255, 255, .25);
-  display: grid; place-items: center; font-size: 26px;
+  display: grid; place-items: center;
 }
+.banner-icon img { width: 28px; height: 28px; }
 
 .store-info { margin-bottom: 20px; }
 .store-info .pill { margin-bottom: 8px; }
