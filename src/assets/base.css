@@ -67,6 +67,16 @@ button, input { font: inherit; }
 button { border: 0; background: none; color: inherit; cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 
+/* 모바일 웹앱 기준이라 데스크톱 스크롤바 UI가 어울리지 않는다 - 스크롤 동작 자체는
+   그대로 두고 스크롤바만 시각적으로 숨긴다. */
+* {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* 레거시 Edge/IE */
+}
+*::-webkit-scrollbar {
+  display: none;                /* Chrome/Safari/최신 Edge */
+}
+
 /* 아이콘/placeholder만으로 의도를 전달하는 입력창들이 스크린리더에서도 이름을 갖도록.
    시각적으로는 숨기고 label-input 연결만 제공한다. */
 /* 앱 전체에 커스텀 포커스 스타일이 없어서 브라우저 기본 파란 아웃라인이 그대로 노출되고

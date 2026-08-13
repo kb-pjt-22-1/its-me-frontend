@@ -14,13 +14,23 @@
         <input v-model="searchQuery" type="text" placeholder="지금 화면에 보이는 매장명 또는 카테고리 검색" />
       </div>
 
-      <div ref="chipsContainer" class="category-chips" @wheel="onChipsWheel">
+      <div
+        ref="chipsContainer"
+        class="category-chips"
+        :class="{ dragging: isDraggingChips }"
+        @wheel="onChipsWheel"
+        @pointerdown="onChipsPointerDown"
+        @pointermove="onChipsPointerMove"
+        @pointerup="onChipsPointerUp"
+        @pointercancel="onChipsPointerUp"
+        @pointerleave="onChipsPointerUp"
+      >
         <button
           v-for="cat in categories"
           :key="cat"
           class="chip"
           :class="{ active: selectedCategory === cat }"
-          @click="selectCategory(cat)"
+          @click="onChipClick(cat)"
         >
           {{ cat }}
         </button>
@@ -178,7 +188,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch, computed } from 'vue'
+import { onMounted, onUnmounted, ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
@@ -434,6 +444,21 @@ function scheduleLoadBoundsMerchants() {
   boundsLoadTimer = setTimeout(loadBoundsMerchants, 150)
 }
 
+// 카카오맵은 생성 시점의 컨테이너 크기로 내부 캔버스를 그려두고, 이후 컨테이너 크기가
+// 바뀌어도 스스로 다시 그리지 않는다. 이 페이지가 다른 탭에서 라우트 전환 애니메이션
+// 중에(또는 직후에) 마운트되면, 지도가 최종 크기로 자리잡기 전 중간 크기에서 초기화될 수
+// 있어서 - 전환이 끝나고 나면 지도가 회색으로 비거나 실제 화면보다 작게 그려진 채로
+// 남는다. ResizeObserver로 컨테이너 크기가 바뀔 때마다 relayout()을 불러서 항상
+// 최신 크기에 맞춰 다시 그리게 한다.
+let mapResizeObserver = null
+function observeMapContainerResize() {
+  if (mapResizeObserver || !mapContainer.value || typeof ResizeObserver === 'undefined') return
+  mapResizeObserver = new ResizeObserver(() => {
+    mapInstance?.relayout()
+  })
+  mapResizeObserver.observe(mapContainer.value)
+}
+
 function initMap(kakao, center) {
   const map = new kakao.maps.Map(mapContainer.value, {
     center: new kakao.maps.LatLng(center.lat, center.lng),
@@ -444,6 +469,7 @@ function initMap(kakao, center) {
   const centerMarker = new kakao.maps.Marker({ map, position: new kakao.maps.LatLng(center.lat, center.lng) })
   kakaoInstance = kakao
   mapInstance = map
+  observeMapContainerResize()
 
   // 매장이 몰려있으면 핀을 하나로 뭉쳐서 보여줍니다. MarkerClusterer는 CustomOverlay를
   // 받지 못하고 kakao.maps.Marker만 받을 수 있어(SDK 제약) 핀을 Marker+MarkerImage로 그립니다.
@@ -639,6 +665,60 @@ function onChipsWheel(event) {
   el.scrollLeft += event.deltaY
 }
 
+// 모바일에서는 overflow-x: auto만으로 터치 슬라이드가 되지만, 마우스는 휠 말고는
+// 드래그로 가로 스크롤할 방법이 없다. pointer 이벤트로 마우스도 손가락 슬라이드처럼
+// 드래그-스크롤되게 한다(터치는 이미 브라우저 네이티브 스크롤이 동작하므로 그대로 둔다).
+const isDraggingChips = ref(false)
+let chipsDragStartX = 0
+let chipsDragStartScrollLeft = 0
+let chipsDragMoved = false
+let chipsDragPointerId = null
+
+function onChipsPointerDown(event) {
+  const el = chipsContainer.value
+  if (!el) return
+  isDraggingChips.value = true
+  chipsDragMoved = false
+  chipsDragStartX = event.clientX
+  chipsDragStartScrollLeft = el.scrollLeft
+  chipsDragPointerId = event.pointerId
+  // setPointerCapture는 여기서 바로 호출하지 않는다 - 캡처가 걸린 상태에서 나오는
+  // mouseup/click은 원래 눌렀던 칩(button)이 아니라 캡처를 건 el(.category-chips)로
+  // 다시 타겟팅돼서, 마우스로 그냥 눌렀다 뗀(드래그 아닌) 클릭이 칩의 @click을 못
+  // 타고 그대로 씹혀버린다(터치는 이 리타겟팅 대상이 아니라 멀쩡했다). 그래서 실제로
+  // 드래그로 확정된 뒤(아래 onChipsPointerMove에서 4px 넘게 움직였을 때)에만 캡처한다.
+}
+
+function onChipsPointerMove(event) {
+  if (!isDraggingChips.value) return
+  const el = chipsContainer.value
+  if (!el) return
+  const delta = event.clientX - chipsDragStartX
+  if (Math.abs(delta) > 4 && !chipsDragMoved) {
+    chipsDragMoved = true
+    el.setPointerCapture?.(chipsDragPointerId)
+  }
+  el.scrollLeft = chipsDragStartScrollLeft - delta
+}
+
+function onChipsPointerUp(event) {
+  if (!isDraggingChips.value) return
+  isDraggingChips.value = false
+  if (chipsContainer.value?.hasPointerCapture?.(event.pointerId)) {
+    chipsContainer.value.releasePointerCapture(event.pointerId)
+  }
+}
+
+// 드래그로 살짝이라도 움직인 뒤 손을 떼면 pointerup 다음에 click도 따라와서, 드래그
+// 끝나는 위치에 있던 칩이 의도치 않게 선택돼버린다 - 움직임이 있었으면 클릭을 무시한다.
+function onChipClick(cat) {
+  if (chipsDragMoved) {
+    chipsDragMoved = false
+    return
+  }
+  selectCategory(cat)
+}
+
 onMounted(async () => {
   merchantsStore.fetchCategories()
   // 매장 상세(추천 카드)에 쓸 보유 카드 - Storedetail.vue와 동일하게, 이미 있으면 다시 안 받습니다.
@@ -665,6 +745,10 @@ onMounted(async () => {
   } else {
     initMap(kakao, defaultCenter)
   }
+})
+
+onUnmounted(() => {
+  mapResizeObserver?.disconnect()
 })
 </script>
 
@@ -699,11 +783,13 @@ onMounted(async () => {
 
 .category-chips {
   display: flex; gap: 8px; overflow-x: auto; padding-bottom: 14px; padding-right: 24px;
-  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch; touch-action: pan-x;
+  cursor: grab;
   mask-image: linear-gradient(to right, black calc(100% - 36px), transparent 100%);
   -webkit-mask-image: linear-gradient(to right, black calc(100% - 36px), transparent 100%);
 }
 .category-chips::-webkit-scrollbar { display: none; }
+.category-chips.dragging { cursor: grabbing; user-select: none; }
 
 .chip {
   flex: 0 0 auto; height: 34px; padding: 0 16px; border-radius: 999px; border: none;

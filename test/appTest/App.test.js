@@ -4,7 +4,6 @@ import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 
 import App from '@/App.vue'
-import SidebarMenu from '@/components/SidebarMenu.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCardsStore } from '@/stores/cards'
 import { useMerchantsStore } from '@/stores/merchants'
@@ -30,7 +29,7 @@ function setupStores() {
 function mountApp() {
   return mount(App, {
     global: {
-      stubs: { SidebarMenu: true, 'router-view': true },
+      stubs: { 'router-view': true },
     },
   })
 }
@@ -50,7 +49,7 @@ describe('부트스트랩 판정 전 (isBootstrapped=false)', () => {
 })
 
 describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
-  it('로그인 상태가 아니면 사이드메뉴 없이 본문만 보여주고 사용자 데이터를 불러오지 않는다', () => {
+  it('로그인 상태가 아니면 본문만 보여주고 사용자 데이터를 불러오지 않는다', () => {
     const stores = setupStores()
     stores.authStore.isBootstrapped = true
 
@@ -58,22 +57,20 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
 
     expect(wrapper.find('.app-splash').exists()).toBe(false)
     expect(wrapper.find('.page-container').exists()).toBe(true)
-    expect(wrapper.findComponent(SidebarMenu).exists()).toBe(false)
     expect(stores.cardsStore.fetchCards).not.toHaveBeenCalled()
     expect(stores.merchantsStore.fetchMerchants).not.toHaveBeenCalled()
     expect(stores.bookmarksStore.fetchBookmarks).not.toHaveBeenCalled()
     expect(stores.paymentStore.fetchHistory).not.toHaveBeenCalled()
   })
 
-  it('이미 로그인 상태로 마운트되면 사이드메뉴를 보여주고 모든 사용자 데이터를 불러온다', () => {
+  it('이미 로그인 상태로 마운트되면 모든 사용자 데이터를 불러온다', () => {
     const stores = setupStores()
     stores.authStore.isBootstrapped = true
     stores.authStore.accessToken = 'token'
     stores.authStore.user = { userId: 1, name: '홍길동' }
 
-    const wrapper = mountApp()
+    mountApp()
 
-    expect(wrapper.findComponent(SidebarMenu).exists()).toBe(true)
     expect(stores.cardsStore.fetchCards).toHaveBeenCalledTimes(1)
     expect(stores.merchantsStore.fetchMerchants).toHaveBeenCalledTimes(1)
     expect(stores.bookmarksStore.fetchBookmarks).toHaveBeenCalledTimes(1)

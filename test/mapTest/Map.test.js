@@ -603,3 +603,170 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     expect(wrapper.find('.store-name').text()).toBe('동네 카페')
   })
 })
+
+describe('카테고리 칩 드래그 스크롤 (마우스도 손가락처럼 슬라이드)', () => {
+  // 합성 pointerdown/up 이벤트에는 브라우저가 실제로 캡처할 "활성 포인터"가 없어서,
+  // 진짜 setPointerCapture를 호출하면 jsdom/실브라우저 둘 다 NotFoundError를 던진다.
+  // 소스가 el.setPointerCapture?.(...) 로 옵셔널 체이닝만 해뒀지 예외까지 삼키진
+  // 않으므로, 테스트에서는 no-op으로 바꿔서 드래그 로직 자체만 검증한다.
+  beforeEach(() => {
+    Element.prototype.setPointerCapture = vi.fn()
+    Element.prototype.releasePointerCapture = vi.fn()
+  })
+
+  function mockScrollable(el) {
+    Object.defineProperty(el, 'scrollWidth', { value: 800, configurable: true })
+    Object.defineProperty(el, 'clientWidth', { value: 300, configurable: true })
+  }
+
+  it('포인터를 눌러서 끌면 이동한 거리만큼 scrollLeft가 반대 방향으로 움직인다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const chips = wrapper.find('.category-chips')
+    mockScrollable(chips.element)
+
+    await chips.trigger('pointerdown', { clientX: 200, pointerId: 1 })
+    await chips.trigger('pointermove', { clientX: 130, pointerId: 1 }) // 70px 왼쪽으로 드래그
+
+    expect(chips.element.scrollLeft).toBe(70)
+  })
+
+  it('4px 넘게 드래그한 뒤 손을 떼면, 뒤이어 오는 클릭으로 그 자리 칩이 선택되지 않는다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const chips = wrapper.find('.category-chips')
+    mockScrollable(chips.element)
+    const cafeChip = wrapper.findAll('.chip').find((c) => c.text() === '카페')
+
+    await chips.trigger('pointerdown', { clientX: 200, pointerId: 1 })
+    await chips.trigger('pointermove', { clientX: 150, pointerId: 1 }) // 50px, 드래그로 인식되는 임계치(4px) 초과
+    await chips.trigger('pointerup', { clientX: 150, pointerId: 1 })
+    await cafeChip.trigger('click')
+    await flushPromises()
+
+    // 필터링되지 않고 두 매장이 그대로 남아있어야 한다 (카페 칩 클릭이 무시됨)
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
+  })
+
+  it('4px 이하로만 움직이면(사실상 탭) 드래그로 보지 않고 클릭이 정상적으로 카테고리를 선택한다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const chips = wrapper.find('.category-chips')
+    mockScrollable(chips.element)
+    const cafeChip = wrapper.findAll('.chip').find((c) => c.text() === '카페')
+
+    await chips.trigger('pointerdown', { clientX: 200, pointerId: 1 })
+    await chips.trigger('pointermove', { clientX: 198, pointerId: 1 }) // 2px, 임계치 이하
+    await chips.trigger('pointerup', { clientX: 198, pointerId: 1 })
+    await cafeChip.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
+  })
+
+  it('움직임 없이 누르고 떼는 것만으로는 pointer capture를 걸지 않는다 (마우스 클릭이 캡처 때문에 씹히는 것 방지)', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const chips = wrapper.find('.category-chips')
+    mockScrollable(chips.element)
+
+    await chips.trigger('pointerdown', { clientX: 200, pointerId: 1 })
+    await chips.trigger('pointerup', { clientX: 200, pointerId: 1 })
+
+    expect(Element.prototype.setPointerCapture).not.toHaveBeenCalled()
+  })
+
+  it('4px 넘게 드래그하면 그제서야 pointer capture를 건다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const chips = wrapper.find('.category-chips')
+    mockScrollable(chips.element)
+
+    await chips.trigger('pointerdown', { clientX: 200, pointerId: 1 })
+    await chips.trigger('pointermove', { clientX: 130, pointerId: 1 })
+
+    expect(Element.prototype.setPointerCapture).toHaveBeenCalledWith(1)
+  })
+
+  it('마우스 휠을 굴리면 스크롤 가능한 만큼 scrollLeft가 deltaY만큼 움직인다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const chips = wrapper.find('.category-chips')
+    mockScrollable(chips.element)
+
+    await chips.trigger('wheel', { deltaY: 40 })
+
+    expect(chips.element.scrollLeft).toBe(40)
+  })
+})
+
+describe('카카오맵 컨테이너 리사이즈 대응 (ResizeObserver -> relayout)', () => {
+  it('지도 컨테이너 크기가 바뀌면 relayout()을 호출한다', async () => {
+    const observeMock = vi.fn()
+    const disconnectMock = vi.fn()
+    let resizeCallback = null
+    const originalResizeObserver = window.ResizeObserver
+    window.ResizeObserver = vi.fn((cb) => {
+      resizeCallback = cb
+      return { observe: observeMock, disconnect: disconnectMock, unobserve: vi.fn() }
+    })
+
+    try {
+      const { kakao, mapInstance } = createKakaoMock()
+      mapInstance.relayout = vi.fn()
+      window.kakao = kakao
+      fetchRecommendedNearbyMerchants.mockResolvedValue([])
+
+      const wrapper = mountMapPage()
+      await flushPromises()
+
+      expect(observeMock).toHaveBeenCalledTimes(1)
+      resizeCallback()
+      expect(mapInstance.relayout).toHaveBeenCalledTimes(1)
+
+      wrapper.unmount()
+      expect(disconnectMock).toHaveBeenCalledTimes(1)
+    } finally {
+      window.ResizeObserver = originalResizeObserver
+    }
+  })
+
+  it('ResizeObserver를 지원하지 않는 환경이어도 에러 없이 지도를 그린다', async () => {
+    const originalResizeObserver = window.ResizeObserver
+    delete window.ResizeObserver
+
+    try {
+      window.kakao = createKakaoMock().kakao
+      fetchRecommendedNearbyMerchants.mockResolvedValue([])
+
+      expect(() => mountMapPage()).not.toThrow()
+      await flushPromises()
+    } finally {
+      window.ResizeObserver = originalResizeObserver
+    }
+  })
+})
