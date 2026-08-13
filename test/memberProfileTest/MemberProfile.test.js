@@ -70,3 +70,18 @@ describe('휴대폰 번호 입력 포맷 (formatPhoneDigits)', () => {
     expect(phoneInput.element.value).toBe('010-9999-8888')
   })
 })
+
+describe('뒤로가기 버튼', () => {
+  it('본인 확인 게이트 화면에도 뒤로가기 버튼이 있고, 누르면 router.back()이 호출된다', async () => {
+    const backMock = vi.fn()
+    const wrapper = mount(MemberProfile, {
+      global: { mocks: { $router: { back: backMock } } },
+    })
+
+    expect(wrapper.find('.back-btn-top').exists()).toBe(true)
+
+    await wrapper.find('.back-btn-top').trigger('click')
+
+    expect(backMock).toHaveBeenCalledTimes(1)
+  })
+})

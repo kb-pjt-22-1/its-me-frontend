@@ -1,4 +1,5 @@
 import api from '@/api'
+import { getCategoryEmoji } from '@/services/merchantsService'
 
 // Benefits.vue의 도넛/범례 색상 팔레트. 백엔드 응답에는 색상이 없어서
 // categoryBreakdown 순서(금액 내림차순)대로 순환 배정합니다.
@@ -59,6 +60,50 @@ export async function fetchAnnualFeeBreakEven(year) {
     params: year ? { year } : undefined,
   })
   return data.map(normalizeBreakEvenCard)
+}
+
+/**
+ * AI 혜택 코칭 [POST /api/v1/benefits/coaching]
+ * 사용자 소비/혜택 데이터를 외부 LLM에 전달해서 코칭 멘트를 받아옴.
+ * report/annual-fee-break-even보다 느리고(외부 API 호출) 실패율도 높을 수 있음 -
+ * Benefits.vue에서 로딩/에러 상태 꼭 별도로 다뤄야 함.
+ *
+ * 주의: 실제 응답 DTO를 아직 못 봐서 필드명은 추정입니다. 기획 시트 기준으로 코칭
+ * 멘트 배열이 올 거라고 가정했고, 프론트에서 쓰던 headline/detail 이름으로 정리했어요.
+ * 실제 DTO 나오면 이 정규화 함수만 고치면 됩니다.
+ */
+export async function fetchAiCoaching() {
+  const { data } = await api.post('/v1/benefits/coaching')
+  const tips = Array.isArray(data) ? data : (data.tips ?? data.coachingTips ?? [])
+  return tips.map((tip) => ({
+    headline: tip.headline ?? tip.message ?? tip.content ?? '',
+    detail: tip.detail ?? tip.description ?? tip.expectedSaving ?? '',
+  }))
+}
+
+/**
+ * 이번 달 받을 수 있는 혜택 [GET /api/v1/benefits/limits]
+ * 카테고리별 한도 총합 + 이번 달 사용 총합.
+ *
+ * 주의: 실제 응답 DTO를 아직 못 봐서 필드명은 추정입니다(categories 배열에 categoryCode/
+ * categoryName/limitAmount/usedAmount가 있을 거라고 가정). 아이콘은 백엔드가 안 줄 거라고
+ * 보고 merchantsService의 getCategoryEmoji로 프론트에서 매핑했어요 - 카드 아이콘 때도
+ * 가짜 CDN URL 문제가 있어서 이모지 직접 매핑으로 갔던 전례를 그대로 따른 것.
+ *
+ * @param {string} [yearMonth] - 'yyyy-MM' 형식. 생략 시 이번 달.
+ */
+export async function fetchBenefitLimits(yearMonth) {
+  const { data } = await api.get('/v1/benefits/limits', {
+    params: yearMonth ? { yearMonth: toApiYearMonth(yearMonth) } : undefined,
+  })
+  const categories = data.categories ?? data ?? []
+  return categories.map((item) => ({
+    category: item.categoryName,
+    categoryCode: item.categoryCode,
+    icon: getCategoryEmoji(item.categoryCode),
+    used: item.usedAmount ?? 0,
+    limit: item.limitAmount ?? 0,
+  }))
 }
 
 // 백엔드 필드명 -> Benefits.vue(카드 8구간 그래프 로직)에서 쓰던 이름으로 정리

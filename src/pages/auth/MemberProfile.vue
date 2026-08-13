@@ -1,6 +1,12 @@
 <template>
   <PageContainer>
     <div class="profile-page">
+      <button class="icon-btn-outline back-btn-top" @click="$router.back()" aria-label="뒤로가기">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+
       <div class="brand">
         <div class="brand-badge">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -275,6 +281,16 @@ async function handleChangePassword() {
   min-height: 100vh;
   padding: 0 24px 40px;
   box-sizing: border-box;
+  position: relative;
+}
+
+/* 본인 확인 게이트/프로필 상세 둘 다 이 컨테이너 위에서 갈리므로, 게이트 상태와
+   무관하게 항상 같은 자리에 떠 있게 절대 위치로 뺐다 - .brand의 padding-top(48px)
+   안에 들어가서 가운데 정렬된 브랜드 영역을 건드리지 않는다. */
+.back-btn-top {
+  position: absolute;
+  top: 16px;
+  left: 24px;
 }
 
 .brand {
@@ -367,7 +383,6 @@ async function handleChangePassword() {
 .field-box--editable input {
   flex: 1;
   border: 0;
-  outline: 0;
   font-size: 15px;
   font-weight: 600;
   text-align: right;

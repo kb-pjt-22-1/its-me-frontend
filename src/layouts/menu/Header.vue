@@ -13,7 +13,7 @@
           <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
         </svg>
       </button>
-      <button type="button" class="icon-btn" aria-label="메뉴" @click="toggleMenu">
+      <button type="button" class="icon-btn" aria-label="메뉴" @click="goToMenu">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="4" y1="12" x2="20" y2="12"></line>
           <line x1="4" y1="6" x2="20" y2="6"></line>
@@ -27,15 +27,14 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { toggleMenu } from '@/composables/useMenu';
 
 const route = useRoute();
 const router = useRouter();
 
-// 하단 탭 이름(홈/주변/결제/카드)과 그대로 맞춘다 - 헤더와 하단 내비게이션이 같은 어휘를 쓰게.
+// 하단 탭 이름(홈/지도/결제/카드)과 그대로 맞춘다 - 헤더와 하단 내비게이션이 같은 어휘를 쓰게.
 const PAGE_TITLES = {
   home: '홈',
-  map: '주변',
+  map: '지도',
   pay: '결제',
   benefits: '혜택',
   cards: '카드',
@@ -46,6 +45,9 @@ const pageTitle = computed(() => PAGE_TITLES[route.name] ?? '');
 const goToNotification = () => alert('알림 페이지로 이동');
 const goToBookmarks = () => {
   router.push('/bookmarks');
+};
+const goToMenu = () => {
+  router.push('/menu');
 };
 </script>
 

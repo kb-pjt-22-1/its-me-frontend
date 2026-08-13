@@ -157,7 +157,7 @@ export const useAuthStore = defineStore('auth', {
     async logout() {
       // 서버 호출이 실패해도(네트워크 끊김, 이미 만료된 토큰 등) 로컬 세션은 반드시 지운다 -
       // 여기서 끊기면 사용자는 로그아웃 버튼을 눌렀는데 로그인된 채로 남아있게 된다.
-      // catch 없이 finally만 쓰면 정리는 되지만 예외가 다시 던져져서, 호출부(SidebarMenu의
+      // catch 없이 finally만 쓰면 정리는 되지만 예외가 다시 던져져서, 호출부(Menu.vue의
       // handleLogout)가 이어서 하는 router.push('/login')까지 실행이 안 된다 - 반드시 삼킨다.
       try {
         await logoutRequest()

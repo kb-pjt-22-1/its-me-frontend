@@ -1,5 +1,10 @@
 import { defineStore } from 'pinia'
-import { fetchMonthlyBenefitReport, fetchAnnualFeeBreakEven } from '@/services/benefitService'
+import {
+  fetchMonthlyBenefitReport,
+  fetchAnnualFeeBreakEven,
+  fetchAiCoaching,
+  fetchBenefitLimits,
+} from '@/services/benefitService'
 
 function getCurrentYearMonth() {
   const now = new Date()
@@ -29,6 +34,16 @@ export const useBenefitsStore = defineStore('benefits', {
     breakevenCards: [],
     breakevenLoading: false,
     breakevenError: false,
+
+    // AI 혜택 코칭 [POST /api/v1/benefits/coaching]
+    aiTips: [],
+    aiTipsLoading: false,
+    aiTipsError: false,
+
+    // 이번 달 받을 수 있는 혜택 [GET /api/v1/benefits/limits]
+    benefitLimits: [],
+    limitsLoading: false,
+    limitsError: false,
   }),
 
   getters: {
@@ -67,6 +82,7 @@ export const useBenefitsStore = defineStore('benefits', {
       const next = new Date(year, month - 1 + delta, 1)
       this.selectedYearMonth = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`
       this.fetchReport()
+      this.fetchLimits() // limits도 yearMonth 파라미터를 받아서 리포트랑 같이 갱신
     },
 
     async fetchBreakEven() {
@@ -79,6 +95,32 @@ export const useBenefitsStore = defineStore('benefits', {
         this.breakevenError = true
       } finally {
         this.breakevenLoading = false
+      }
+    },
+
+    async fetchAiCoaching() {
+      this.aiTipsLoading = true
+      this.aiTipsError = false
+      try {
+        this.aiTips = await fetchAiCoaching()
+      } catch (e) {
+        console.error('[benefits store] AI 혜택 코칭 조회 실패', e.message)
+        this.aiTipsError = true
+      } finally {
+        this.aiTipsLoading = false
+      }
+    },
+
+    async fetchLimits() {
+      this.limitsLoading = true
+      this.limitsError = false
+      try {
+        this.benefitLimits = await fetchBenefitLimits(this.selectedYearMonth)
+      } catch (e) {
+        console.error('[benefits store] 이번 달 받을 수 있는 혜택 조회 실패', e.message)
+        this.limitsError = true
+      } finally {
+        this.limitsLoading = false
       }
     },
   },
