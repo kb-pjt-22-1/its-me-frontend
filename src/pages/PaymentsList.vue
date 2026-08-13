@@ -48,7 +48,7 @@
               class="history-item"
               @click="goToDetail(item.paymentId)"
             >
-              <div class="item-icon">{{ getCategoryEmoji(item.categoryCode) }}</div>
+              <div class="item-icon"><img :src="item.categoryIcon" alt="" /></div>
               <div class="item-info">
                 <p class="name">{{ item.merchantName }}</p>
                 <p class="desc muted-text">{{ item.time }} · {{ item.cardName }}</p>
@@ -77,7 +77,6 @@ import Button from '@/components/common/Button.vue';
 import Footer from '@/layouts/menu/Footer.vue';
 import { usePaymentStore } from '@/stores/payment';
 import { useMerchantsStore } from '@/stores/merchants';
-import { getCategoryEmoji } from '@/services/merchantsService';
 
 const router = useRouter();
 const paymentStore = usePaymentStore();
@@ -115,6 +114,7 @@ const normalizedHistory = computed(() =>
       paymentId: item.paymentId ?? item.id,
       merchantName: item.merchantName ?? item.merchant?.name ?? merchant?.name ?? '알 수 없는 매장',
       categoryCode: item.categoryCode ?? merchant?.categoryCode ?? null,
+      categoryIcon: merchant?.icon,
       cardName: item.cardName ?? item.card?.cardName ?? '',
       finalAmount: item.finalAmount ?? item.amount ?? 0,
       discountAmount: item.discountAmount ?? 0,
@@ -240,6 +240,7 @@ onMounted(() => {
   width: 42px; height: 42px; border-radius: 12px; background: var(--page, #f7f7f5);
   display: grid; place-items: center; font-size: 1.2rem; flex: 0 0 auto;
 }
+.item-icon img { width: 20px; height: 20px; }
 .item-info { flex: 1; min-width: 0; }
 .name { font-weight: 700; margin: 0 0 4px; color: var(--charcoal, #24211d); font-size: 0.95rem; }
 .desc { font-size: 0.8rem; margin: 0; }

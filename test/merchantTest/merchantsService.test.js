@@ -17,7 +17,6 @@ import {
   fetchMerchantDetail,
   fetchMerchantCategories,
   fetchMerchantBrands,
-  getCategoryEmoji,
 } from '@/services/merchantsService.js'
 
 const rawMerchant = {
@@ -150,18 +149,5 @@ describe('fetchMerchantBrands', () => {
 
     expect(api.get).toHaveBeenCalledWith('/v1/merchant-brands')
     expect(result).toEqual(brands)
-  })
-})
-
-describe('getCategoryEmoji', () => {
-  it('알려진 카테고리 코드는 매핑된 이모지를 반환한다', () => {
-    expect(getCategoryEmoji('5812')).toBe('🍽️')
-    expect(getCategoryEmoji('5813')).toBe('☕')
-    expect(getCategoryEmoji('5912')).toBe('💊')
-  })
-
-  it('알 수 없는 카테고리 코드는 기본 이모지(📍)를 반환한다', () => {
-    expect(getCategoryEmoji('9999')).toBe('📍')
-    expect(getCategoryEmoji(undefined)).toBe('📍')
   })
 })

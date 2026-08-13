@@ -48,13 +48,39 @@
         </svg>
       </button>
 
-      <button class="sheet-handle-area" @click="sheetExpanded = !sheetExpanded" aria-label="매장 목록 펼치기/접기">
+      <div
+        class="sheet-handle-area"
+        role="button"
+        tabindex="0"
+        aria-label="매장 목록 펼치기/접기"
+        @click="sheetExpanded = !sheetExpanded"
+        @keydown.enter="sheetExpanded = !sheetExpanded"
+        @keydown.space.prevent="sheetExpanded = !sheetExpanded"
+      >
         <span class="sheet-handle"></span>
-        <div class="sheet-summary">
-          <p class="sheet-meta muted-text">{{ selectedMerchant ? '매장 상세' : '현재 위치 기준' }}</p>
-          <p class="sheet-title">{{ selectedMerchant ? selectedMerchant.name : '제휴 매장' }}</p>
+        <div class="sheet-peek-row">
+          <div class="sheet-summary">
+            <p class="sheet-meta muted-text">{{ selectedMerchant ? '매장 상세' : `현재 위치 기준 · ${nearbyMerchants.length}곳` }}</p>
+            <p class="sheet-title">{{ selectedMerchant ? selectedMerchant.name : '주변 제휴 매장' }}</p>
+          </div>
+          <div v-if="!selectedMerchant" class="sort-toggle" @click.stop>
+            <button
+              class="sort-btn"
+              :class="{ active: sortMode === 'distance' }"
+              @click="sortMode = 'distance'"
+            >
+              거리순
+            </button>
+            <button
+              class="sort-btn"
+              :class="{ active: sortMode === 'benefit' }"
+              @click="sortMode = 'benefit'"
+            >
+              혜택순
+            </button>
+          </div>
         </div>
-      </button>
+      </div>
 
       <div class="sheet-body">
         <!-- 매장 상세: 새 페이지로 이동하지 않고 이 바텀시트 자리에서 그대로 보여줍니다 -->
@@ -67,7 +93,7 @@
           </button>
 
           <div class="store-banner">
-            <span class="banner-icon">{{ getCategoryEmoji(selectedMerchant.categoryCode) }}</span>
+            <span class="banner-icon"><img :src="selectedMerchant.categoryIcon" alt="" /></span>
           </div>
 
           <div class="store-info">
@@ -123,29 +149,6 @@
             <button @click="clusterFilterMerchantIds = null">전체 보기</button>
           </div>
 
-          <div class="sheet-list-header">
-            <h3>주변 제휴 매장</h3>
-            <div class="sheet-list-right">
-              <span class="muted-text">{{ nearbyMerchants.length }}곳</span>
-              <div class="sort-toggle">
-                <button
-                  class="sort-btn"
-                  :class="{ active: sortMode === 'distance' }"
-                  @click="sortMode = 'distance'"
-                >
-                  거리순
-                </button>
-                <button
-                  class="sort-btn"
-                  :class="{ active: sortMode === 'benefit' }"
-                  @click="sortMode = 'benefit'"
-                >
-                  혜택순
-                </button>
-              </div>
-            </div>
-          </div>
-
           <div v-if="nearbyMerchants.length === 0" class="sheet-empty muted-text">
             이 화면에 제휴 매장이 없어요.
           </div>
@@ -157,7 +160,7 @@
               class="sheet-item"
               @click="selectMerchant(shop.id)"
             >
-              <div class="sheet-item-icon">{{ getCategoryEmoji(shop.categoryCode) }}</div>
+              <div class="sheet-item-icon"><img :src="shop.categoryIcon" alt="" /></div>
               <div class="sheet-item-info">
                 <strong>{{ shop.name }}</strong>
                 <p class="muted-text">
@@ -191,7 +194,7 @@ import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { useCardsStore } from '@/stores/cards'
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
-import { fetchRecommendedNearbyMerchants, getCategoryEmoji } from '@/services/merchantsService'
+import { fetchRecommendedNearbyMerchants } from '@/services/merchantsService'
 
 const router = useRouter()
 const merchantsStore = useMerchantsStore()
@@ -294,6 +297,7 @@ const boundsMerchantsWithCategory = computed(() =>
   boundsMerchants.value.map((m) => ({
     ...m,
     categoryName: merchantsStore.getCategoryByCode(m.categoryCode)?.categoryName,
+    categoryIcon: merchantsStore.getCategoryByCode(m.categoryCode)?.categoryIcon,
   })),
 )
 
@@ -473,8 +477,26 @@ function initMap(kakao, center) {
     map,
     averageCenter: true,
     disableClickZoom: true, // 클릭 시 확대하는 대신, 안에 뭉친 매장들을 하단 목록에 보여줍니다.
+    minClusterSize: 5, // 5개 미만이면 클러스터로 안 뭉치고 핀을 개별로 보여줍니다.
+    // styles를 안 주면 카카오 SDK 기본값(파란 배지)이 나가서 KB 옐로우 톤과 어긋난다.
+    // --dark(간편결제 박스와 동일 톤)로 통일 - 추천 매장 핀의 --orange 후광과도 겹치지 않게.
+    styles: [{
+      width: '36px',
+      height: '36px',
+      background: 'rgba(84, 80, 69, 0.9)',
+      borderRadius: '18px',
+      color: '#ffffff',
+      textAlign: 'center',
+      lineHeight: '36px',
+      fontWeight: 'bold',
+      fontSize: '13px',
+    }],
   })
   kakao.maps.event.addListener(clusterer, 'clusterclick', onClusterClick)
+  // 클러스터 안에 지금 혜택 받을 수 있는(recommended) 매장이 하나라도 섞여있으면
+  // 배지 테두리를 KB 옐로우로 표시합니다 - 개수 정보(styles)는 그대로 두고, 개별 핀의
+  // 추천 강조(테두리+후광)와 같은 시각 언어를 클러스터에도 얹는 것뿐입니다.
+  kakao.maps.event.addListener(clusterer, 'clustered', onClustered)
 
   // 줌/드래그가 끝날 때마다(idle) 화면에 보이는 영역의 매장만 새로 받아옵니다.
   kakao.maps.event.addListener(map, 'idle', scheduleLoadBoundsMerchants)
@@ -495,13 +517,48 @@ function onClusterClick(cluster) {
   sheetExpanded.value = true
 }
 
+// 매 클러스터링 결과마다(줌/이동으로 다시 뭉칠 때도) 클러스터별로 혜택 매장 포함 여부를
+// 확인해서 배지 스타일을 다시 그립니다. getClusterMarker()가 돌려주는 오버레이는
+// styles 옵션으로 그려진 기본 배지와 같은 CustomOverlay라 setContent로 덮어쓸 수 있습니다.
+function onClustered(clusters) {
+  clusters.forEach((cluster) => {
+    const clusterMarkers = cluster.getMarkers()
+    const hasRecommended = clusterMarkers.some((marker) => marker.merchantRef?.recommended)
+    const clusterMarker = cluster.getClusterMarker()
+    if (!clusterMarker) return
+    clusterMarker.setContent(buildClusterBadgeContent(clusterMarkers.length, hasRecommended))
+  })
+}
+
+function buildClusterBadgeContent(count, hasRecommended) {
+  // border-box라 테두리 두께만큼 line-height를 줄여야 숫자가 수직 중앙에 남는다.
+  const border = hasRecommended ? '2px solid #ffbc00' : '2px solid transparent'
+  return (
+    '<div style="cursor: pointer; width: 36px; height: 36px; box-sizing: border-box; ' +
+    `border: ${border}; background: rgba(84, 80, 69, 0.9); border-radius: 18px; ` +
+    'color: #ffffff; text-align: center; line-height: 32px; font-weight: bold; font-size: 13px;">' +
+    `${count}</div>`
+  )
+}
+
 // 매장 전체를 미리 안 받고, 지금 화면(bounds)에 보이는 매장을 지도 중심에서 가까운 순으로
 // 최대 500개(백엔드 LIMIT) 받아옵니다. 축소해서 매장이 몰려도 검색 자체는 항상 동작하고,
 // 화면이 빽빽해지는 문제는 클러스터링(renderMerchantMarkers)이 시각적으로 해결합니다.
 // 응답의 recommended(boolean)로 "사용자 보유 카드로 지금 당장 혜택 받을 수 있는 매장"만
 // 하이라이트하고, 나머지도 전부 핀으로 보여줍니다(추천 매장만 남기는 필터링이 아닙니다).
+// 카카오맵은 숫자가 클수록 더 축소된 상태입니다(1이 가장 확대). 6 이상으로 축소하면
+// 화면에 잡히는 매장이 너무 많아져서 클러스터 숫자만 잔뜩 떠 있는 상태가 되고, 조회도
+// 무거워지니 아예 요청도 안 보내고 핀도 다 지웁니다 - 사용자가 다시 확대해야 보입니다.
+const MAX_VISIBLE_LEVEL = 6
+
 async function loadBoundsMerchants() {
   if (!kakaoInstance || !mapInstance) return
+
+  if (mapInstance.getLevel() >= MAX_VISIBLE_LEVEL) {
+    boundsMerchants.value = []
+    clusterFilterMerchantIds.value = null
+    return
+  }
 
   const bounds = mapInstance.getBounds()
   const sw = bounds.getSouthWest()
@@ -536,22 +593,26 @@ async function loadBoundsMerchants() {
   }
 }
 
-// 핀 모양(물방울 + 카테고리 이모지)을 SVG로 그려서 MarkerImage로 씁니다. MarkerClusterer가
+// 핀 모양(물방울 + 카테고리 아이콘)을 SVG로 그려서 MarkerImage로 씁니다. MarkerClusterer가
 // CustomOverlay를 못 받고 Marker만 받아서(SDK 제약) DOM 대신 이 방식을 씁니다.
+// 카테고리 아이콘은 merchant_categories.category_icon(실제 CDN URL)을 SVG <image>로
+// 그대로 참조합니다 - 하드코딩 이모지 매핑은 더 이상 안 씁니다.
 // recommended=true인 매장만 테두리 색과 은은한 후광으로 강조합니다 -
 // 나머지 매장도 똑같이 핀은 그려지고, 강조만 빠집니다(필터링이 아니라 하이라이트).
 const PIN_WIDTH = 32
 const PIN_HEIGHT = 40
 function buildMerchantMarkerImage(kakao, merchant) {
   const recommended = !!merchant.recommended
-  const borderColor = recommended ? '#ffb800' : '#8f897f'
-  const emoji = getCategoryEmoji(merchant.categoryCode)
-  const glow = recommended ? '<circle cx="16" cy="15" r="15" fill="#ffb800" fill-opacity="0.22"/>' : ''
+  const borderColor = recommended ? '#ffbc00' : '#8f897f'
+  const glow = recommended ? '<circle cx="16" cy="15" r="15" fill="#ffbc00" fill-opacity="0.22"/>' : ''
+  const iconTag = merchant.categoryIcon
+    ? `<image href="${merchant.categoryIcon}" x="9" y="8" width="14" height="14"/>`
+    : ''
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_WIDTH}" height="${PIN_HEIGHT}" viewBox="0 0 32 40">` +
     glow +
     `<path d="M16 39C16 39 4 23.6 4 15A12 12 0 1 1 28 15C28 23.6 16 39 16 39Z" fill="#ffffff" stroke="${borderColor}" stroke-width="2.5"/>` +
-    `<text x="16" y="20" font-size="14" text-anchor="middle" dominant-baseline="middle">${emoji}</text>` +
+    iconTag +
     '</svg>'
   const src = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
   return new kakao.maps.MarkerImage(src, new kakao.maps.Size(PIN_WIDTH, PIN_HEIGHT), {
@@ -706,7 +767,7 @@ onUnmounted(() => {
   box-shadow: 0 4px 14px rgba(0, 0, 0, .08); display: flex; align-items: center; gap: 10px;
   padding: 0 16px; color: var(--muted, #8f897f); margin-bottom: 12px;
 }
-.search-bar input { flex: 1; border: none; outline: none; background: transparent; font-size: 14px; color: var(--charcoal, #24211d); }
+.search-bar input { flex: 1; border: none; background: transparent; font-size: 14px; color: var(--charcoal, #24211d); }
 .search-bar input::placeholder { color: var(--muted, #8f897f); }
 
 .category-chips {
@@ -745,11 +806,18 @@ onUnmounted(() => {
   border-radius: 20px 20px 0 0;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, .14);
   z-index: 15;
-  max-height: var(--sheet-expanded-height);
+  /* max-height(내용에 따라 그보다 작아짐)였던 걸 고정 height로 바꿨다. 리스트↔상세
+     전환처럼 내용 길이가 크게 다른 화면을 오갈 때, 박스 자체 크기가 안 바뀌고
+     sheet-body 안에서만 스크롤되니까 "갑자기 확 커지는" 점프가 원천적으로 없어진다. */
+  height: var(--sheet-expanded-height);
   display: flex;
   flex-direction: column;
-  transform: translateY(calc(100% - 92px));
+  /* 80px = 접힌 상태에서 보이는 handle-area 실측 높이. 정렬 토글을 제목 옆으로
+     옮기면서 기존 92px 하드코딩값과 어긋나 접혔을 때 아래쪽에 빈 여백이 살짝
+     보이던 걸 같이 맞췄다. will-change로 트랜지션 중 리페인트를 컴포지터에 맡긴다. */
+  transform: translateY(calc(100% - 80px));
   transition: transform 280ms cubic-bezier(.2, .8, .2, 1);
+  will-change: transform;
 }
 .store-sheet.expanded {
   transform: translateY(0);
@@ -773,8 +841,16 @@ onUnmounted(() => {
   border-radius: 99px;
   background: var(--line, #e7e4de);
 }
-.sheet-summary {
+.sheet-peek-row {
   width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+}
+.sheet-summary {
+  flex: 1 1 auto;
+  min-width: 0;
   text-align: left;
 }
 .sheet-meta { margin: 0; font-size: 11px; }
@@ -786,15 +862,7 @@ onUnmounted(() => {
   flex: 1 1 auto;
 }
 
-.sheet-list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.sheet-list-header h3 { margin: 0; font-size: 14px; color: var(--charcoal, #24211d); }
-.sheet-list-right { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-.sort-toggle { display: flex; gap: 6px; }
+.sort-toggle { display: flex; gap: 6px; flex: 0 0 auto; }
 .sort-btn {
   border: 1px solid var(--line, #e7e4de);
   background: var(--surface, #ffffff);
@@ -835,8 +903,11 @@ onUnmounted(() => {
   background: var(--inactive, #f0efec);
   display: grid;
   place-items: center;
-  font-size: 1.3rem;
   flex: 0 0 auto;
+}
+.sheet-item-icon img {
+  width: 22px;
+  height: 22px;
 }
 .sheet-item-info { flex: 1; min-width: 0; }
 .sheet-item-info strong { font-size: 14px; color: var(--charcoal, #24211d); }
@@ -851,7 +922,7 @@ onUnmounted(() => {
   flex: 0 0 auto;
   cursor: pointer;
 }
-.sheet-bookmark.active { color: var(--orange, #ffb800); }
+.sheet-bookmark.active { color: var(--orange, #ffbc00); }
 
 .sheet-pagination {
   display: flex;
@@ -893,8 +964,9 @@ onUnmounted(() => {
 }
 .banner-icon {
   width: 56px; height: 56px; border-radius: 50%; background: rgba(255, 255, 255, .25);
-  display: grid; place-items: center; font-size: 26px;
+  display: grid; place-items: center;
 }
+.banner-icon img { width: 28px; height: 28px; }
 
 .store-info { margin-bottom: 20px; }
 .store-info .pill { margin-bottom: 8px; }

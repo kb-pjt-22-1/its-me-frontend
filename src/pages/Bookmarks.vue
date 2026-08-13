@@ -28,7 +28,7 @@
           style="flex-direction: row; align-items: center; min-height: auto; gap: 15px;"
           @click="goToStore(shop.merchantId)"
         >
-          <div class="store-icon">{{ getCategoryEmoji(shop.categoryCode) }}</div>
+          <div class="store-icon"><img :src="shop.categoryIcon" alt="" /></div>
 
           <div class="card-center">
             <h3>{{ shop.name }}</h3>
@@ -55,7 +55,6 @@ import { useBookmarksStore } from '@/stores/bookmarks';
 import { useMerchantsStore } from '@/stores/merchants';
 import { useCardsStore } from '@/stores/cards';
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService';
-import { getCategoryEmoji } from '@/services/merchantsService';
 
 const router = useRouter();
 const bookmarksStore = useBookmarksStore();
@@ -93,6 +92,7 @@ const enrichedBookmarks = computed(() =>
       name: b.name ?? merchant.name ?? '이름 없는 매장',
       categoryCode: b.categoryCode ?? merchant.categoryCode,
       categoryName: b.categoryName ?? merchant.categoryName ?? '',
+      categoryIcon: merchant.icon,
       address: b.address ?? merchant.address ?? '',
       discountLabel: bestDiscountLabel(b.categoryCode ?? merchant.categoryCode),
     };
@@ -124,8 +124,9 @@ const handleRemove = async (merchantId) => {
 
 .store-icon {
   width: 50px; height: 50px; background: var(--inactive, #f0efec); border-radius: 12px;
-  display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
 }
+.store-icon img { width: 24px; height: 24px; }
 .card-center { flex: 1; min-width: 0; }
 .card-center h3 { margin: 0 0 5px 0; font-size: 1.05rem; color: var(--charcoal, #24211d); }
 .details { font-size: 0.8rem; margin: 0 0 8px 0; }

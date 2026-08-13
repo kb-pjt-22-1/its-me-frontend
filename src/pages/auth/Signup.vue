@@ -271,7 +271,6 @@ async function handleSignUp() {
 .input-box input {
   flex: 1;
   border: 0;
-  outline: 0;
   font-size: 15px;
   color: var(--charcoal, #24211d);
   min-width: 0;
