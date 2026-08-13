@@ -367,7 +367,6 @@ async function handleChangePassword() {
 .field-box--editable input {
   flex: 1;
   border: 0;
-  outline: 0;
   font-size: 15px;
   font-weight: 600;
   text-align: right;

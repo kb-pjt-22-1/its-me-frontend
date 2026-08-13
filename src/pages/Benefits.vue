@@ -419,7 +419,7 @@ function linePoints(card) {
 
 .expand-btn {
   width: calc(100% + 32px); margin: 0 -16px; display: flex; align-items: center; justify-content: center; gap: 5px;
-  border: none; border-top: 1px solid var(--page, #f7f7f5); background: none; color: var(--charcoal, #60584c);
+  border: none; border-top: 1px solid var(--page, #f7f7f5); background: none; color: var(--charcoal, #24211d);
   font-size: 12px; font-weight: 600; padding: 9px 0; cursor: pointer;
 }
 .expand-btn svg { transition: transform 150ms ease; }
@@ -437,14 +437,14 @@ function linePoints(card) {
 .benefit-usage-item:last-child { border-bottom: none; }
 .usage-icon {
   width: 36px; height: 36px; border-radius: 10px; background: var(--page, #f7f7f5);
-  display: grid; place-items: center; flex: 0 0 auto; color: var(--charcoal, #60584c); margin-top: 1px;
+  display: grid; place-items: center; flex: 0 0 auto; color: var(--charcoal, #24211d); margin-top: 1px;
 }
 .usage-main { flex: 1; min-width: 0; }
 .usage-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
 .usage-top-row strong { font-size: 13.5px; font-weight: 700; color: var(--charcoal, #24211d); }
 .usage-link { border: none; background: none; color: var(--muted, #8f897f); font-size: 11px; font-weight: 400; cursor: pointer; padding: 0; }
 .usage-mid-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; gap: 8px; }
-.usage-desc { font-size: 11px; color: var(--charcoal, #60584c); }
+.usage-desc { font-size: 11px; color: var(--charcoal, #24211d); }
 .usage-remaining { font-size: 11px; font-weight: 600; white-space: nowrap; }
 .benefit-usage-card .expand-btn { background: var(--page, #f7f7f5); }
 

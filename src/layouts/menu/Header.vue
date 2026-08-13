@@ -32,10 +32,10 @@ import { toggleMenu } from '@/composables/useMenu';
 const route = useRoute();
 const router = useRouter();
 
-// 하단 탭 이름(홈/주변/결제/카드)과 그대로 맞춘다 - 헤더와 하단 내비게이션이 같은 어휘를 쓰게.
+// 하단 탭 이름(홈/지도/결제/카드)과 그대로 맞춘다 - 헤더와 하단 내비게이션이 같은 어휘를 쓰게.
 const PAGE_TITLES = {
   home: '홈',
-  map: '주변',
+  map: '지도',
   pay: '결제',
   benefits: '혜택',
   cards: '카드',
