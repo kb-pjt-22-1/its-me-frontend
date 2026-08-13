@@ -74,6 +74,19 @@
   z-index: 0;
 }
 
+/* App.vue(최상위 라우트)에서만 붙는 클래스. .app-page가 position:fixed로 뷰포트 높이에
+   고정돼 있어서, 자체 .scroll-area가 없는 화면(카드/매장 상세, PIN 설정, 회원정보 등)은
+   콘텐츠가 뷰포트보다 길면 스크롤할 방법이 없었다 - 이 래퍼가 세로 스크롤 컨테이너 역할을
+   대신 한다. Menu.vue/PaymentsList.vue처럼 이미 자체 .scroll-area를 쓰는 화면은 루트가
+   position:absolute;inset:0라 이 래퍼를 넘치지 않으므로 영향 없다.
+   DefaultLayout.vue(탭 전환)의 .route-transition-wrap은 이 클래스가 없다 - 거기는
+   .main-content가 이미 스크롤 컨테이너라 여기서 또 스크롤을 걸면 이중 스크롤이 된다. */
+.app-route-scroll {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
 /* 탭 전환(DefaultLayout.vue 내부, 홈/지도/결제/혜택/카드/북마크) - 좌우 슬라이드.
    이 페이지들은 전부 자기 루트가 position:fixed가 아니라(static/relative)
    래퍼의 transform을 그대로 잘 따라온다. */

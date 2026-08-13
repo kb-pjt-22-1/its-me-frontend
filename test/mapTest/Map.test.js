@@ -676,6 +676,38 @@ describe('카테고리 칩 드래그 스크롤 (마우스도 손가락처럼 슬
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
   })
 
+  it('움직임 없이 누르고 떼는 것만으로는 pointer capture를 걸지 않는다 (마우스 클릭이 캡처 때문에 씹히는 것 방지)', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const chips = wrapper.find('.category-chips')
+    mockScrollable(chips.element)
+
+    await chips.trigger('pointerdown', { clientX: 200, pointerId: 1 })
+    await chips.trigger('pointerup', { clientX: 200, pointerId: 1 })
+
+    expect(Element.prototype.setPointerCapture).not.toHaveBeenCalled()
+  })
+
+  it('4px 넘게 드래그하면 그제서야 pointer capture를 건다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const chips = wrapper.find('.category-chips')
+    mockScrollable(chips.element)
+
+    await chips.trigger('pointerdown', { clientX: 200, pointerId: 1 })
+    await chips.trigger('pointermove', { clientX: 130, pointerId: 1 })
+
+    expect(Element.prototype.setPointerCapture).toHaveBeenCalledWith(1)
+  })
+
   it('마우스 휠을 굴리면 스크롤 가능한 만큼 scrollLeft가 deltaY만큼 움직인다', async () => {
     window.kakao = createKakaoMock().kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])

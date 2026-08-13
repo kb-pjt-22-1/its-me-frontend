@@ -20,7 +20,15 @@
              파일의 .layout-container 주석 참고), 이제 슬라이드가 제대로 그려진다. -->
         <router-view v-slot="{ Component, route }">
           <transition name="page-slide">
-            <div :key="route.matched[0]?.path ?? route.path" class="route-transition-wrap">
+            <!-- app-route-scroll은 DefaultLayout('/') 라우트에는 안 붙인다 - 그 안의
+                 .main-content가 이미 position:fixed + overflow-y:auto로 스크롤을
+                 직접 담당하는데, 조상에 또 overflow-y:auto를 걸면 main.css 상단
+                 주석에 적힌 것과 같은 종류의 iOS/터치 이벤트 이상 동작 위험이 있다. -->
+            <div
+              :key="route.matched[0]?.path ?? route.path"
+              class="route-transition-wrap"
+              :class="{ 'app-route-scroll': route.matched[0]?.path !== '/' }"
+            >
               <component :is="Component" />
             </div>
           </transition>

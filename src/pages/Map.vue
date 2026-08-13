@@ -672,6 +672,7 @@ const isDraggingChips = ref(false)
 let chipsDragStartX = 0
 let chipsDragStartScrollLeft = 0
 let chipsDragMoved = false
+let chipsDragPointerId = null
 
 function onChipsPointerDown(event) {
   const el = chipsContainer.value
@@ -680,7 +681,12 @@ function onChipsPointerDown(event) {
   chipsDragMoved = false
   chipsDragStartX = event.clientX
   chipsDragStartScrollLeft = el.scrollLeft
-  el.setPointerCapture?.(event.pointerId)
+  chipsDragPointerId = event.pointerId
+  // setPointerCapture는 여기서 바로 호출하지 않는다 - 캡처가 걸린 상태에서 나오는
+  // mouseup/click은 원래 눌렀던 칩(button)이 아니라 캡처를 건 el(.category-chips)로
+  // 다시 타겟팅돼서, 마우스로 그냥 눌렀다 뗀(드래그 아닌) 클릭이 칩의 @click을 못
+  // 타고 그대로 씹혀버린다(터치는 이 리타겟팅 대상이 아니라 멀쩡했다). 그래서 실제로
+  // 드래그로 확정된 뒤(아래 onChipsPointerMove에서 4px 넘게 움직였을 때)에만 캡처한다.
 }
 
 function onChipsPointerMove(event) {
@@ -688,14 +694,19 @@ function onChipsPointerMove(event) {
   const el = chipsContainer.value
   if (!el) return
   const delta = event.clientX - chipsDragStartX
-  if (Math.abs(delta) > 4) chipsDragMoved = true
+  if (Math.abs(delta) > 4 && !chipsDragMoved) {
+    chipsDragMoved = true
+    el.setPointerCapture?.(chipsDragPointerId)
+  }
   el.scrollLeft = chipsDragStartScrollLeft - delta
 }
 
 function onChipsPointerUp(event) {
   if (!isDraggingChips.value) return
   isDraggingChips.value = false
-  chipsContainer.value?.releasePointerCapture?.(event.pointerId)
+  if (chipsContainer.value?.hasPointerCapture?.(event.pointerId)) {
+    chipsContainer.value.releasePointerCapture(event.pointerId)
+  }
 }
 
 // 드래그로 살짝이라도 움직인 뒤 손을 떼면 pointerup 다음에 click도 따라와서, 드래그
