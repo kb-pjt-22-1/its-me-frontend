@@ -1,25 +1,5 @@
 <template>
   <div class="page">
-    <header class="page-header">
-      <h1>혜택</h1>
-      <div class="header-icons">
-        <button type="button" class="icon-btn-outline" aria-label="알림">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-          </svg>
-        </button>
-        <button type="button" class="icon-btn-outline" aria-label="메뉴">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
-            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
-            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
-            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
-          </svg>
-        </button>
-      </div>
-    </header>
-
     <!-- AI 혜택 코치 (하드코딩 유지 - 백엔드 API 없음, 사용자 요청) -->
     <section class="surface-card ai-card">
       <span class="pill pill--gold ai-badge">
@@ -236,7 +216,7 @@
                 </span>
               </div>
               <p class="be-card-name">{{ card.cardName }}</p>
-              <p class="be-card-owner">본인 · {{ card.panLast4 }}</p>
+              <p class="be-card-owner">···· {{ card.panLast4 }}</p>
             </div>
 
             <div class="be-status" :class="card.isBreakEven ? 'be-status--met' : 'be-status--pending'">
@@ -252,7 +232,12 @@
 
             <div class="be-stats-row">
               <div><span class="be-stat-label muted-text">연회비</span><strong>{{ card.annualFee.toLocaleString() }}원</strong></div>
-              <div><span class="be-stat-label muted-text">누적 혜택</span><strong>{{ card.cumulativeBenefit.toLocaleString() }}원</strong></div>
+              <div>
+                <span class="be-stat-label muted-text">누적 혜택</span>
+                <strong :class="card.isBreakEven ? 'success-text' : 'danger-text'">
+                  {{ card.cumulativeBenefit.toLocaleString() }}원
+                </strong>
+              </div>
               <div>
                 <span class="be-stat-label muted-text">순혜택</span>
                 <strong :class="card.netBenefit >= 0 ? 'success-text' : 'danger-text'">
@@ -261,27 +246,34 @@
               </div>
             </div>
 
-            <svg v-if="card.months.length > 1" viewBox="0 0 300 130" class="be-chart">
+            <svg viewBox="0 0 300 160" class="be-chart">
+              <!-- 그래프 전체를 5등분하는 연한 그리드선 4개 (연회비/데이터 값과 무관하게 고정 위치) -->
+              <line
+                v-for="(gy, i) in gridLineYs()" :key="i"
+                x1="0" :y1="gy" x2="300" :y2="gy"
+                stroke="var(--line, #e7e4de)" stroke-width="1"
+              />
+
               <line
                 x1="0" :y1="scaleY(card.annualFee, card)" x2="300" :y2="scaleY(card.annualFee, card)"
-                stroke="var(--line, #e9e5df)" stroke-width="1" stroke-dasharray="4 4"
+                stroke="var(--muted, #8f897f)" stroke-width="1.5" stroke-dasharray="4 4"
               />
               <text x="4" :y="scaleY(card.annualFee, card) - 6" class="be-chart-threshold-label">{{ (card.annualFee / 1000) }}k</text>
 
               <polyline
                 :points="linePoints(card)"
-                fill="none" stroke="var(--orange, #ffb800)" stroke-width="2.5"
+                fill="none" stroke="var(--orange, #ffbc00)" stroke-width="2.5"
               />
 
               <circle
                 v-if="card.isBreakEven && card.breakEvenIndex >= 0"
                 :cx="scaleX(card.breakEvenIndex, card)" :cy="scaleY(card.annualFee, card)" r="4"
-                fill="var(--green, #00a97b)"
+                fill="var(--green, #00a878)"
               />
 
               <text
                 v-for="(m, i) in card.months" :key="i"
-                :x="scaleX(i, card)" y="126" text-anchor="middle" class="be-chart-month-label"
+                :x="scaleX(i, card)" y="156" text-anchor="middle" class="be-chart-month-label"
               >{{ m }}</text>
             </svg>
           </div>
@@ -455,18 +447,44 @@ function scrollToCard(index) {
   activeCardIndex.value = clamped;
 }
 
-// 라인차트 좌표 변환 (0~300 x, 0~130 y, 위쪽 여백 10px)
+// 라인차트 좌표 변환 (0~300 x, 0~160 y, 위쪽 여백 10px)
+// 좌우 여백(14px)을 둬서 첫/마지막 달 라벨이 text-anchor=middle 때문에
+// 차트 가장자리(x=0, x=300)에서 잘리는 걸 방지
+const CHART_LEFT = 14;
+const CHART_WIDTH = 272; // 300 - 14*2
+// 데이터가 있는 달 수만큼 항상 전체 폭(왼쪽 끝~오른쪽 끝)에 맞춰 늘려서 배치.
+// 즉 1월(달 1개)뿐이면 가운데 한 점, 2월까지면 1월=왼쪽 끝/2월=오른쪽 끝,
+// 3월 이후로 달이 늘어날수록 그 늘어난 마지막 달이 항상 오른쪽 끝에 오도록 함.
 function scaleX(index, card) {
-  const step = 300 / (card.months.length - 1);
-  return index * step;
+  if (card.months.length <= 1) {
+    return CHART_LEFT + CHART_WIDTH / 2; // 데이터가 1개월치뿐이면 가운데 고정
+  }
+  const step = CHART_WIDTH / (card.months.length - 1);
+  return CHART_LEFT + index * step;
 }
+// 차트 상단 여백(10px)과 데이터 영역 높이. scaleY/gridLineYs가 같은 값을 쓰도록 상수로 공유
+// (viewBox 300x160, 아래쪽 10px는 월 라벨용으로 비움)
+const CHART_TOP = 10;
+const CHART_HEIGHT = 140;
+
 function scaleY(value, card) {
-  const maxValue = Math.max(...card.monthlyValues, card.annualFee, 1) * 1.1;
-  const chartHeight = 110; // 아래쪽 20px는 월 라벨용으로 비움
-  return 10 + chartHeight - (value / maxValue) * chartHeight;
+  const highestDataValue = Math.max(...card.monthlyValues.filter((v) => v != null), card.annualFee, 1);
+  // 연회비 기준선이 차트 세로 중간쯤에 오도록, 연회비의 2배를 기본 상단 여백으로 확보.
+  // 누적 혜택이 연회비를 많이 넘어서면(연회비*2 초과) 그때는 데이터가 기준이 되어
+  // 기준선이 위로 올라감 - 그래야 큰 값도 잘리지 않고 다 보임.
+  const maxValue = Math.max(highestDataValue * 1.1, card.annualFee * 2);
+  return CHART_TOP + CHART_HEIGHT - (value / maxValue) * CHART_HEIGHT;
+}
+// 그래프 전체를 5등분하는 연한 그리드선 4개의 y좌표 (데이터/연회비값과 무관하게 항상 고정)
+function gridLineYs() {
+  return [1, 2, 3, 4].map((n) => CHART_TOP + (CHART_HEIGHT * n) / 5);
 }
 function linePoints(card) {
-  return card.monthlyValues.map((v, i) => `${scaleX(i, card)},${scaleY(v, card)}`).join(' ');
+  // 아직 안 지난 달(monthlyValues가 null)은 선을 안 그리고, 실제 데이터가 있는 지점까지만 이음
+  return card.monthlyValues
+    .map((v, i) => (v == null ? null : `${scaleX(i, card)},${scaleY(v, card)}`))
+    .filter((p) => p !== null)
+    .join(' ');
 }
 
 onMounted(() => {
@@ -476,6 +494,12 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* base.css에 --green/--danger 변수는 있지만 success-text/danger-text 클래스 자체가
+   전역 어디에도 정의되어 있지 않아서, 이 컴포넌트 안에서 직접 정의함
+   (KB_SUCCESS #00a878 / KB_ERROR #d94343 - base.css :root 기준) */
+.success-text { color: var(--green, #00a878); }
+.danger-text { color: var(--danger, #d94343); }
+
 .page {
   padding: 18px 18px 40px;
 }
@@ -490,7 +514,7 @@ onMounted(() => {
   margin: 0;
   font-size: 22px;
   letter-spacing: -.5px;
-  color: var(--charcoal, #151515);
+  color: var(--charcoal, #24211d);
 }
 .header-icons { display: flex; gap: 8px; }
 
@@ -500,17 +524,17 @@ onMounted(() => {
   display: inline-flex; align-items: center; gap: 5px;
   margin-bottom: 10px;
 }
-.ai-title { margin: 0 0 8px; font-size: 17px; color: var(--charcoal, #151515); }
+.ai-title { margin: 0 0 8px; font-size: 17px; color: var(--charcoal, #24211d); }
 .ai-intro { margin: 0 0 16px; font-size: 12.5px; line-height: 1.6; }
 
 .ai-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .ai-tips li { display: flex; gap: 10px; align-items: flex-start; }
 .ai-tip-num {
-  width: 20px; height: 20px; border-radius: 50%; background: var(--orange, #ffb800);
+  width: 20px; height: 20px; border-radius: 50%; background: var(--orange, #ffbc00);
   color: #171717; font-size: 11px; font-weight: 800; display: grid; place-items: center;
   flex: 0 0 auto; margin-top: 1px;
 }
-.ai-tip-headline { margin: 0 0 3px; font-size: 13px; font-weight: 700; color: var(--charcoal, #2c2b27); line-height: 1.5; }
+.ai-tip-headline { margin: 0 0 3px; font-size: 13px; font-weight: 700; color: var(--charcoal, #24211d); line-height: 1.5; }
 .ai-tip-detail { margin: 0; font-size: 11.5px; }
 
 /* 상단 이전/다음 화살표 (월간 리포트, 연회비 본전 공용) */
@@ -519,19 +543,19 @@ onMounted(() => {
 /* 월간 리포트 */
 .report-card { padding: 22px; margin-bottom: 22px; }
 .report-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
-.report-label { margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--charcoal, #151515); }
+.report-label { margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--charcoal, #24211d); }
 .month-nav-btn {
   border: none; background: none; padding: 2px; cursor: pointer;
-  color: var(--muted, #918a81); display: grid; place-items: center;
+  color: var(--muted, #8f897f); display: grid; place-items: center;
   border-radius: 6px; transition: background 150ms ease, color 150ms ease, opacity 150ms ease;
 }
-.month-nav-btn:hover:not(:disabled) { background: var(--page, #f2f1ee); color: var(--charcoal, #151515); }
+.month-nav-btn:hover:not(:disabled) { background: var(--page, #f7f7f5); color: var(--charcoal, #24211d); }
 .month-nav-btn:disabled { opacity: .35; cursor: not-allowed; }
 .report-sub { margin: 0; font-size: 11px; }
 .report-delta { font-size: 12px; font-weight: 700; white-space: nowrap; }
 
 .report-caption { margin: 0 0 4px; font-size: 12px; }
-.report-total { margin: 0 0 18px; font-size: 26px; font-weight: 800; color: var(--charcoal, #151515); }
+.report-total { margin: 0 0 18px; font-size: 26px; font-weight: 800; color: var(--charcoal, #24211d); }
 
 .donut-row { display: flex; align-items: center; gap: 18px; margin-bottom: 14px; }
 .donut-row--collapsed { justify-content: center; }
@@ -539,8 +563,8 @@ onMounted(() => {
 .donut-chart--large { width: 190px; height: 190px; }
 .donut-segment { cursor: pointer; transition: opacity 150ms ease; }
 .donut-segment:hover { opacity: .85; }
-.donut-center-amount { font-size: 15px; font-weight: 800; fill: var(--charcoal, #151515); }
-.donut-center-label { font-size: 8px; fill: var(--muted, #918a81); white-space: pre; }
+.donut-center-amount { font-size: 15px; font-weight: 800; fill: var(--charcoal, #24211d); }
+.donut-center-label { font-size: 8px; fill: var(--muted, #8f897f); white-space: pre; }
 
 .donut-legend { list-style: none; margin: 0; padding: 0; flex: 1; display: flex; flex-direction: column; gap: 8px; }
 .donut-legend li {
@@ -548,17 +572,17 @@ onMounted(() => {
   cursor: pointer; border-radius: 8px; padding: 3px 4px; transition: background 150ms ease;
 }
 .donut-legend li.active,
-.donut-legend li:hover { background: var(--page, #f2f1ee); }
+.donut-legend li:hover { background: var(--page, #f7f7f5); }
 .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
-.legend-name { font-weight: 700; color: var(--charcoal, #2c2b27); flex: 0 0 auto; }
-.legend-percent { color: var(--charcoal, #59554a); font-weight: 700; flex: 0 0 auto; }
+.legend-name { font-weight: 700; color: var(--charcoal, #24211d); flex: 0 0 auto; }
+.legend-percent { color: var(--charcoal, #24211d); font-weight: 700; flex: 0 0 auto; }
 .legend-amount { margin-left: auto; font-size: 11px; }
 
 .report-summary { margin: 0 0 14px; font-size: 12px; text-align: center; }
 
 .expand-btn {
   width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px;
-  border: none; background: none; color: var(--muted, #918a81); font-size: 12px; font-weight: 700;
+  border: none; background: none; color: var(--muted, #8f897f); font-size: 12px; font-weight: 700;
   padding: 6px 0; cursor: pointer;
 }
 .expand-btn svg { transition: transform 150ms ease; }
@@ -567,9 +591,9 @@ onMounted(() => {
 /* 이번 달 받을 수 있는 혜택 */
 .available-section { margin-bottom: 26px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-.section-header h3 { margin: 0; font-size: 15px; color: var(--charcoal, #151515); }
+.section-header h3 { margin: 0; font-size: 15px; color: var(--charcoal, #24211d); }
 .section-sub { margin: 0 0 14px; font-size: 11.5px; }
-.link-btn { border: none; background: none; color: var(--muted, #918a81); font-size: 12px; font-weight: 700; cursor: pointer; }
+.link-btn { border: none; background: none; color: var(--muted, #8f897f); font-size: 12px; font-weight: 700; cursor: pointer; }
 
 .benefit-usage-loading,
 .benefit-usage-empty { text-align: center; padding: 24px 0; font-size: 12.5px; }
@@ -577,19 +601,19 @@ onMounted(() => {
 .benefit-usage-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 6px; }
 .benefit-usage-item { display: flex; gap: 12px; }
 .usage-icon {
-  width: 38px; height: 38px; border-radius: 10px; background: var(--page, #f2f1ee);
+  width: 38px; height: 38px; border-radius: 10px; background: var(--page, #f7f7f5);
   display: grid; place-items: center; font-size: 1.1rem; flex: 0 0 auto;
 }
 .usage-main { flex: 1; min-width: 0; }
 .usage-top-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-.usage-top-row strong { font-size: 13.5px; color: var(--charcoal, #151515); }
-.usage-link { border: none; background: none; color: var(--orange, #d98d00); font-size: 11px; font-weight: 700; cursor: pointer; padding: 0; }
+.usage-top-row strong { font-size: 13.5px; color: var(--charcoal, #24211d); }
+.usage-link { border: none; background: none; color: var(--orange-deep, #e6aa00); font-size: 11px; font-weight: 700; cursor: pointer; padding: 0; }
 .usage-desc { margin: 0 0 6px; font-size: 11.5px; }
 .usage-remaining { margin: 6px 0 0; font-size: 11px; }
 
 /* 카드별 연회비 본전 */
 .breakeven-section { display: flex; flex-direction: column; gap: 14px; }
-.section-title { margin: 0; font-size: 15px; color: var(--charcoal, #151515); }
+.section-title { margin: 0; font-size: 15px; color: var(--charcoal, #24211d); }
 
 .section-header { display: flex; justify-content: space-between; align-items: center; }
 
@@ -625,16 +649,20 @@ onMounted(() => {
 
 .be-status { border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
 .be-status--met { background: #e0f8ef; }
-.be-status--pending { background: var(--page, #f2f1ee); }
-.be-status-title { margin: 0 0 3px; font-size: 12.5px; font-weight: 700; color: var(--charcoal, #151515); }
+.be-status--pending { background: var(--page, #f7f7f5); }
+.be-status-title { margin: 0 0 3px; font-size: 12.5px; font-weight: 700; color: var(--charcoal, #24211d); }
 .be-status-desc { margin: 0; font-size: 11px; }
 
 .be-stats-row { display: flex; justify-content: space-between; margin-bottom: 16px; }
 .be-stats-row > div { display: flex; flex-direction: column; gap: 4px; }
 .be-stat-label { font-size: 10.5px; }
-.be-stats-row strong { font-size: 14px; color: var(--charcoal, #151515); }
+.be-stats-row strong { font-size: 14px; font-weight: 700; color: var(--charcoal, #24211d); }
+/* .success-text/.danger-text(클래스 1개, 명시도 0-1-0)보다 위 .be-stats-row strong
+   (클래스+엘리먼트, 명시도 0-1-1)이 더 세서 색이 안 먹혔음 - 여기서 다시 눌러줌 */
+.be-stats-row strong.success-text { color: var(--green, #00a878); }
+.be-stats-row strong.danger-text { color: var(--danger, #d94343); }
 
 .be-chart { width: 100%; height: auto; }
-.be-chart-threshold-label { font-size: 8px; fill: var(--muted, #918a81); }
-.be-chart-month-label { font-size: 8px; fill: var(--muted, #918a81); }
+.be-chart-threshold-label { font-size: 8px; fill: var(--muted, #8f897f); }
+.be-chart-month-label { font-size: 8px; fill: var(--muted, #8f897f); }
 </style>

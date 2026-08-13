@@ -16,9 +16,9 @@ const CATEGORY_COLORS = [
 // 연회비 본전 카드의 비주얼(be-card-visual) 배경. 백엔드에 색상 필드가 없어서
 // userCardId 기준으로 순환 배정합니다.
 const CARD_GRADIENTS = [
+  'linear-gradient(135deg, #3a5a8c, #1f3a5f)',
   'linear-gradient(135deg, #35322b, #211f1a)',
   'linear-gradient(135deg, #4a7fd4, #2c4f8f)',
-  'linear-gradient(135deg, #d98d00, #a35f00)',
   'linear-gradient(135deg, #00a97b, #00714f)',
 ]
 
@@ -81,6 +81,9 @@ function normalizeBreakEvenCard(dto, index) {
   const monthly = dto.monthlyBenefits ?? []
   const months = monthly.map((m) => formatMonthLabel(m.yearMonth))
   const monthlyValues = monthly.map((m) => m.accumulatedBenefitAmount ?? 0)
+
+  // x축엔 실제로 데이터가 있는 달까지만 표시 (1~2월처럼 데이터가 적으면 라벨도 그만큼만).
+  // 그래프를 12칸 기준 폭 안에서 가운데 정렬하는 건 Benefits.vue의 scaleX가 처리함.
 
   // breakEvenDate가 속한 달의 인덱스를 찾아 그래프에 본전 달성 마커를 찍습니다.
   // (monthlyBenefits는 yearMonth 오름차순이라고 가정)
