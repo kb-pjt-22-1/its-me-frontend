@@ -208,6 +208,10 @@
           <div v-for="card in breakevenCards" :key="card.userCardId" class="surface-card breakeven-card breakeven-slide">
             <div class="be-card-visual" :style="{ background: card.color }">
               <div class="be-card-top">
+                <div>
+                  <p class="be-card-name">{{ card.cardName }}</p>
+                  <p class="be-card-owner">···· {{ card.panLast4 }}</p>
+                </div>
                 <span class="be-card-icon">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
                     <rect x="2" y="5" width="20" height="14" rx="3"></rect>
@@ -215,8 +219,6 @@
                   </svg>
                 </span>
               </div>
-              <p class="be-card-name">{{ card.cardName }}</p>
-              <p class="be-card-owner">···· {{ card.panLast4 }}</p>
             </div>
 
             <div class="be-status" :class="card.isBreakEven ? 'be-status--met' : 'be-status--pending'">
@@ -285,68 +287,38 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
-import { fetchMonthlyBenefitReport, fetchAnnualFeeBreakEven } from '@/services/benefitService';
+import { storeToRefs } from 'pinia';
+import { useBenefitsStore } from '@/stores/benefits';
 
-// ---------------------------------------------------------
-// 월간 리포트 [GET /api/v1/benefits/report]
-// ---------------------------------------------------------
-const reportMonthLabel = ref('');
-const totalBenefit = ref(0);
-const deltaVsLastMonth = ref(0);
-const categoryBreakdown = ref([]);
-const reportLoading = ref(true);
-const reportError = ref(false);
-
-// 조회 중인 달, 'yyyy-MM' 형식. 기본값은 이번 달.
-const selectedYearMonth = ref(getCurrentYearMonth());
-const isCurrentMonth = computed(() => selectedYearMonth.value === getCurrentYearMonth());
-
-function getCurrentYearMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
+const benefitsStore = useBenefitsStore();
+const {
+  reportMonthLabel,
+  totalBenefit,
+  deltaVsLastMonth,
+  categoryBreakdown,
+  reportLoading,
+  reportError,
+  isCurrentMonth,
+  breakevenCards,
+  breakevenLoading,
+  breakevenError,
+} = storeToRefs(benefitsStore);
 
 function goToPrevMonth() {
-  shiftSelectedMonth(-1);
+  showFullBreakdown.value = false;
+  activeSegment.value = null;
+  benefitsStore.goToPrevMonth();
 }
 
 function goToNextMonth() {
   if (isCurrentMonth.value) return; // 백엔드가 미래 달 조회를 막음
-  shiftSelectedMonth(1);
-}
-
-function shiftSelectedMonth(delta) {
-  const [year, month] = selectedYearMonth.value.split('-').map(Number);
-  const next = new Date(year, month - 1 + delta, 1);
-  selectedYearMonth.value = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
   showFullBreakdown.value = false;
   activeSegment.value = null;
-  loadReport();
+  benefitsStore.goToNextMonth();
 }
 
-async function loadReport() {
-  reportLoading.value = true;
-  reportError.value = false;
-  try {
-    const report = await fetchMonthlyBenefitReport(selectedYearMonth.value);
-    reportMonthLabel.value = formatYearMonthLabel(report.yearMonth);
-    totalBenefit.value = report.totalBenefit;
-    deltaVsLastMonth.value = report.deltaVsLastMonth;
-    categoryBreakdown.value = report.categoryBreakdown;
-  } catch (e) {
-    console.error('[Benefits] 월간 리포트 조회 실패', e);
-    reportError.value = true;
-  } finally {
-    reportLoading.value = false;
-  }
-}
-
-// 연도가 올해와 다르면 '2025년 12월'처럼 연도를 붙여서 표시
-function formatYearMonthLabel(yearMonth) {
-  if (!yearMonth) return '';
-  const [year, month] = yearMonth.split('-').map(Number);
-  const currentYear = new Date().getFullYear();
-  return year === currentYear ? `${month}월` : `${year}년 ${month}월`;
+function loadReport() {
+  benefitsStore.fetchReport();
 }
 
 const aiTips = ref([
@@ -403,32 +375,18 @@ function usagePercent(item) {
 }
 
 // ---------------------------------------------------------
-// 카드별 연회비 본전 [GET /api/v1/benefits/annual-fee-break-even]
+// 카드별 연회비 본전 - 슬라이더는 UI 관심사라 컴포넌트에 남겨두고, 데이터는 스토어에서 가져옴
+// (백엔드 BenefitController 주석에도 "응답 배열을 슬라이드 형태로 표시한다"고 명시되어 있음)
 // ---------------------------------------------------------
-const breakevenCards = ref([]);
-const breakevenLoading = ref(true);
-const breakevenError = ref(false);
-
-// 가로 슬라이더 (카드 여러 장 - 백엔드 BenefitController 주석에도
-// "응답 배열을 슬라이드 형태로 표시한다"고 명시되어 있음)
 const sliderRef = ref(null);
 const activeCardIndex = ref(0);
 
 async function loadBreakEven() {
-  breakevenLoading.value = true;
-  breakevenError.value = false;
-  try {
-    breakevenCards.value = await fetchAnnualFeeBreakEven();
-    activeCardIndex.value = 0;
-    nextTick(() => {
-      if (sliderRef.value) sliderRef.value.scrollTo({ left: 0 });
-    });
-  } catch (e) {
-    console.error('[Benefits] 연회비 본전 조회 실패', e);
-    breakevenError.value = true;
-  } finally {
-    breakevenLoading.value = false;
-  }
+  await benefitsStore.fetchBreakEven();
+  activeCardIndex.value = 0;
+  nextTick(() => {
+    if (sliderRef.value) sliderRef.value.scrollTo({ left: 0 });
+  });
 }
 
 // 스와이프로 스크롤했을 때 현재 몇 번째 카드인지 갱신 (점/카운터 표시용)
@@ -615,8 +573,6 @@ onMounted(() => {
 .breakeven-section { display: flex; flex-direction: column; gap: 14px; }
 .section-title { margin: 0; font-size: 15px; color: var(--charcoal, #24211d); }
 
-.section-header { display: flex; justify-content: space-between; align-items: center; }
-
 .breakeven-slider {
   display: flex;
   overflow-x: auto;
@@ -637,14 +593,14 @@ onMounted(() => {
 .breakeven-card { padding: 18px; }
 .be-card-visual {
   border-radius: 14px; padding: 16px; color: #ffffff; margin-bottom: 14px;
-  min-height: 90px; display: flex; flex-direction: column; justify-content: space-between;
+  min-height: 90px; display: flex; flex-direction: column; justify-content: flex-start;
 }
-.be-card-top { display: flex; justify-content: flex-end; }
+.be-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
 .be-card-icon {
   width: 26px; height: 18px; border-radius: 4px; background: rgba(255,255,255,.18);
-  display: grid; place-items: center;
+  display: grid; place-items: center; flex: 0 0 auto;
 }
-.be-card-name { margin: 8px 0 2px; font-size: 13.5px; font-weight: 700; }
+.be-card-name { margin: 0 0 2px; font-size: 13.5px; font-weight: 700; }
 .be-card-owner { margin: 0; font-size: 10.5px; opacity: .8; }
 
 .be-status { border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
