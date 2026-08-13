@@ -18,6 +18,17 @@ vi.mock('@/services/cardService', async (importOriginal) => {
   }
 })
 
+const { mockToastError, mockConfirm } = vi.hoisted(() => ({
+  mockToastError: vi.fn(),
+  mockConfirm: vi.fn(),
+}))
+vi.mock('@/composables/useToast', () => ({
+  useToast: () => ({ success: vi.fn(), error: mockToastError, info: vi.fn() }),
+}))
+vi.mock('@/composables/useConfirmDialog', () => ({
+  useConfirmDialog: () => ({ confirm: mockConfirm }),
+}))
+
 import Carddetail from '@/pages/Carddetail.vue'
 import { useCardsStore } from '@/stores/cards'
 
@@ -43,8 +54,7 @@ async function mountPage() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  window.alert = vi.fn()
-  window.confirm = vi.fn(() => true)
+  mockConfirm.mockResolvedValue(true)
   window.console.error = vi.fn()
 })
 
@@ -57,7 +67,7 @@ describe('추천 카드 제외 토글 실패 처리', () => {
     await flushPromises()
 
     expect(console.error).toHaveBeenCalledWith('추천 제외 설정 변경 실패', 'locked')
-    expect(window.alert).toHaveBeenCalledWith('설정 변경에 실패했습니다. 다시 시도해주세요.')
+    expect(mockToastError).toHaveBeenCalledWith('설정 변경에 실패했습니다. 다시 시도해주세요.')
   })
 })
 
@@ -70,7 +80,7 @@ describe('대표 카드 설정 실패 처리', () => {
     await flushPromises()
 
     expect(console.error).toHaveBeenCalledWith('대표 카드 설정 실패', 'conflict')
-    expect(window.alert).toHaveBeenCalledWith('대표 카드 설정에 실패했습니다. 다시 시도해주세요.')
+    expect(mockToastError).toHaveBeenCalledWith('대표 카드 설정에 실패했습니다. 다시 시도해주세요.')
   })
 })
 
@@ -83,13 +93,22 @@ describe('카드 삭제 실패 처리', () => {
     await flushPromises()
 
     expect(console.error).toHaveBeenCalledWith('카드 삭제 실패', 'server error')
-    expect(window.alert).toHaveBeenCalledWith('카드 삭제에 실패했습니다. 다시 시도해주세요.')
+    expect(mockToastError).toHaveBeenCalledWith('카드 삭제에 실패했습니다. 다시 시도해주세요.')
     expect(routerMock.push).not.toHaveBeenCalled()
   })
 
-  it('사용자가 확인 창에서 취소하면 삭제를 시도하지 않는다', async () => {
+  it('삭제 전 파괴적 확인 다이얼로그를 danger 모드로 띄운다', async () => {
+    const { wrapper } = await mountPage()
+
+    await wrapper.find('.delete-card-btn').trigger('click')
+    await flushPromises()
+
+    expect(mockConfirm).toHaveBeenCalledWith('이 카드를 삭제할까요? 되돌릴 수 없습니다.', { danger: true })
+  })
+
+  it('사용자가 확인 다이얼로그에서 취소하면 삭제를 시도하지 않는다', async () => {
     const { wrapper, cardsStore } = await mountPage()
-    window.confirm = vi.fn(() => false)
+    mockConfirm.mockResolvedValue(false)
     const deleteSpy = vi.spyOn(cardsStore, 'deleteCard')
 
     await wrapper.find('.delete-card-btn').trigger('click')

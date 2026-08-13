@@ -27,6 +27,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useToast } from '@/composables/useToast';
 
 const route = useRoute();
 const router = useRouter();
@@ -42,7 +43,8 @@ const PAGE_TITLES = {
 };
 const pageTitle = computed(() => PAGE_TITLES[route.name] ?? '');
 
-const goToNotification = () => alert('알림 페이지로 이동');
+const toast = useToast();
+const goToNotification = () => toast.info('알림 페이지로 이동');
 const goToBookmarks = () => {
   router.push('/bookmarks');
 };

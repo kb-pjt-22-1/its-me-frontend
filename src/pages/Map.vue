@@ -195,11 +195,13 @@ import { useBookmarksStore } from '@/stores/bookmarks'
 import { useCardsStore } from '@/stores/cards'
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
 import { fetchRecommendedNearbyMerchants } from '@/services/merchantsService'
+import { useToast } from '@/composables/useToast'
 
 const router = useRouter()
 const merchantsStore = useMerchantsStore()
 const bookmarksStore = useBookmarksStore()
 const cardsStore = useCardsStore()
+const toast = useToast()
 
 // 바텀시트 상태
 const sheetExpanded = ref(false)
@@ -272,7 +274,7 @@ const toggleBookmark = async (shop) => {
     }
   } catch (err) {
     console.error('북마크 처리 실패', err.message)
-    alert('북마크 처리에 실패했습니다. 다시 시도해주세요.')
+    toast.error('북마크 처리에 실패했습니다. 다시 시도해주세요.')
   }
 }
 
