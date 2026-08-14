@@ -150,10 +150,13 @@ const pinError = ref(false);
 const barcodeCanvasRef = ref(null);
 
 // tokenValue가 새로 생기거나(발급) 바뀔 때마다(재발급) 캔버스에 실제 바코드를 그린다.
-// 발급 직후엔 isIssuingToken이 아직 true라 canvas가 DOM에 없을 수 있어서, nextTick으로
-// 렌더링 이후까지 기다린다.
+// watch source를 tokenValue 하나만 보면, currentToken이 세팅되는 시점이 isIssuingToken이
+// false로 바뀌는 시점보다 미묘하게 먼저 와서 - nextTick 이후에도 아직 "발급 중..." 문구
+// (v-else-if="isIssuingToken")가 그려진 상태라 canvas가 DOM에 없고, 그 뒤로 tokenValue가
+// 다시 안 바뀌니 재시도도 안 되는 경쟁 상태가 있었다. isIssuingToken까지 같이 조건에
+// 넣어서, "캔버스가 실제로 그려지는(v-else) 시점"에만 트리거되게 한다.
 watch(
-  () => paymentStore.currentToken?.tokenValue,
+  () => (isAuthenticated.value && !isIssuingToken.value ? paymentStore.currentToken?.tokenValue : null),
   async (tokenValue) => {
     if (!tokenValue) return;
     await nextTick();
