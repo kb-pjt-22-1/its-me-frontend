@@ -24,6 +24,34 @@ export async function fetchCardDetail(userCardId) {
   return normalizeCard(data)
 }
 
+function getKoreanYearMonth(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(now)
+
+  return {
+    year: Number(parts.find((part) => part.type === 'year').value),
+    month: Number(parts.find((part) => part.type === 'month').value),
+  }
+}
+
+export function getCurrentYearMonth(now = new Date()) {
+  const { year, month } = getKoreanYearMonth(now)
+
+  return `${year}${String(month).padStart(2, '0')}`
+}
+
+export function getPreviousYearMonth(now = new Date()) {
+  const { year, month } = getKoreanYearMonth(now)
+
+  const previousYear = month === 1 ? year - 1 : year
+  const previousMonth = month === 1 ? 12 : month - 1
+
+  return `${previousYear}${String(previousMonth).padStart(2, '0')}`
+}
+
 /**
  * 카드 실적 현황 조회 [GET /api/v1/cards/{userCardId}/performance]
  * 응답(CardPerformanceResponseDto): userCardId, cardId, cardName, targetYearMonth,

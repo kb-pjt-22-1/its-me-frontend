@@ -25,7 +25,7 @@
         </svg>
       </div>
       <p class="card-name">{{ card.cardName }}</p>
-      <p class="card-number">•••• •••• •••• {{ card.panLast4 }}</p>
+      <p class="card-number">{{ displayLast4 }}</p>
     </div>
 
     <!-- 카드 기본 정보 -->
@@ -42,32 +42,40 @@
     <!-- 이번 달 이용실적 -->
     <section class="surface-card status-section">
       <p class="section-label">이번 달 이용실적</p>
-
-      <template v-if="typeof card.currentAmount === 'number' && typeof card.targetAmount === 'number'">
+      <template v-if="typeof card.currentAmount === 'number'">
         <h3 class="tier-label">{{ tierLabel }}</h3>
         <div class="progress-track">
-          <div class="progress-fill" :class="{ 'progress-fill--met': card.performanceMet }" :style="{ width: tierPercent + '%' }"></div>
+          <div
+              class="progress-fill"
+              :style="{ width: tierPercent + '%' }"
+          ></div>
         </div>
         <p class="recognized-amount muted-text">
-          실적인정금액 <strong>{{ card.currentAmount.toLocaleString() }}원</strong>
-          / 목표 {{ card.targetAmount.toLocaleString() }}원
-          <span v-if="card.performanceMet" class="success-text"> · 실적 충족</span>
+          실적인정금액
+          <strong>{{ card.currentAmount.toLocaleString() }}원</strong>
+          <template v-if="nextTargetAmount !== null">
+            / 목표 {{ nextTargetAmount.toLocaleString() }}원
+          </template>
+          <span v-else class="success-text">
+        · 최고 구간 달성
+      </span>
         </p>
       </template>
-      <p v-else class="muted-text">실적 정보를 불러오지 못했어요.</p>
+      <p v-else class="muted-text">
+        실적 정보를 불러오지 못했어요.
+      </p>
     </section>
 
-    <!-- 카드 혜택 (benefits_info.performanceTiers) -->
+    <!-- 카드 혜택 (이번 달 현재 실적 구간 기준) -->
     <section class="surface-card benefits-section">
       <p class="section-label">카드 혜택 - {{ tierLabel }} 기준</p>
-
       <template v-if="currentTierBenefits.length">
         <div v-for="(b, i) in currentTierBenefits" :key="i" class="benefit-row">
           <span class="benefit-cat">{{ b.categoryName }}</span>
           <span class="benefit-rate">{{ formatBenefit(b) }}</span>
         </div>
       </template>
-      <p v-else class="muted-text">지금 구간에서 적용되는 혜택이 없어요.</p>
+      <p v-else class="muted-text">현재 실적 구간의 혜택이 없어요.</p>
     </section>
 
     <!-- 추천 카드에서 제외 -->
@@ -123,15 +131,60 @@ const isLoading = ref(false);
 
 const card = computed(() => cardsStore.getById(route.params.userCardId));
 
-const tierPercent = computed(() => {
-  if (!card.value || !card.value.targetAmount) return 0;
-  return Math.min((card.value.currentAmount / card.value.targetAmount) * 100, 100);
+const displayLast4 = computed(() => {
+  const value = card.value?.panLast4;
+  if (!value) return '';
+
+  return String(value).replace(/\D/g, '').slice(-4);
 });
 
-const currentTier = computed(() =>
-  card.value?.benefitsInfo ? getCurrentTier(card.value.benefitsInfo, card.value.currentAmount ?? 0) : null
+const performanceTiers = computed(() =>
+    [...(card.value?.benefitsInfo?.performanceTiers ?? [])]
+        .sort((a, b) =>
+            (a.minimumSpending ?? 0) - (b.minimumSpending ?? 0)
+        )
 );
-const tierLabel = computed(() => currentTier.value?.tierName ?? '기본');
+
+// 현재까지 사용한 금액으로 이번 달 현재 구간을 계산합니다.
+const currentTier = computed(() =>
+    card.value?.benefitsInfo
+        ? getCurrentTier(
+            card.value.benefitsInfo,
+            card.value.currentAmount ?? 0
+        )
+        : null
+);
+
+const tierLabel = computed(() =>
+    currentTier.value?.tierName ?? '0구간'
+);
+
+// 현재 사용액보다 기준 금액이 높은 첫 번째 구간을 다음 목표로 정합니다.
+const nextTier = computed(() => {
+  const currentAmount = card.value?.currentAmount ?? 0;
+
+  return performanceTiers.value.find((tier) => (tier.minimumSpending ?? 0) > currentAmount) ?? null;
+});
+
+// 다음 구간의 최소 실적 금액입니다.
+const nextTargetAmount = computed(() =>
+    nextTier.value?.minimumSpending ?? null
+);
+
+// 현재 사용액을 다음 구간 목표 금액과 비교해 진행률을 계산합니다.
+const tierPercent = computed(() => {
+  const currentAmount = card.value?.currentAmount ?? 0;
+  const targetAmount = nextTargetAmount.value;
+
+  // 다음 구간이 없으면 이미 최고 구간입니다.
+  if (targetAmount === null) return 100;
+
+  if (targetAmount === 0) return 100;
+
+  return Math.min((currentAmount / targetAmount) * 100, 100
+  );
+});
+
 const currentTierBenefits = computed(() => currentTier.value?.benefits ?? []);
 
 const isExcludedFromRecommendation = computed(() => card.value && !card.value.recommendationEnabled);
