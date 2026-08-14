@@ -40,7 +40,7 @@ export const useBenefitsStore = defineStore('benefits', {
     aiTipsLoading: false,
     aiTipsError: false,
 
-    // 이번 달 받을 수 있는 혜택 [GET /api/v1/benefits/limits]
+    // 이번 달 받을 수 있는 혜택 [GET /api/v1/benefits/category-status]
     benefitLimits: [],
     limitsLoading: false,
     limitsError: false,
@@ -111,6 +111,7 @@ export const useBenefitsStore = defineStore('benefits', {
       }
     },
 
+    // [GET /api/v1/benefits/category-status]
     async fetchLimits() {
       this.limitsLoading = true
       this.limitsError = false

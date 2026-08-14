@@ -38,11 +38,32 @@ function makeAiTips() {
   ]
 }
 
+function makeBenefitLimitItem(overrides = {}) {
+  return {
+    key: '1-FOOD-혜택',
+    userCardId: 1,
+    cardName: '청춘대로 톡톡카드',
+    serviceName: '혜택',
+    category: '음식점',
+    categoryCode: 'FOOD',
+    icon: '🍽️',
+    used: 7500,
+    limit: 15000,
+    remaining: 7500,
+    limitReached: false,
+    countLimit: null,
+    usedCount: 0,
+    remainingCount: null,
+    countLimitReached: false,
+    ...overrides,
+  }
+}
+
 function makeBenefitLimits() {
   return [
-    { category: '음식점', categoryCode: 'FOOD', icon: '🍽️', used: 7500, limit: 15000 },
-    { category: '카페', categoryCode: 'CAFE', icon: '☕', used: 8000, limit: 10000 },
-    { category: '편의점', categoryCode: 'CVS', icon: '🏪', used: 3500, limit: 5000 },
+    makeBenefitLimitItem({ key: '1-FOOD-혜택A', category: '음식점', categoryCode: 'FOOD', icon: '🍽️', used: 7500, limit: 15000, remaining: 7500 }),
+    makeBenefitLimitItem({ key: '1-CAFE-혜택B', category: '카페', categoryCode: 'CAFE', icon: '☕', used: 8000, limit: 10000, remaining: 2000 }),
+    makeBenefitLimitItem({ key: '1-CVS-혜택C', category: '편의점', categoryCode: 'CVS', icon: '🏪', used: 3500, limit: 5000, remaining: 1500 }),
   ]
 }
 
@@ -296,6 +317,7 @@ describe('이번 달 받을 수 있는 혜택', () => {
 
     expect(wrapper.text()).toContain('음식점')
     expect(wrapper.text()).toContain('7,500원 사용 / 총 15,000원')
+    expect(wrapper.text()).toContain('남은 혜택 7,500원')
 
     const items = wrapper.findAll('.benefit-usage-item')
     expect(items).toHaveLength(3)
@@ -306,7 +328,7 @@ describe('이번 달 받을 수 있는 혜택', () => {
     const { wrapper } = mountPage({
       benefitLimits: [
         ...makeBenefitLimits(),
-        { category: '주유소', categoryCode: 'GAS', icon: '⛽', used: 2000, limit: 5000 },
+        makeBenefitLimitItem({ key: '2-GAS-혜택D', category: '주유소', categoryCode: 'GAS', icon: '⛽', used: 2000, limit: 5000, remaining: 3000 }),
       ],
     })
 
@@ -318,5 +340,51 @@ describe('이번 달 받을 수 있는 혜택', () => {
 
     expect(wrapper.findAll('.benefit-usage-item')).toHaveLength(4)
     expect(wrapper.text()).toContain('주유소')
+  })
+
+  it('같은 categoryCode가 여러 카드/혜택으로 중복되어도 key 중복 없이 모두 렌더링한다', () => {
+    const { wrapper } = mountPage({
+      benefitLimits: [
+        makeBenefitLimitItem({ key: '1-CAFE-혜택A', userCardId: 1, cardName: '청춘대로 톡톡카드', serviceName: '카페 5% 청구할인', category: '카페', categoryCode: 'CAFE' }),
+        makeBenefitLimitItem({ key: '2-CAFE-혜택B', userCardId: 2, cardName: '가온 올포인트 체크카드', serviceName: '카페 10% 적립', category: '카페', categoryCode: 'CAFE' }),
+      ],
+    })
+
+    expect(wrapper.findAll('.benefit-usage-item')).toHaveLength(2)
+    expect(wrapper.text()).toContain('청춘대로 톡톡카드')
+    expect(wrapper.text()).toContain('가온 올포인트 체크카드')
+    expect(wrapper.text()).toContain('카페 5% 청구할인')
+    expect(wrapper.text()).toContain('카페 10% 적립')
+  })
+
+  it('amountLimit이 null이면(한도 없음) "무제한"으로 표시하고 진행률/남은 금액 계산에서 NaN이 나지 않는다', () => {
+    const { wrapper } = mountPage({
+      benefitLimits: [
+        makeBenefitLimitItem({ key: '1-CAFE-무제한', used: 5000, limit: null, remaining: null }),
+      ],
+    })
+
+    expect(wrapper.text()).toContain('무제한')
+    expect(wrapper.text()).not.toContain('NaN')
+    expect(wrapper.text()).not.toContain('Infinity')
+
+    const fill = wrapper.find('.progress-fill')
+    expect(fill.attributes('style')).toContain('width: 0%')
+  })
+
+  it('countLimit이 있으면 사용/한도 횟수를 보여주고, 없으면 표시하지 않는다', () => {
+    const { wrapper } = mountPage({
+      benefitLimits: [
+        makeBenefitLimitItem({ key: '1-CAFE-횟수한도', usedCount: 3, countLimit: 5 }),
+      ],
+    })
+    expect(wrapper.text()).toContain('3/5회 사용')
+
+    const { wrapper: wrapperNoCount } = mountPage({
+      benefitLimits: [
+        makeBenefitLimitItem({ key: '1-CAFE-무제한횟수', usedCount: 0, countLimit: null }),
+      ],
+    })
+    expect(wrapperNoCount.text()).not.toContain('회 사용')
   })
 })

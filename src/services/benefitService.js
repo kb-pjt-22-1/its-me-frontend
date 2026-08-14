@@ -110,27 +110,42 @@ export async function fetchAiCoaching() {
 }
 
 /**
- * 이번 달 받을 수 있는 혜택 [GET /api/v1/benefits/limits]
- * 카테고리별 한도 총합 + 이번 달 사용 총합.
+ * 이번 달 받을 수 있는 혜택 [GET /api/v1/benefits/category-status]
+ * 응답은 { categories: [...] }로 감싸져 있지 않고 최상위가 바로 배열이다.
  *
- * 주의: 실제 응답 DTO를 아직 못 봐서 필드명은 추정입니다(categories 배열에 categoryCode/
- * categoryName/limitAmount/usedAmount가 있을 거라고 가정). 아이콘은 위쪽 CATEGORY_EMOJI_BY_NAME로
+ * 집계 단위는 카테고리가 아니라 "카드 + 카테고리 + 혜택"이다 - 카드가 여러 장이거나
+ * 한 카드가 같은 카테고리에 혜택을 여러 개 가지면 같은 categoryCode가 여러 번 나올 수
+ * 있음. 그래서 key를 categoryCode 단독이 아니라 userCardId+categoryCode+serviceName
+ * 조합으로 만듦(Benefits.vue의 v-for :key로 사용). 아이콘은 위쪽 CATEGORY_EMOJI_BY_NAME로
  * 카테고리명 기준 프론트에서 직접 매핑함 (merchant_categories.category_icon이 가짜 CDN URL이라
  * 못 쓰는 문제가 카드 아이콘 때도 있었어서, 같은 방식으로 우회).
+ *
+ * amountLimit/countLimit은 한도가 없으면 null로 온다(무제한). 이 경우 remainingAmount/
+ * remainingCount도 null이고, amountLimitReached/countLimitReached는 항상 false다.
  *
  * @param {string} [yearMonth] - 'yyyy-MM' 형식. 생략 시 이번 달.
  */
 export async function fetchBenefitLimits(yearMonth) {
-  const { data } = await api.get('/v1/benefits/limits', {
+  const { data } = await api.get('/v1/benefits/category-status', {
     params: yearMonth ? { yearMonth: toApiYearMonth(yearMonth) } : undefined,
   })
-  const categories = data.categories ?? data ?? []
-  return categories.map((item) => ({
+  const items = Array.isArray(data) ? data : []
+  return items.map((item) => ({
+    key: `${item.userCardId}-${item.categoryCode}-${item.serviceName}`,
+    userCardId: item.userCardId,
+    cardName: item.cardName,
+    serviceName: item.serviceName,
     category: item.categoryName,
     categoryCode: item.categoryCode,
     icon: getCategoryEmojiByName(item.categoryName),
     used: item.usedAmount ?? 0,
-    limit: item.limitAmount ?? 0,
+    limit: item.amountLimit ?? null,
+    remaining: item.remainingAmount ?? null,
+    limitReached: item.amountLimitReached ?? false,
+    countLimit: item.countLimit ?? null,
+    usedCount: item.usedCount ?? 0,
+    remainingCount: item.remainingCount ?? null,
+    countLimitReached: item.countLimitReached ?? false,
   }))
 }
 

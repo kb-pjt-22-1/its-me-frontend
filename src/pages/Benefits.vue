@@ -171,18 +171,20 @@
 
         <template v-else>
           <div class="benefit-usage-list">
-            <div v-for="item in visibleAvailableBenefits" :key="item.categoryCode" class="benefit-usage-item">
+            <div v-for="item in visibleAvailableBenefits" :key="item.key" class="benefit-usage-item">
               <span class="usage-icon">{{ item.icon }}</span>
               <div class="usage-main">
                 <div class="usage-top-row">
                   <strong>{{ item.category }}</strong>
                   <button type="button" class="usage-link">이 혜택 사용하기 &gt;</button>
                 </div>
-                <p class="usage-desc muted-text">{{ item.used.toLocaleString() }}원 사용 / 총 {{ item.limit.toLocaleString() }}원</p>
+                <p class="usage-sub muted-text">{{ item.cardName }} · {{ item.serviceName }}</p>
+                <p class="usage-desc muted-text">{{ item.used.toLocaleString() }}원 사용 / {{ limitLabel(item) }}</p>
                 <div class="progress-track">
                   <div class="progress-fill" :style="{ width: usagePercent(item) + '%' }"></div>
                 </div>
-                <p class="usage-remaining muted-text">남은 혜택 {{ (item.limit - item.used).toLocaleString() }}원</p>
+                <p class="usage-remaining muted-text">{{ remainingLabel(item) }}</p>
+                <p v-if="item.countLimit != null" class="usage-count muted-text">{{ item.usedCount }}/{{ item.countLimit }}회 사용</p>
               </div>
             </div>
           </div>
@@ -402,7 +404,15 @@ const visibleAvailableBenefits = computed(() =>
   showAllAvailable.value ? benefitLimits.value : benefitLimits.value.slice(0, 3)
 );
 function usagePercent(item) {
+  if (!item.limit) return 0; // 한도 없음(null) - 진행률 바는 항상 0%로 둔다
   return Math.min((item.used / item.limit) * 100, 100);
+}
+function limitLabel(item) {
+  return item.limit == null ? '무제한' : `총 ${item.limit.toLocaleString()}원`;
+}
+function remainingLabel(item) {
+  if (item.limit == null) return '한도 없이 계속 받을 수 있어요';
+  return `남은 혜택 ${(item.remaining ?? 0).toLocaleString()}원`;
 }
 
 // ---------------------------------------------------------
@@ -603,8 +613,10 @@ onMounted(() => {
 .usage-top-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
 .usage-top-row strong { font-size: 13.5px; color: var(--charcoal, #24211d); }
 .usage-link { border: none; background: none; color: var(--orange-deep, #e6aa00); font-size: 11px; font-weight: 700; cursor: pointer; padding: 0; }
+.usage-sub { margin: 0 0 4px; font-size: 10.5px; }
 .usage-desc { margin: 0 0 6px; font-size: 11.5px; }
 .usage-remaining { margin: 6px 0 0; font-size: 11px; }
+.usage-count { margin: 2px 0 0; font-size: 11px; }
 
 /* 카드별 연회비 본전 */
 .breakeven-section { display: flex; flex-direction: column; gap: 14px; }
