@@ -416,7 +416,11 @@ async function loadBreakEven() {
   await benefitsStore.fetchBreakEven();
   activeCardIndex.value = 0;
   nextTick(() => {
-    if (sliderRef.value) sliderRef.value.scrollTo({ left: 0 });
+    // jsdom(테스트 환경)엔 Element.prototype.scrollTo가 구현되어 있지 않아서 방어적으로 체크.
+    // 실제 브라우저에선 항상 있으니 동작에 영향 없음.
+    if (sliderRef.value && typeof sliderRef.value.scrollTo === 'function') {
+      sliderRef.value.scrollTo({ left: 0 });
+    }
   });
 }
 
@@ -432,7 +436,9 @@ function onSliderScroll() {
 function scrollToCard(index) {
   if (!sliderRef.value) return;
   const clamped = Math.min(Math.max(index, 0), breakevenCards.value.length - 1);
-  sliderRef.value.scrollTo({ left: clamped * sliderRef.value.clientWidth, behavior: 'smooth' });
+  if (typeof sliderRef.value.scrollTo === 'function') {
+    sliderRef.value.scrollTo({ left: clamped * sliderRef.value.clientWidth, behavior: 'smooth' });
+  }
   activeCardIndex.value = clamped;
 }
 
