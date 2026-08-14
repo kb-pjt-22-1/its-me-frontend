@@ -1,5 +1,4 @@
 import api from '@/api'
-import { getCategoryEmoji } from '@/services/merchantsService'
 
 // Benefits.vue의 도넛/범례 색상 팔레트. 백엔드 응답에는 색상이 없어서
 // categoryBreakdown 순서(금액 내림차순)대로 순환 배정합니다.
@@ -22,6 +21,35 @@ const CARD_GRADIENTS = [
   'linear-gradient(135deg, #4a7fd4, #2c4f8f)',
   'linear-gradient(135deg, #00a97b, #00714f)',
 ]
+
+// merchantsService에는 아이콘 매핑 함수가 없고, merchant_categories.category_icon은
+// 실제 CDN URL이 아니라 가짜값이라 신뢰할 수 없음(인수인계 문서 기준). 그래서 혜택
+// 한도 화면(usage-icon)용으로 여기서 카테고리명 -> 이모지 매핑을 직접 둠. merchant_categories
+// 시드에 있던 19개 카테고리명 기준.
+const CATEGORY_EMOJI_BY_NAME = {
+  음식점: '🍽️',
+  카페: '☕',
+  편의점: '🏪',
+  영화관: '🎬',
+  패스트푸드: '🍔',
+  주유소: '⛽',
+  주차장: '🅿️',
+  병원: '🏥',
+  약국: '💊',
+  여가: '🎮',
+  뷰티: '💄',
+  빵집: '🥐',
+  마트: '🛒',
+  백화점: '🏬',
+  문구점: '✏️',
+  독서실: '📖',
+  학원: '🎓',
+  피트니스센터: '💪',
+  숙박: '🏨',
+}
+function getCategoryEmojiByName(categoryName) {
+  return CATEGORY_EMOJI_BY_NAME[categoryName] ?? '🎁'
+}
 
 /**
  * 월간 혜택 리포트 조회 [GET /api/v1/benefits/report]
@@ -86,9 +114,9 @@ export async function fetchAiCoaching() {
  * 카테고리별 한도 총합 + 이번 달 사용 총합.
  *
  * 주의: 실제 응답 DTO를 아직 못 봐서 필드명은 추정입니다(categories 배열에 categoryCode/
- * categoryName/limitAmount/usedAmount가 있을 거라고 가정). 아이콘은 백엔드가 안 줄 거라고
- * 보고 merchantsService의 getCategoryEmoji로 프론트에서 매핑했어요 - 카드 아이콘 때도
- * 가짜 CDN URL 문제가 있어서 이모지 직접 매핑으로 갔던 전례를 그대로 따른 것.
+ * categoryName/limitAmount/usedAmount가 있을 거라고 가정). 아이콘은 위쪽 CATEGORY_EMOJI_BY_NAME로
+ * 카테고리명 기준 프론트에서 직접 매핑함 (merchant_categories.category_icon이 가짜 CDN URL이라
+ * 못 쓰는 문제가 카드 아이콘 때도 있었어서, 같은 방식으로 우회).
  *
  * @param {string} [yearMonth] - 'yyyy-MM' 형식. 생략 시 이번 달.
  */
@@ -100,7 +128,7 @@ export async function fetchBenefitLimits(yearMonth) {
   return categories.map((item) => ({
     category: item.categoryName,
     categoryCode: item.categoryCode,
-    icon: getCategoryEmoji(item.categoryCode),
+    icon: getCategoryEmojiByName(item.categoryName),
     used: item.usedAmount ?? 0,
     limit: item.limitAmount ?? 0,
   }))
@@ -168,4 +196,25 @@ function formatDateLabel(dateStr) {
   if (!dateStr) return ''
   const [, month, day] = dateStr.split('-')
   return `${Number(month)}월 ${Number(day)}일`
+}
+
+/**
+ * 놓치기 쉬운 혜택 [GET /api/v1/benefits/expiring]
+ * 이번 달에 사라지는 혜택 + 최근 결제한 곳 주변에서 받을 수 있는 혜택.
+ *
+ * 주의: 실제 응답 DTO를 아직 못 봐서 필드명은 추정입니다.
+ */
+export async function fetchExpiringBenefits() {
+  const { data } = await api.get('/v1/benefits/expiring')
+  return {
+    daysRemaining: data.daysRemaining ?? null,
+    expiringBenefits: (data.expiringBenefits ?? []).map((b) => ({
+      categoryName: b.categoryName,
+      label: b.label ?? `${b.categoryName} ${(b.discountAmount ?? 0).toLocaleString()}원 할인`,
+    })),
+    nearbyMerchantBenefits: (data.nearbyMerchantBenefits ?? data.nearbyMerchants ?? []).map((m) => ({
+      merchantName: m.merchantName,
+      label: m.label ?? m.benefitLabel ?? '',
+    })),
+  }
 }
