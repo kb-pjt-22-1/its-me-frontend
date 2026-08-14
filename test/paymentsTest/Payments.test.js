@@ -74,7 +74,12 @@ function mountPage() {
 }
 
 // PIN 6자리를 입력해서(값은 상관없음, verifyPin이 모킹되어 있음) 인증을 통과시킨다.
+// isEnteringPin이 false로 시작해서 키패드가 아직 안 그려져 있으므로, 먼저
+// "간편 비밀번호 인증 후 결제하기" 버튼을 눌러 pin-page로 전환한 뒤 진행한다.
 async function enterPin(wrapper) {
+  const startButton = wrapper.findAll('button').find((b) => b.text().includes('간편 비밀번호 인증 후 결제하기'))
+  await startButton.trigger('click')
+
   const digitButtons = wrapper.findAll('.keypad-key').filter((b) => /^[0-9]$/.test(b.text()))
   for (let i = 0; i < 6; i++) {
     await digitButtons[i].trigger('click')
