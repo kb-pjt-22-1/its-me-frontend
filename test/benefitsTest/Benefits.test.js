@@ -1,29 +1,9 @@
-<<<<<<< HEAD
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+
 import Benefits from '@/pages/Benefits.vue'
-import { fetchMonthlyBenefitReport, fetchAnnualFeeBreakEven } from '@/services/benefitService'
-
-// benefitService는 실제 axios 호출(api.get)을 감싸고 있어서, 컴포넌트 테스트에서는
-// 정규화된 반환값 형태(fetchMonthlyBenefitReport/fetchAnnualFeeBreakEven의 결과물)만
-// 알면 되니까 모듈 전체를 모킹함. store 의존성이 없어서 Pinia 목킹은 필요 없음.
-vi.mock('@/services/benefitService', () => ({
-  fetchMonthlyBenefitReport: vi.fn(),
-  fetchAnnualFeeBreakEven: vi.fn(),
-}))
-
-function makeReport(overrides = {}) {
-  return {
-    yearMonth: '2026-08',
-    totalBenefit: 42500,
-    deltaVsLastMonth: 7200,
-    categoryBreakdown: [
-      { categoryCode: 'CAFE', name: '카페', amount: 16000, percent: 38, color: 'var(--orange, #ffbc00)' },
-      { categoryCode: 'CVS', name: '편의점', amount: 9000, percent: 21, color: 'var(--green, #00a878)' },
-    ],
-    ...overrides,
-  }
-}
+import { useBenefitsStore } from '@/stores/benefits'
 
 function makeCard(overrides = {}) {
   return {
@@ -45,6 +25,53 @@ function makeCard(overrides = {}) {
   }
 }
 
+function makeCategoryBreakdown() {
+  return [
+    { categoryCode: 'CAFE', name: '카페', amount: 16000, percent: 38, color: 'var(--orange, #ffbc00)' },
+    { categoryCode: 'CVS', name: '편의점', amount: 9000, percent: 21, color: 'var(--green, #00a878)' },
+  ]
+}
+
+function makeAiTips() {
+  return [
+    { headline: '카페 혜택은 한 번 더 사용한 뒤 굿데이카드로 바꾸는 게 유리해요.', detail: '약 2,000원 추가 절약 예상' },
+  ]
+}
+
+function makeBenefitLimits() {
+  return [
+    { category: '음식점', categoryCode: 'FOOD', icon: '🍽️', used: 7500, limit: 15000 },
+    { category: '카페', categoryCode: 'CAFE', icon: '☕', used: 8000, limit: 10000 },
+    { category: '편의점', categoryCode: 'CVS', icon: '🏪', used: 3500, limit: 5000 },
+  ]
+}
+
+// fetchReport/fetchBreakEven/fetchAiCoaching/fetchLimits는 axios 호출(benefitService)까지
+// 감싸고 있어서, 컴포넌트 테스트에서는 실제 네트워크 대신 스토어 상태를 미리 세팅하고
+// 네 액션 다 스파이로 대체함 (Bookmarks.test.js와 동일한 패턴).
+function mountPage(stateOverrides = {}) {
+  setActivePinia(createPinia())
+  const benefitsStore = useBenefitsStore()
+
+  benefitsStore.$patch({
+    reportMonthLabel: '8월',
+    totalBenefit: 42500,
+    deltaVsLastMonth: 7200,
+    categoryBreakdown: makeCategoryBreakdown(),
+    breakevenCards: [makeCard()],
+    aiTips: makeAiTips(),
+    benefitLimits: makeBenefitLimits(),
+    ...stateOverrides,
+  })
+
+  vi.spyOn(benefitsStore, 'fetchReport').mockResolvedValue()
+  vi.spyOn(benefitsStore, 'fetchBreakEven').mockResolvedValue()
+  vi.spyOn(benefitsStore, 'fetchAiCoaching').mockResolvedValue()
+  vi.spyOn(benefitsStore, 'fetchLimits').mockResolvedValue()
+
+  return { wrapper: mount(Benefits), benefitsStore }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
@@ -57,24 +84,20 @@ afterEach(() => {
 })
 
 // ---------------------------------------------------------------------
-// 초기 로딩 / API 호출
+// 초기 로딩 / 액션 호출
 // ---------------------------------------------------------------------
-it('mount 시 월간 리포트와 연회비 본전 API를 각각 한 번씩 호출한다', async () => {
-  fetchMonthlyBenefitReport.mockResolvedValue(makeReport())
-  fetchAnnualFeeBreakEven.mockResolvedValue([makeCard()])
-
-  mount(Benefits)
+it('mount 시 fetchReport/fetchBreakEven/fetchAiCoaching/fetchLimits를 각각 한 번씩 호출한다', async () => {
+  const { benefitsStore } = mountPage()
   await flushPromises()
 
-  expect(fetchMonthlyBenefitReport).toHaveBeenCalledTimes(1)
-  expect(fetchAnnualFeeBreakEven).toHaveBeenCalledTimes(1)
+  expect(benefitsStore.fetchReport).toHaveBeenCalledTimes(1)
+  expect(benefitsStore.fetchBreakEven).toHaveBeenCalledTimes(1)
+  expect(benefitsStore.fetchAiCoaching).toHaveBeenCalledTimes(1)
+  expect(benefitsStore.fetchLimits).toHaveBeenCalledTimes(1)
 })
 
-it('데이터가 오기 전까지는 로딩 문구를 보여준다', () => {
-  fetchMonthlyBenefitReport.mockReturnValue(new Promise(() => {})) // 영원히 안 풀리는 프로미스
-  fetchAnnualFeeBreakEven.mockReturnValue(new Promise(() => {}))
-
-  const wrapper = mount(Benefits)
+it('로딩 상태면 로딩 문구를 보여준다', () => {
+  const { wrapper } = mountPage({ reportLoading: true, breakevenLoading: true })
 
   expect(wrapper.text()).toContain('불러오는 중')
 })
@@ -84,10 +107,7 @@ it('데이터가 오기 전까지는 로딩 문구를 보여준다', () => {
 // ---------------------------------------------------------------------
 describe('월간 리포트', () => {
   it('총 혜택 금액과 지난달 대비 증감을 렌더링한다', async () => {
-    fetchMonthlyBenefitReport.mockResolvedValue(makeReport())
-    fetchAnnualFeeBreakEven.mockResolvedValue([])
-
-    const wrapper = mount(Benefits)
+    const { wrapper } = mountPage()
     await flushPromises()
 
     expect(wrapper.text()).toContain('42,500원')
@@ -97,69 +117,47 @@ describe('월간 리포트', () => {
   })
 
   it('카테고리 내역이 없으면 빈 상태 문구를 보여준다', async () => {
-    fetchMonthlyBenefitReport.mockResolvedValue(makeReport({ categoryBreakdown: [], totalBenefit: 0 }))
-    fetchAnnualFeeBreakEven.mockResolvedValue([])
-
-    const wrapper = mount(Benefits)
+    const { wrapper } = mountPage({ categoryBreakdown: [], totalBenefit: 0 })
     await flushPromises()
 
     expect(wrapper.text()).toContain('받은 혜택이 아직 없어요')
   })
 
-  it('조회 실패 시 에러 문구와 다시 시도 버튼을 보여주고, 클릭하면 재조회한다', async () => {
-    fetchMonthlyBenefitReport.mockRejectedValueOnce(new Error('network error'))
-    fetchAnnualFeeBreakEven.mockResolvedValue([])
-
-    const wrapper = mount(Benefits)
+  it('리포트 에러 상태면 에러 문구와 다시 시도 버튼을 보여주고, 클릭하면 fetchReport를 다시 호출한다', async () => {
+    const { wrapper, benefitsStore } = mountPage({ reportError: true })
     await flushPromises()
 
     expect(wrapper.text()).toContain('불러오지 못했어요')
-    expect(console.error).toHaveBeenCalledWith('[Benefits] 월간 리포트 조회 실패', 'network error')
 
-    fetchMonthlyBenefitReport.mockResolvedValueOnce(makeReport())
     const retryButton = wrapper.findAll('button').find((b) => b.text() === '다시 시도')
     expect(retryButton).toBeTruthy()
 
     await retryButton.trigger('click')
-    await flushPromises()
 
-    expect(fetchMonthlyBenefitReport).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('42,500원')
+    // mount 시 1번 + 재시도 클릭 1번
+    expect(benefitsStore.fetchReport).toHaveBeenCalledTimes(2)
   })
 
-  it('이전 달 화살표를 누르면 하이픈 있는 yyyy-MM 형식으로 이전 달을 조회한다', async () => {
-    fetchMonthlyBenefitReport.mockResolvedValue(makeReport())
-    fetchAnnualFeeBreakEven.mockResolvedValue([])
-
-    const wrapper = mount(Benefits)
+  it('이전 달 화살표를 누르면 goToPrevMonth 액션을 호출한다', async () => {
+    const { wrapper, benefitsStore } = mountPage()
     await flushPromises()
+    const goToPrevMonthSpy = vi.spyOn(benefitsStore, 'goToPrevMonth')
 
     await wrapper.find('button[aria-label="이전 달"]').trigger('click')
-    await flushPromises()
 
-    // benefitService.fetchMonthlyBenefitReport는 'yyyy-MM'을 받아서 내부에서
-    // 'yyyyMM'으로 변환하는 계약이라, 여기서는 하이픈 있는 포맷으로 넘어가는지만 확인
-    expect(fetchMonthlyBenefitReport).toHaveBeenLastCalledWith('2026-07')
+    expect(goToPrevMonthSpy).toHaveBeenCalledTimes(1)
   })
 
   it('이번 달일 때는 다음 달 화살표가 비활성화된다', async () => {
-    fetchMonthlyBenefitReport.mockResolvedValue(makeReport())
-    fetchAnnualFeeBreakEven.mockResolvedValue([])
-
-    const wrapper = mount(Benefits)
+    const { wrapper } = mountPage({ selectedYearMonth: '2026-08' })
     await flushPromises()
 
     const nextButton = wrapper.find('button[aria-label="다음 달"]')
     expect(nextButton.attributes('disabled')).toBeDefined()
   })
 
-  it('이전 달로 이동한 뒤에는 다음 달 화살표가 다시 활성화된다', async () => {
-    fetchMonthlyBenefitReport.mockResolvedValue(makeReport({ yearMonth: '2026-07' }))
-    fetchAnnualFeeBreakEven.mockResolvedValue([])
-
-    const wrapper = mount(Benefits)
-    await flushPromises()
-    await wrapper.find('button[aria-label="이전 달"]').trigger('click')
+  it('이번 달이 아니면 다음 달 화살표가 활성화된다', async () => {
+    const { wrapper } = mountPage({ selectedYearMonth: '2026-07' })
     await flushPromises()
 
     const nextButton = wrapper.find('button[aria-label="다음 달"]')
@@ -171,11 +169,8 @@ describe('월간 리포트', () => {
 // 연회비 본전
 // ---------------------------------------------------------------------
 describe('연회비 본전', () => {
-  it('카드 정보를 렌더링하고, 본전 달성 여부에 따라 초록/빨강 클래스를 붙인다', async () => {
-    fetchMonthlyBenefitReport.mockResolvedValue(makeReport())
-    fetchAnnualFeeBreakEven.mockResolvedValue([makeCard({ isBreakEven: true, netBenefit: 3400 })])
-
-    const wrapper = mount(Benefits)
+  it('카드 정보를 렌더링하고, 본전 달성이면 초록 클래스를 붙인다', async () => {
+    const { wrapper } = mountPage({ breakevenCards: [makeCard({ isBreakEven: true, netBenefit: 3400 })] })
     await flushPromises()
 
     expect(wrapper.text()).toContain('청춘대로 톡톡카드')
@@ -185,12 +180,11 @@ describe('연회비 본전', () => {
   })
 
   it('본전 전이면 빨강 클래스를 붙인다', async () => {
-    fetchMonthlyBenefitReport.mockResolvedValue(makeReport())
-    fetchAnnualFeeBreakEven.mockResolvedValue([
-      makeCard({ isBreakEven: false, cumulativeBenefit: 8000, netBenefit: -4000, breakEvenIndex: -1 }),
-    ])
-
-    const wrapper = mount(Benefits)
+    const { wrapper } = mountPage({
+      breakevenCards: [
+        makeCard({ isBreakEven: false, cumulativeBenefit: 8000, netBenefit: -4000, breakEvenIndex: -1 }),
+      ],
+    })
     await flushPromises()
 
     expect(wrapper.text()).toContain('아직 연회비 본전 전이에요')
@@ -198,44 +192,33 @@ describe('연회비 본전', () => {
   })
 
   it('연회비가 있는 카드가 없으면 빈 상태 문구를 보여준다', async () => {
-    fetchMonthlyBenefitReport.mockResolvedValue(makeReport())
-    fetchAnnualFeeBreakEven.mockResolvedValue([])
-
-    const wrapper = mount(Benefits)
+    const { wrapper } = mountPage({ breakevenCards: [] })
     await flushPromises()
 
     expect(wrapper.text()).toContain('연회비가 있는 카드가 없어요')
   })
 
-  it('조회 실패 시 에러 문구와 다시 시도 버튼을 보여준다', async () => {
-    fetchMonthlyBenefitReport.mockResolvedValue(makeReport())
-    fetchAnnualFeeBreakEven.mockRejectedValue(new Error('network error'))
-
-    const wrapper = mount(Benefits)
+  it('연회비 본전 에러 상태면 에러 문구를 보여준다', async () => {
+    const { wrapper } = mountPage({ breakevenError: true })
     await flushPromises()
 
     expect(wrapper.text()).toContain('연회비 본전 정보를 불러오지 못했어요')
-    expect(console.error).toHaveBeenCalledWith('[Benefits] 연회비 본전 조회 실패', 'network error')
   })
 
   it('카드가 1장이면 슬라이더 화살표가 안 보인다', async () => {
-    fetchMonthlyBenefitReport.mockResolvedValue(makeReport())
-    fetchAnnualFeeBreakEven.mockResolvedValue([makeCard()])
-
-    const wrapper = mount(Benefits)
+    const { wrapper } = mountPage({ breakevenCards: [makeCard()] })
     await flushPromises()
 
     expect(wrapper.find('button[aria-label="다음 카드"]').exists()).toBe(false)
   })
 
   it('카드가 2장 이상이면 슬라이더 화살표가 보이고, 첫 카드에서는 이전 화살표가 비활성화된다', async () => {
-    fetchMonthlyBenefitReport.mockResolvedValue(makeReport())
-    fetchAnnualFeeBreakEven.mockResolvedValue([
-      makeCard({ userCardId: 1, cardName: '첫번째카드' }),
-      makeCard({ userCardId: 2, cardName: '두번째카드' }),
-    ])
-
-    const wrapper = mount(Benefits)
+    const { wrapper } = mountPage({
+      breakevenCards: [
+        makeCard({ userCardId: 1, cardName: '첫번째카드' }),
+        makeCard({ userCardId: 2, cardName: '두번째카드' }),
+      ],
+    })
     await flushPromises()
 
     const prevButton = wrapper.find('button[aria-label="이전 카드"]')
@@ -249,121 +232,91 @@ describe('연회비 본전', () => {
 })
 
 // ---------------------------------------------------------------------
-// 하드코딩 유지 섹션 (AI 혜택 코치 / 이번 달 받을 수 있는 혜택)
-// 백엔드 API가 없어서 사용자 요청으로 하드코딩 그대로 둔 부분 - 값이 안 깨졌는지만 확인
+// AI 혜택 코칭 [POST /api/v1/benefits/coaching]
 // ---------------------------------------------------------------------
-it('AI 혜택 코치와 이번 달 받을 수 있는 혜택 섹션은 하드코딩된 내용을 그대로 보여준다', async () => {
-  fetchMonthlyBenefitReport.mockResolvedValue(makeReport())
-  fetchAnnualFeeBreakEven.mockResolvedValue([])
-
-  const wrapper = mount(Benefits)
-  await flushPromises()
-
-  expect(wrapper.text()).toContain('AI 혜택 코치')
-  expect(wrapper.text()).toContain('이번 달 받을 수 있는 혜택')
-  expect(wrapper.text()).toContain('음식점')
-=======
-import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
-import Benefits from '@/pages/Benefits.vue'
-
-// Benefits.vue는 지금 store를 안 쓰고 있어서(하드코딩 데이터), Pinia 목킹 없이 바로 마운트합니다.
-// 페이지 제목 "혜택"은 더 이상 이 컴포넌트가 자체 렌더링하지 않는다 - 전역 Header.vue가
-// route name('benefits')을 보고 표시한다(Header.vue의 PAGE_TITLES 참고).
-describe('Benefits.vue', () => {
-  it('AI 혜택 코치 팁이 aiTips 개수만큼 렌더링된다', () => {
-    const wrapper = mount(Benefits)
-    const tips = wrapper.findAll('.ai-tips li')
-    expect(tips.length).toBe(2)
-    expect(tips[0].find('.ai-tip-num').text()).toBe('1')
-    expect(tips[1].find('.ai-tip-num').text()).toBe('2')
+describe('AI 혜택 코칭', () => {
+  it('로딩 상태면 로딩 문구를 보여준다', () => {
+    const { wrapper } = mountPage({ aiTipsLoading: true })
+    expect(wrapper.text()).toContain('불러오는 중')
   })
 
-  it('이번 달 받은 혜택 총액이 천단위 콤마로 표시된다', () => {
-    const wrapper = mount(Benefits)
-    expect(wrapper.find('.report-total').text()).toBe('42,500원')
+  it('에러 상태면 에러 문구와 다시 시도 버튼을 보여주고, 클릭하면 fetchAiCoaching을 다시 호출한다', async () => {
+    const { wrapper, benefitsStore } = mountPage({ aiTipsError: true })
+
+    expect(wrapper.text()).toContain('AI 코칭을 불러오지 못했어요')
+
+    const retryButton = wrapper.findAll('button').find((b) => b.text() === '다시 시도')
+    expect(retryButton).toBeTruthy()
+    await retryButton.trigger('click')
+
+    // mount 시 1번 + 재시도 클릭 1번
+    expect(benefitsStore.fetchAiCoaching).toHaveBeenCalledTimes(2)
   })
 
-  it('도넛차트 segment 개수가 categoryBreakdown 개수와 같다', () => {
-    const wrapper = mount(Benefits)
-    const segments = wrapper.findAll('circle.donut-segment')
-    expect(segments.length).toBe(5) // 카페/편의점/대형마트/주유소/기타
+  it('코칭 항목이 없으면 빈 상태 문구를 보여준다', () => {
+    const { wrapper } = mountPage({ aiTips: [] })
+    expect(wrapper.text()).toContain('지금은 코칭할 내용이 없어요')
   })
 
-  it('기본 상태에서는 범례(legend)가 안 보이고, 차트만 크게 나온다', () => {
-    const wrapper = mount(Benefits)
-    expect(wrapper.find('.donut-legend').exists()).toBe(false)
-    expect(wrapper.find('.donut-chart').classes()).toContain('donut-chart--large')
+  it('코칭 항목을 렌더링한다', () => {
+    const { wrapper } = mountPage()
+    expect(wrapper.text()).toContain('카페 혜택은 한 번 더 사용한 뒤 굿데이카드로 바꾸는 게 유리해요')
+    expect(wrapper.text()).toContain('약 2,000원 추가 절약 예상')
+  })
+})
+
+// ---------------------------------------------------------------------
+// 이번 달 받을 수 있는 혜택 [GET /api/v1/benefits/limits]
+// ---------------------------------------------------------------------
+describe('이번 달 받을 수 있는 혜택', () => {
+  it('로딩 상태면 로딩 문구를 보여준다', () => {
+    const { wrapper } = mountPage({ limitsLoading: true })
+    expect(wrapper.text()).toContain('불러오는 중')
   })
 
-  it('"전체 구성 보기" 클릭하면 범례가 나오고 버튼 텍스트가 "간단히 보기"로 바뀐다', async () => {
-    const wrapper = mount(Benefits)
-    const expandBtn = wrapper.findAll('.expand-btn')[0] // 리포트 카드 쪽 expand 버튼
+  it('에러 상태면 에러 문구와 다시 시도 버튼을 보여주고, 클릭하면 fetchLimits를 다시 호출한다', async () => {
+    const { wrapper, benefitsStore } = mountPage({ limitsError: true })
 
-    expect(expandBtn.text()).toContain('전체 구성 보기')
-    await expandBtn.trigger('click')
+    expect(wrapper.text()).toContain('혜택 한도 정보를 불러오지 못했어요')
 
-    expect(wrapper.find('.donut-legend').exists()).toBe(true)
-    expect(wrapper.findAll('.donut-legend li').length).toBe(5)
-    expect(expandBtn.text()).toContain('간단히 보기')
+    const retryButton = wrapper.findAll('button').find((b) => b.text() === '다시 시도')
+    expect(retryButton).toBeTruthy()
+    await retryButton.trigger('click')
+
+    expect(benefitsStore.fetchLimits).toHaveBeenCalledTimes(2)
   })
 
-  it('도넛 조각에 마우스를 올리면 가운데 텍스트가 해당 카테고리 정보로 바뀐다', async () => {
-    const wrapper = mount(Benefits)
-    const firstSegment = wrapper.findAll('circle.donut-segment')[0] // 카페(38%, 16,000원)
-
-    await firstSegment.trigger('mouseenter')
-    expect(wrapper.find('.donut-center-amount').text()).toBe('카페')
-    expect(wrapper.find('.donut-center-label').text()).toBe('16,000원 · 38%')
-
-    await firstSegment.trigger('mouseleave')
-    expect(wrapper.find('.donut-center-amount').text()).toBe('43k') // (42500/1000).toFixed(0)
+  it('한도가 없으면 빈 상태 문구를 보여준다', () => {
+    const { wrapper } = mountPage({ benefitLimits: [] })
+    expect(wrapper.text()).toContain('이번 달 받을 수 있는 혜택이 아직 없어요')
   })
 
-  it('이번 달 받을 수 있는 혜택은 기본 3개만 보이고, 항목이 3개뿐이면 "더보기" 버튼이 없다', () => {
-    const wrapper = mount(Benefits)
+  it('카테고리별 사용/한도를 렌더링하고, 3개 초과면 더보기 버튼을 보여준다', () => {
+    const { wrapper } = mountPage()
+
+    expect(wrapper.text()).toContain('음식점')
+    expect(wrapper.text()).toContain('7,500원 사용 / 총 15,000원')
+
     const items = wrapper.findAll('.benefit-usage-item')
-    expect(items.length).toBe(3)
-
-    // availableBenefits가 지금 정확히 3개라 "N개 더보기" 버튼 자체가 안 뜸
-    const moreBtn = wrapper.findAll('.expand-btn').find((b) => b.text().includes('더보기'))
-    expect(moreBtn).toBeUndefined()
+    expect(items).toHaveLength(3)
+    expect(wrapper.text()).not.toContain('더보기')
   })
 
-  it('카테고리별 사용률(progress bar 너비)이 used/limit 비율로 계산된다', () => {
-    const wrapper = mount(Benefits)
-    const fills = wrapper.findAll('.available-section .progress-fill')
-    // 카페: 8000/10000 = 80%
-    expect(fills[1].attributes('style')).toContain('width: 80%')
-  })
+  it('4개 이상이면 더보기 버튼이 뜨고, 누르면 나머지도 보여준다', async () => {
+    const { wrapper } = mountPage({
+      benefitLimits: [
+        ...makeBenefitLimits(),
+        { category: '주유소', categoryCode: 'GAS', icon: '⛽', used: 2000, limit: 5000 },
+      ],
+    })
 
-  it('연회비 본전 카드가 카드 개수만큼 렌더링된다', () => {
-    const wrapper = mount(Benefits)
-    expect(wrapper.findAll('.breakeven-card').length).toBe(1)
-  })
+    expect(wrapper.findAll('.benefit-usage-item')).toHaveLength(3)
+    const moreButton = wrapper.findAll('button').find((b) => b.text().includes('더보기'))
+    expect(moreButton).toBeTruthy()
 
-  it('본전 달성한 카드는 "본전 달성" 문구와 순혜택 +표시가 나온다', () => {
-    const wrapper = mount(Benefits)
-    const card = wrapper.find('.breakeven-card')
-    expect(card.find('.be-status').classes()).toContain('be-status--met')
-    expect(card.find('.be-status-title').text()).toContain('본전 달성 4월 12일')
-    expect(card.find('.be-status-desc').text()).toContain('13,400원 더 받았어요')
-  })
+    await moreButton.trigger('click')
 
-  it('연회비/누적혜택/순혜택 통계 3개가 정확한 금액으로 나온다', () => {
-    const wrapper = mount(Benefits)
-    const stats = wrapper.findAll('.be-stats-row > div strong')
-    expect(stats[0].text()).toBe('15,000원')
-    expect(stats[1].text()).toBe('28,400원')
-    expect(stats[2].text()).toBe('+13,400원')
+    expect(wrapper.findAll('.benefit-usage-item')).toHaveLength(4)
+    expect(wrapper.text()).toContain('주유소')
   })
-
-  it('꺾은선 그래프의 월 라벨이 7개(1월~7월) 렌더링된다', () => {
-    const wrapper = mount(Benefits)
-    const monthLabels = wrapper.findAll('.be-chart-month-label')
-    expect(monthLabels.length).toBe(7)
-    expect(monthLabels[0].text()).toBe('1월')
-    expect(monthLabels[6].text()).toBe('7월')
-  })
->>>>>>> origin/dev
 })
