@@ -1,109 +1,206 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import JsBarcode from 'jsbarcode'
 
+// vue-router 전체를 모킹. onBeforeRouteLeave는 실제로는 라우터 네비게이션에 걸려있어야
+// 동작하는데, 여기선 등록되는 콜백을 캡처해뒀다가 테스트에서 직접 호출해서
+// "페이지를 벗어나는 상황"을 시뮬레이션한다.
+const routeMock = { query: {} }
+let capturedLeaveGuard = null
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: { merchantId: '1' } }),
+  useRoute: () => routeMock,
+  onBeforeRouteLeave: (fn) => {
+    capturedLeaveGuard = fn
+  },
+}))
+
+vi.mock('jsbarcode', () => ({ default: vi.fn() }))
+
+const toastMock = { success: vi.fn(), error: vi.fn() }
+vi.mock('@/composables/useToast', () => ({
+  useToast: () => toastMock,
 }))
 
 vi.mock('@/services/paymentAuthService', () => ({
   verifyPin: vi.fn(),
 }))
 
-const { mockToastSuccess } = vi.hoisted(() => ({ mockToastSuccess: vi.fn() }))
-vi.mock('@/composables/useToast', () => ({
-  useToast: () => ({ success: mockToastSuccess, error: vi.fn(), info: vi.fn() }),
+vi.mock('@/services/cardService', () => ({
+  findBenefitForCategory: () => null,
+  formatBenefit: () => '',
+}))
+
+const cardsStoreMock = {
+  cards: [
+    { userCardId: 1, cardName: '청춘대로 톡톡카드', panLast4: '1234', status: 'ACTIVE', color: '#1f3a5f', isPrimary: true, benefitsInfo: null, currentAmount: 0 },
+  ],
+  isLoading: false,
+  primaryCard: { userCardId: 1 },
+  getById(id) {
+    return this.cards.find((c) => c.userCardId === id)
+  },
+  fetchCards: vi.fn(),
+}
+vi.mock('@/stores/cards', () => ({ useCardsStore: () => cardsStoreMock }))
+
+const merchantsStoreMock = { getByIdWithCategory: () => null }
+vi.mock('@/stores/merchants', () => ({ useMerchantsStore: () => merchantsStoreMock }))
+
+vi.mock('@/services/paymentService', () => ({
+  createPaymentToken: vi.fn(),
+  fetchPayableCards: vi.fn(),
+  fetchRecommendedCard: vi.fn(),
+  fetchPaymentTokenStatus: vi.fn(),
+  completePaymentToken: vi.fn(),
+  cancelPaymentToken: vi.fn(),
+  fetchPaymentHistory: vi.fn(),
 }))
 
 import Payments from '@/pages/Payments.vue'
-import { useCardsStore } from '@/stores/cards'
-import { useMerchantsStore } from '@/stores/merchants'
 import { verifyPin } from '@/services/paymentAuthService'
+import {
+  createPaymentToken as createPaymentTokenApi,
+  completePaymentToken as completePaymentTokenApi,
+  cancelPaymentToken as cancelPaymentTokenApi,
+} from '@/services/paymentService'
+import { usePaymentStore } from '@/stores/payment'
 
-const TIER_WITH_CAFE_BENEFIT = {
-  performanceTiers: [
-    { minimumSpending: 0, benefits: [{ categoryCodes: ['CAFE'], discountRate: 10 }] },
-  ],
-}
-const TIER_WITHOUT_MATCH = {
-  performanceTiers: [
-    { minimumSpending: 0, benefits: [{ categoryCodes: ['MART'], discountRate: 5 }] },
-  ],
-}
-
-function mountPage(cards) {
+function mountPage() {
   setActivePinia(createPinia())
-  const cardsStore = useCardsStore()
-  const merchantsStore = useMerchantsStore()
-  merchantsStore.merchants = [{ id: 1, name: '스타벅스', categoryCode: 'CAFE' }]
-  merchantsStore.categories = [{ categoryCode: 'CAFE', categoryName: '카페' }]
-  cardsStore.cards = cards
-  return mount(Payments)
+  const paymentStore = usePaymentStore()
+  const wrapper = mount(Payments)
+  return { wrapper, paymentStore }
 }
 
-// keypad 버튼은 순서대로 1~9, blank, 0, backspace로 렌더링된다 (Pinsetting.test.js와 동일한 패턴).
-async function pressDigits(wrapper, digits) {
-  const buttons = wrapper.findAll('.keypad-key')
-  for (const d of digits) {
-    const btn = buttons.find((b) => b.text() === d)
-    await btn.trigger('click')
+// PIN 6자리를 입력해서(값은 상관없음, verifyPin이 모킹되어 있음) 인증을 통과시킨다.
+async function enterPin(wrapper) {
+  const digitButtons = wrapper.findAll('.keypad-key').filter((b) => /^[0-9]$/.test(b.text()))
+  for (let i = 0; i < 6; i++) {
+    await digitButtons[i].trigger('click')
   }
+  await flushPromises()
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  capturedLeaveGuard = null
+  routeMock.query = {}
 })
 
-describe('결제수단별 혜택 문구 (rewardLabelFor)', () => {
-  it('매장 카테고리에 맞는 혜택이 있으면 할인 문구를 보여준다', () => {
-    const wrapper = mountPage([
-      { userCardId: 1, cardName: '혜택카드', status: 'ACTIVE', currentAmount: 0, benefitsInfo: TIER_WITH_CAFE_BENEFIT },
-    ])
+describe('바코드 발급/렌더링', () => {
+  it('PIN 인증에 성공하면 결제 토큰을 발급하고 JsBarcode로 바코드를 그린다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
 
-    expect(wrapper.text()).toContain('10% 할인')
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    expect(createPaymentTokenApi).toHaveBeenCalledWith(1) // selectedMethodId(대표카드 userCardId)
+    expect(wrapper.text()).toContain('ABC123XYZ')
+    expect(JsBarcode).toHaveBeenCalledWith(
+      expect.anything(),
+      'ABC123XYZ',
+      expect.objectContaining({ format: 'CODE128', displayValue: false })
+    )
   })
 
-  it('매장 카테고리에 맞는 혜택이 없으면 "혜택 없음"을 보여준다', () => {
-    const wrapper = mountPage([
-      { userCardId: 2, cardName: '무혜택카드', status: 'ACTIVE', currentAmount: 0, benefitsInfo: TIER_WITHOUT_MATCH },
-    ])
+  it('토큰 발급에 실패하면 에러 토스트를 띄우고 인증 전 화면으로 되돌린다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockRejectedValue(new Error('server error'))
 
-    expect(wrapper.text()).toContain('혜택 없음')
-  })
-})
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
 
-describe('간편 비밀번호 인증 후 결제 완료', () => {
-  it('PIN 인증에 성공하고 결제 완료를 누르면 성공 토스트를 띄운다', async () => {
-    verifyPin.mockResolvedValueOnce()
-    const wrapper = mountPage([
-      { userCardId: 1, cardName: '혜택카드', status: 'ACTIVE', currentAmount: 0, isPrimary: true },
-    ])
-    await flushPromises()
-
-    await wrapper.find('.sticky-action .main-action-btn').trigger('click')
-    await pressDigits(wrapper, '123456')
-    await flushPromises()
-
-    expect(verifyPin).toHaveBeenCalledWith('123456')
-    expect(wrapper.find('.barcode-display').exists()).toBe(true)
-
-    await wrapper.find('.main-action-btn').trigger('click')
-
-    expect(mockToastSuccess).toHaveBeenCalledWith('결제가 완료되었습니다!')
+    expect(toastMock.error).toHaveBeenCalledWith('바코드를 발급하지 못했어요. 다시 시도해주세요.')
+    expect(wrapper.text()).toContain('간편 비밀번호 인증 후 바코드가 표시됩니다')
+    expect(JsBarcode).not.toHaveBeenCalled()
   })
 
-  it('PIN이 틀리면 인증하지 않고 에러 문구를 보여준다', async () => {
-    verifyPin.mockRejectedValueOnce(new Error('invalid pin'))
-    const wrapper = mountPage([
-      { userCardId: 1, cardName: '혜택카드', status: 'ACTIVE', currentAmount: 0, isPrimary: true },
-    ])
-    await flushPromises()
+  it('PIN이 틀리면 토큰을 발급하지 않는다', async () => {
+    verifyPin.mockRejectedValue(new Error('wrong pin'))
 
-    await wrapper.find('.sticky-action .main-action-btn').trigger('click')
-    await pressDigits(wrapper, '000000')
-    await flushPromises()
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
 
     expect(wrapper.text()).toContain('비밀번호가 올바르지 않습니다')
-    expect(mockToastSuccess).not.toHaveBeenCalled()
+    expect(createPaymentTokenApi).not.toHaveBeenCalled()
+  })
+})
+
+describe('결제 완료', () => {
+  it('완료하면 completePaymentToken을 호출하고 성공 토스트를 띄운 뒤 인증 상태를 해제한다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
+    completePaymentTokenApi.mockResolvedValue({
+      paymentId: 99, merchantName: '스타벅스 강남점', finalAmount: 4400, discountAmount: 600,
+    })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    const completeButton = wrapper.findAll('button').find((b) => b.text().includes('결제 완료하기'))
+    await completeButton.trigger('click')
+    await flushPromises()
+
+    expect(completePaymentTokenApi).toHaveBeenCalledWith('tok-1')
+    expect(toastMock.success).toHaveBeenCalledWith('스타벅스 강남점에서 4,400원 결제 완료!')
+    expect(wrapper.text()).toContain('간편 비밀번호 인증 후 바코드가 표시됩니다')
+  })
+
+  it('완료에 실패하면 에러 토스트만 띄운다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
+    completePaymentTokenApi.mockRejectedValue(new Error('network error'))
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    const completeButton = wrapper.findAll('button').find((b) => b.text().includes('결제 완료하기'))
+    await completeButton.trigger('click')
+    await flushPromises()
+
+    expect(toastMock.error).toHaveBeenCalledWith('결제를 완료하지 못했어요. 다시 시도해주세요.')
+  })
+})
+
+describe('페이지 이탈 시 토큰 취소', () => {
+  it('발급된 토큰이 있으면 페이지를 벗어날 때 취소를 요청한다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
+    cancelPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', status: 'CANCELED' })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    expect(capturedLeaveGuard).toBeTypeOf('function')
+    const result = capturedLeaveGuard()
+    await flushPromises()
+
+    expect(cancelPaymentTokenApi).toHaveBeenCalledWith('tok-1')
+    expect(result).toBe(true) // 네비게이션을 막지 않는다
+  })
+
+  it('발급된 토큰이 없으면 페이지를 벗어나도 취소를 요청하지 않는다', () => {
+    mountPage()
+
+    const result = capturedLeaveGuard()
+
+    expect(cancelPaymentTokenApi).not.toHaveBeenCalled()
+    expect(result).toBe(true)
+  })
+
+  it('취소 요청이 실패해도 네비게이션은 막지 않는다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
+    cancelPaymentTokenApi.mockRejectedValue(new Error('network error'))
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    const result = capturedLeaveGuard()
+    await flushPromises()
+
+    expect(result).toBe(true)
   })
 })
