@@ -34,7 +34,16 @@ export default defineConfig({
     },
     test: {
         environment: 'jsdom',
+        // jsdom은 기본적으로 about:blank를 URL로 쓰는데, localStorage/sessionStorage는
+        // 오리진이 있어야 동작해서 about:blank에선 window.localStorage 자체가 undefined다.
+        // 실제 origin을 지정해줘야 로그인/토큰 저장 등 localStorage를 쓰는 테스트가 돌아간다.
+        environmentOptions: {
+            jsdom: {
+                url: 'http://localhost:3000',
+            },
+        },
         globals: true,
+        setupFiles: ['./test/setup.js'],
         // 아직 작성된 테스트가 없어도 CI가 실패하지 않도록 함.
         // 테스트가 하나라도 생기면 자동으로 정상 동작.
         passWithNoTests: true,
@@ -42,6 +51,15 @@ export default defineConfig({
             provider: 'v8',
             reporter: ['text', 'lcov'],
             reportsDirectory: './coverage',
+            // 소나큐브 sonar.coverage.exclusions와 맞춘다 - 로컬 커버리지 리포트가
+            // 소나큐브가 보는 숫자와 어긋나지 않도록. 이유는 sonar-project.properties 주석 참고.
+            exclude: [
+                'src/config/index.js',
+                'src/stores/counter.js',
+                'src/layouts/menu/NavBar.vue',
+                'src/layouts/menu/DefaultLayout.vue',
+                'src/components/common/PageContainer.vue',
+            ],
         },
     },
 })

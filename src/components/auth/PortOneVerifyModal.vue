@@ -212,12 +212,17 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
   z-index: 100;
 }
 
 .modal-card {
   width: 100%;
   max-width: 380px;
+  /* 인증번호 요청 후 OTP 입력란·버튼이 추가로 붙으면서 폼이 길어진다 - 작은 화면에서
+     .modal-backdrop 높이를 넘어가도 위 overflow-y: auto로 스크롤해서 볼 수 있게 한다. */
+  margin: auto 0;
   background: var(--surface, #ffffff);
   border-radius: 20px;
   padding: 24px 20px;
@@ -253,6 +258,11 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 12px;
 }
+/* grid item 기본 min-width:auto 때문에 좁은 화면에서 폼/버튼이 옆으로 넘칠 수 있다 -
+   Login.vue의 .login-form과 같은 이유로 0으로 풀어준다. */
+.modal-form > * {
+  min-width: 0;
+}
 
 .input-box {
   height: 55px;
@@ -268,7 +278,6 @@ onBeforeUnmount(() => {
 .input-box input {
   flex: 1;
   border: 0;
-  outline: 0;
   font-size: 15px;
   color: var(--charcoal, #24211d);
   min-width: 0;

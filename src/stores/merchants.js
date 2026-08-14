@@ -1,18 +1,12 @@
 import { defineStore } from 'pinia'
-import {
-  fetchMerchantList,
-  fetchMerchantDetail,
-  fetchMerchantCategories,
-  createMerchant,
-  updateMerchant,
-  deleteMerchant,
-} from '@/services/merchantsService'
+import { fetchMerchantList, fetchMerchantDetail, fetchMerchantCategories, fetchMerchantBrands } from '@/services/merchantsService'
 import { useAuthStore } from './auth'
 
 export const useMerchantsStore = defineStore('merchants', {
   state: () => ({
     merchants: [],
     categories: [],   // [{ categoryCode, categoryName, categoryIcon }]
+    brands: [],       // [{ brandId, brandCode, brandName, brandLogo }]
     isLoading: false,
     error: null,
   }),
@@ -23,6 +17,9 @@ export const useMerchantsStore = defineStore('merchants', {
 
     getCategoryByCode: (state) => (categoryCode) =>
       state.categories.find((c) => c.categoryCode === categoryCode),
+
+    getBrandById: (state) => (brandId) =>
+      brandId == null ? undefined : state.brands.find((b) => b.brandId === brandId),
 
     // 매장 하나에 카테고리 이름/아이콘까지 합쳐서 반환 (컴포넌트에서 이거 하나만 쓰면 됨)
     getByIdWithCategory: (state) => (merchantId) => {
@@ -43,6 +40,13 @@ export const useMerchantsStore = defineStore('merchants', {
     async fetchCategories() {
       if (this.categories.length > 0) return
       this.categories = await fetchMerchantCategories()
+    },
+
+    // 브랜드 로고를 화면에 붙이려면 brandId -> brandCode 매칭이 필요해서, 카테고리와
+    // 같은 방식(가볍게, 한 번만)으로 브랜드 목록도 받아 캐싱합니다.
+    async fetchBrands() {
+      if (this.brands.length > 0) return
+      this.brands = await fetchMerchantBrands()
     },
 
     async fetchMerchants() {
@@ -71,24 +75,6 @@ export const useMerchantsStore = defineStore('merchants', {
       const detail = await fetchMerchantDetail(merchantId)
       this.merchants.push(detail)
       return detail
-    },
-
-    async createMerchant(payload) {
-      const merchant = await createMerchant(payload)
-      this.merchants.push(merchant)
-      return merchant
-    },
-
-    async updateMerchant(merchantId, payload) {
-      const updated = await updateMerchant(merchantId, payload)
-      const index = this.merchants.findIndex((m) => m.id === Number(merchantId))
-      if (index !== -1) this.merchants[index] = updated
-      return updated
-    },
-
-    async deleteMerchant(merchantId) {
-      await deleteMerchant(merchantId)
-      this.merchants = this.merchants.filter((m) => m.id !== Number(merchantId))
     },
   },
 })

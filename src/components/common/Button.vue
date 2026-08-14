@@ -5,7 +5,7 @@
     v-bind="$attrs"
     :to="to"
     class="btn"
-    :class="[variantClass, sizeClass, { 'btn--static': tag === 'div', 'btn--full-width': fullWidth }]"
+    :class="[variantClass, sizeClass, { 'btn--static': tag === 'div', 'btn--full-width': fullWidth, 'btn--danger': danger }]"
     :disabled="!to && !tag ? disabled : undefined"
   >
     <slot />
@@ -26,7 +26,10 @@ const props = defineProps({
   // 클릭 동작이 없는 정적 박스로 쓸 때 (예: 혜택 박스) tag="div"로 강제 지정
   tag: { type: String, default: undefined },
   // 참고: box/box-outline 변형은 이 prop과 무관하게 항상 width:100%다
-  fullWidth: { type: Boolean, default: false }
+  fullWidth: { type: Boolean, default: false },
+  // 파괴적 액션(삭제 등) 확인 버튼용 - variant="primary"의 오렌지 배경을 --danger로 바꾼다.
+  // 다른 prop과 무관하게 추가되는 것이라 기존 사용처에 영향 없다.
+  danger: { type: Boolean, default: false }
 })
 
 const variantClass = computed(() => `btn--${props.variant}`)
@@ -68,6 +71,14 @@ const sizeClass = computed(() => `btn--${props.size}`)
   background-color: var(--inactive, #f0efec);
   color: var(--muted, #8f897f);
 }
+
+/* danger - variant="primary"에 danger prop을 얹으면 오렌지 대신 --danger 배경. 소스 순서상
+   .btn--primary보다 뒤에 있어야 같은 우선순위에서 이긴다. */
+.btn--danger {
+  background-color: var(--danger, #d94343);
+  color: #ffffff;
+}
+.btn--danger:hover:not(:disabled) { background-color: #c23a3a; }
 
 /* outline - 테두리만 있는 버튼 */
 .btn--outline {

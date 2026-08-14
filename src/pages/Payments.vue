@@ -55,13 +55,21 @@
       </div>
     </div>
 
+    <div v-else-if="isIssuingToken" class="display-box surface-card">
+      <div class="auth-prompt">
+        <p class="muted-text">바코드 발급 중...</p>
+      </div>
+    </div>
+
     <div v-else class="display-box surface-card">
       <div class="barcode-display">
         <p class="card-name">{{ selectedMethod?.cardName }}</p>
-        <div class="barcode-placeholder">||||||||||||||||||||||||||</div>
-        <p class="barcode-number">3242 9352 0990 20</p>
+        <canvas ref="barcodeCanvasRef" class="barcode-canvas"></canvas>
+        <p class="barcode-number">{{ paymentStore.currentToken?.tokenValue ?? '' }}</p>
       </div>
-      <button class="main-action-btn" @click="completePayment">결제 완료하기</button>
+      <button class="main-action-btn" :disabled="isCompleting" @click="completePayment">
+        {{ isCompleting ? '처리 중...' : '결제 완료하기' }}
+      </button>
     </div>
 
     <div class="payment-methods">
@@ -117,21 +125,56 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { useRoute, onBeforeRouteLeave } from 'vue-router';
+import JsBarcode from 'jsbarcode';
 import { verifyPin } from '@/services/paymentAuthService';
 import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
+import { usePaymentStore } from '@/stores/payment';
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService';
+import { useToast } from '@/composables/useToast';
 
 const route = useRoute();
 const cardsStore = useCardsStore();
+const paymentStore = usePaymentStore();
+const toast = useToast();
 const merchantsStore = useMerchantsStore();
 
 const isAuthenticated = ref(false);
 const isEnteringPin = ref(false);
+const isIssuingToken = ref(false);
+const isCompleting = ref(false);
 const pin = ref('');
 const pinError = ref(false);
+const barcodeCanvasRef = ref(null);
+
+// tokenValue가 새로 생기거나(발급) 바뀔 때마다(재발급) 캔버스에 실제 바코드를 그린다.
+// watch source를 tokenValue 하나만 보면, currentToken이 세팅되는 시점이 isIssuingToken이
+// false로 바뀌는 시점보다 미묘하게 먼저 와서 - nextTick 이후에도 아직 "발급 중..." 문구
+// (v-else-if="isIssuingToken")가 그려진 상태라 canvas가 DOM에 없고, 그 뒤로 tokenValue가
+// 다시 안 바뀌니 재시도도 안 되는 경쟁 상태가 있었다. isIssuingToken까지 같이 조건에
+// 넣어서, "캔버스가 실제로 그려지는(v-else) 시점"에만 트리거되게 한다.
+watch(
+  () => (isAuthenticated.value && !isIssuingToken.value ? paymentStore.currentToken?.tokenValue : null),
+  async (tokenValue) => {
+    if (!tokenValue) return;
+    await nextTick();
+    if (!barcodeCanvasRef.value) return;
+    try {
+      JsBarcode(barcodeCanvasRef.value, tokenValue, {
+        format: 'CODE128',
+        width: 2,
+        height: 60,
+        displayValue: false, // 값 자체는 아래 barcode-number 텍스트로 따로 보여줌
+        margin: 0,
+      });
+    } catch {
+      // tokenValue가 바코드로 인코딩 불가능한 문자를 담고 있으면(이론상 없어야 함) 조용히
+      // 무시한다 - barcode-number 텍스트는 그대로 보이니 결제 자체엔 지장 없다.
+    }
+  }
+);
 
 // StoreDetail.vue에서 "결제하기"를 누르면 /pay?merchantId=1 형태로 넘어옵니다.
 const merchant = computed(() => merchantsStore.getByIdWithCategory(route.query.merchantId) ?? null);
@@ -215,15 +258,60 @@ const checkPin = async () => {
   } finally {
     pin.value = '';
   }
+
+  // PIN 인증에 성공했을 때만 바코드용 결제 토큰을 발급한다.
+  if (isAuthenticated.value) {
+    await issuePaymentToken();
+  }
 };
 
-const completePayment = () => {
-  alert('결제가 완료되었습니다!');
-  isAuthenticated.value = false;
+// PIN 인증 직후 실제 바코드 값(paymentStore.currentToken.tokenValue)을 받아온다.
+// 이게 없으면 화면엔 카드 이름만 뜨고 바코드 아래 실제로 스캔될 값이 비어있게 된다.
+async function issuePaymentToken() {
+  isIssuingToken.value = true;
+  try {
+    await paymentStore.createPaymentToken(selectedMethodId.value);
+  } catch {
+    toast.error('바코드를 발급하지 못했어요. 다시 시도해주세요.');
+    isAuthenticated.value = false; // 토큰 없이는 결제 화면을 보여줘봤자 의미가 없어서 인증 전 화면으로 되돌림
+  } finally {
+    isIssuingToken.value = false;
+  }
+}
+
+const completePayment = async () => {
+  const paymentTokenId = paymentStore.currentToken?.paymentTokenId;
+  if (!paymentTokenId) {
+    toast.error('결제 토큰 정보가 없어요. 다시 인증해주세요.');
+    isAuthenticated.value = false;
+    return;
+  }
+
+  isCompleting.value = true;
+  try {
+    const payment = await paymentStore.completePaymentToken(paymentTokenId);
+    toast.success(`${payment.merchantName}에서 ${Number(payment.finalAmount).toLocaleString()}원 결제 완료!`);
+  } catch {
+    toast.error('결제를 완료하지 못했어요. 다시 시도해주세요.');
+  } finally {
+    isCompleting.value = false;
+    isAuthenticated.value = false;
+  }
 };
 
 onMounted(() => {
   if (cardsStore.cards.length === 0) cardsStore.fetchCards();
+});
+
+// 발급된 토큰(바코드)을 아직 결제 완료도 취소도 안 한 채로 페이지를 벗어나면, 서버에
+// 떠 있는 토큰을 정리한다. 실패해도(네트워크 등) 네비게이션은 막지 않는다 - 토큰은
+// 어차피 TTL이 지나면 서버에서 알아서 만료되니, 여기 취소는 "되면 좋고" 수준의 정리다.
+onBeforeRouteLeave(() => {
+  const paymentTokenId = paymentStore.currentToken?.paymentTokenId;
+  if (paymentTokenId) {
+    paymentStore.cancelPaymentToken(paymentTokenId).catch(() => {});
+  }
+  return true;
 });
 </script>
 
@@ -231,6 +319,7 @@ onMounted(() => {
 .layout-container { padding: 18px 18px 100px; }
 
 .display-box { padding: 40px 20px; text-align: center; margin-bottom: 24px; }
+.barcode-canvas { max-width: 100%; height: 60px; }
 .auth-prompt .lock-icon {
   width: 64px; height: 64px; margin: 0 auto 14px;
   border-radius: 50%; background: var(--inactive, #f0efec);
@@ -279,6 +368,7 @@ onMounted(() => {
   width: 100%; height: 54px; border-radius: 14px;
   background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900;
 }
+.main-action-btn:disabled { opacity: .6; cursor: not-allowed; }
 
 .payment-methods { display: flex; flex-direction: column; gap: 12px; }
 .loading-text { text-align: center; padding: 20px 0; font-size: 0.9rem; }

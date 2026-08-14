@@ -5,19 +5,9 @@ vi.mock('@/services/merchantsService', () => ({
   fetchMerchantList: vi.fn(),
   fetchMerchantDetail: vi.fn(),
   fetchMerchantCategories: vi.fn(),
-  createMerchant: vi.fn(),
-  updateMerchant: vi.fn(),
-  deleteMerchant: vi.fn(),
 }))
 
-import {
-  fetchMerchantList,
-  fetchMerchantDetail,
-  fetchMerchantCategories,
-  createMerchant,
-  updateMerchant,
-  deleteMerchant,
-} from '@/services/merchantsService'
+import { fetchMerchantList, fetchMerchantDetail, fetchMerchantCategories } from '@/services/merchantsService'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useAuthStore } from '@/stores/auth'
 
@@ -185,59 +175,5 @@ describe('fetchMerchantDetail', () => {
     expect(fetchMerchantDetail).toHaveBeenCalledWith(2)
     expect(result).toEqual(detail)
     expect(store.merchants).toEqual([detail])
-  })
-})
-
-describe('createMerchant', () => {
-  it('매장을 생성하고 목록에 추가한다', async () => {
-    const store = useMerchantsStore()
-    const created = { id: 3, categoryCode: '5812' }
-    createMerchant.mockResolvedValueOnce(created)
-
-    const result = await store.createMerchant({ categoryCode: '5812' })
-
-    expect(result).toEqual(created)
-    expect(store.merchants).toEqual([created])
-  })
-})
-
-describe('updateMerchant', () => {
-  it('매장을 수정하고 목록의 해당 항목을 교체한다', async () => {
-    const store = useMerchantsStore()
-    store.merchants = [{ id: 1, categoryCode: '5812' }]
-    const updated = { id: 1, categoryCode: '5813' }
-    updateMerchant.mockResolvedValueOnce(updated)
-
-    const result = await store.updateMerchant(1, { categoryCode: '5813' })
-
-    expect(result).toEqual(updated)
-    expect(store.merchants).toEqual([updated])
-  })
-
-  it('목록에 없는 매장이면 아무것도 교체하지 않는다', async () => {
-    const store = useMerchantsStore()
-    store.merchants = [{ id: 1, categoryCode: '5812' }]
-    const updated = { id: 999, categoryCode: '5813' }
-    updateMerchant.mockResolvedValueOnce(updated)
-
-    await store.updateMerchant(999, { categoryCode: '5813' })
-
-    expect(store.merchants).toEqual([{ id: 1, categoryCode: '5812' }])
-  })
-})
-
-describe('deleteMerchant', () => {
-  it('매장을 삭제하고 목록에서 제거한다', async () => {
-    const store = useMerchantsStore()
-    store.merchants = [
-      { id: 1, categoryCode: '5812' },
-      { id: 2, categoryCode: '5813' },
-    ]
-    deleteMerchant.mockResolvedValueOnce(true)
-
-    await store.deleteMerchant(1)
-
-    expect(deleteMerchant).toHaveBeenCalledWith(1)
-    expect(store.merchants).toEqual([{ id: 2, categoryCode: '5813' }])
   })
 })

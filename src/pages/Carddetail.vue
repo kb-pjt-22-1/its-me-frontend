@@ -25,7 +25,7 @@
         </svg>
       </div>
       <p class="card-name">{{ card.cardName }}</p>
-      <p class="card-number">•••• •••• •••• {{ card.panLast4 }}</p>
+      <p class="card-number">{{ displayLast4 }}</p>
     </div>
 
     <!-- 카드 기본 정보 -->
@@ -42,48 +42,60 @@
     <!-- 이번 달 이용실적 -->
     <section class="surface-card status-section">
       <p class="section-label">이번 달 이용실적</p>
-
-      <template v-if="typeof card.currentAmount === 'number' && typeof card.targetAmount === 'number'">
+      <template v-if="typeof card.currentAmount === 'number'">
         <h3 class="tier-label">{{ tierLabel }}</h3>
         <div class="progress-track">
-          <div class="progress-fill" :class="{ 'progress-fill--met': card.performanceMet }" :style="{ width: tierPercent + '%' }"></div>
+          <div
+              class="progress-fill"
+              :style="{ width: tierPercent + '%' }"
+          ></div>
         </div>
         <p class="recognized-amount muted-text">
-          실적인정금액 <strong>{{ card.currentAmount.toLocaleString() }}원</strong>
-          / 목표 {{ card.targetAmount.toLocaleString() }}원
-          <span v-if="card.performanceMet" class="success-text"> · 실적 충족</span>
+          실적인정금액
+          <strong>{{ card.currentAmount.toLocaleString() }}원</strong>
+          <template v-if="nextTargetAmount !== null">
+            / 목표 {{ nextTargetAmount.toLocaleString() }}원
+          </template>
+          <span v-else class="success-text">
+        · 최고 구간 달성
+      </span>
         </p>
       </template>
-      <p v-else class="muted-text">실적 정보를 불러오지 못했어요.</p>
+      <p v-else class="muted-text">
+        실적 정보를 불러오지 못했어요.
+      </p>
     </section>
 
-    <!-- 카드 혜택 (benefits_info.performanceTiers) -->
+    <!-- 카드 혜택 (이번 달 현재 실적 구간 기준) -->
     <section class="surface-card benefits-section">
       <p class="section-label">카드 혜택 - {{ tierLabel }} 기준</p>
-
       <template v-if="currentTierBenefits.length">
         <div v-for="(b, i) in currentTierBenefits" :key="i" class="benefit-row">
           <span class="benefit-cat">{{ b.categoryName }}</span>
           <span class="benefit-rate">{{ formatBenefit(b) }}</span>
         </div>
       </template>
-      <p v-else class="muted-text">지금 구간에서 적용되는 혜택이 없어요.</p>
+      <p v-else class="muted-text">현재 실적 구간의 혜택이 없어요.</p>
     </section>
 
-    <!-- 추천 카드에서 제외 -->
-    <section class="surface-card exclude-section">
-      <div class="exclude-row">
+    <!-- 추천 카드에 포함 -->
+    <section class="surface-card recommendation-section">
+      <div class="recommendation-row">
         <div>
-          <p class="exclude-title">추천 카드에서 제외</p>
-          <p class="exclude-desc muted-text">카드 추천 시 이 카드를 추천 대상에서 제외합니다.</p>
+          <p class="recommendation-title">추천 카드에 포함</p>
+          <p class="recommendation-desc muted-text">
+            카드 추천 시 이 카드를 추천 대상에 포함합니다.
+          </p>
         </div>
         <button
-          class="exclude-toggle-btn"
-          :class="{ 'exclude-toggle-btn--on': isExcludedFromRecommendation }"
-          @click="handleToggleRecommendation"
+            class="recommendation-toggle"
+            :class="{ 'recommendation-toggle--on': isRecommendationEnabled }"
+            role="switch"
+            :aria-checked="isRecommendationEnabled"
+            aria-label="추천 카드 포함 여부"
+            @click="handleToggleRecommendation"
         >
-          <span class="exclude-toggle-dot"></span>
-          {{ isExcludedFromRecommendation ? '제외됨' : '포함 중' }}
+          <span class="recommendation-toggle-knob"></span>
         </button>
       </div>
     </section>
@@ -110,32 +122,87 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useCardsStore } from '@/stores/cards';
 import { getCurrentTier, formatBenefit } from '@/services/cardService';
+import { useToast } from '@/composables/useToast';
+import { useConfirmDialog } from '@/composables/useConfirmDialog';
 
 const route = useRoute();
 const router = useRouter();
 const cardsStore = useCardsStore();
+const toast = useToast();
+const confirmDialog = useConfirmDialog();
 
 const isLoading = ref(false);
 
 const card = computed(() => cardsStore.getById(route.params.userCardId));
 
-const tierPercent = computed(() => {
-  if (!card.value || !card.value.targetAmount) return 0;
-  return Math.min((card.value.currentAmount / card.value.targetAmount) * 100, 100);
+const displayLast4 = computed(() => {
+  const value = card.value?.panLast4;
+  if (!value) return '';
+
+  return String(value).replace(/\D/g, '').slice(-4);
 });
 
-const currentTier = computed(() =>
-  card.value?.benefitsInfo ? getCurrentTier(card.value.benefitsInfo, card.value.currentAmount ?? 0) : null
+const performanceTiers = computed(() =>
+    [...(card.value?.benefitsInfo?.performanceTiers ?? [])]
+        .sort((a, b) =>
+            (a.minimumSpending ?? 0) - (b.minimumSpending ?? 0)
+        )
 );
-const tierLabel = computed(() => currentTier.value?.tierName ?? '기본');
+
+// 현재까지 사용한 금액으로 이번 달 현재 구간을 계산합니다.
+const currentTier = computed(() =>
+    card.value?.benefitsInfo
+        ? getCurrentTier(
+            card.value.benefitsInfo,
+            card.value.currentAmount ?? 0
+        )
+        : null
+);
+
+const tierLabel = computed(() =>
+    currentTier.value?.tierName ?? '0구간'
+);
+
+// 현재 사용액보다 기준 금액이 높은 첫 번째 구간을 다음 목표로 정합니다.
+const nextTier = computed(() => {
+  const currentAmount = card.value?.currentAmount ?? 0;
+
+  return performanceTiers.value.find((tier) => (tier.minimumSpending ?? 0) > currentAmount) ?? null;
+});
+
+// 다음 구간의 최소 실적 금액입니다.
+const nextTargetAmount = computed(() =>
+    nextTier.value?.minimumSpending ?? null
+);
+
+// 현재 사용액을 다음 구간 목표 금액과 비교해 진행률을 계산합니다.
+const tierPercent = computed(() => {
+  const currentAmount = card.value?.currentAmount ?? 0;
+  const targetAmount = nextTargetAmount.value;
+
+  // 다음 구간이 없으면 이미 최고 구간입니다.
+  if (targetAmount === null) return 100;
+
+  if (targetAmount === 0) return 100;
+
+  return Math.min((currentAmount / targetAmount) * 100, 100
+  );
+});
+
 const currentTierBenefits = computed(() => currentTier.value?.benefits ?? []);
 
-const isExcludedFromRecommendation = computed(() => card.value && !card.value.recommendationEnabled);
+const isRecommendationEnabled = computed(() => card.value?.recommendationEnabled === true);
 
 onMounted(async () => {
   isLoading.value = true;
-  await cardsStore.fetchCardFullDetail(route.params.userCardId);
-  isLoading.value = false;
+  try {
+    await cardsStore.fetchCardFullDetail(route.params.userCardId);
+  } catch (err) {
+    console.error('카드 상세 조회 실패', err);
+    toast.error('카드 정보를 불러오지 못했습니다.');
+  } finally {
+    isLoading.value = false;
+  }
 });
 
 const handleToggleRecommendation = async () => {
@@ -143,8 +210,8 @@ const handleToggleRecommendation = async () => {
   try {
     await cardsStore.toggleRecommendation(card.value.userCardId);
   } catch (err) {
-    console.error('추천 제외 설정 변경 실패', err.message);
-    alert('설정 변경에 실패했습니다. 다시 시도해주세요.');
+    console.error('추천 카드 설정 변경 실패', err.message);
+    toast.error('설정 변경에 실패했습니다. 다시 시도해주세요.');
   }
 };
 
@@ -154,19 +221,19 @@ const handleSetPrimary = async () => {
     await cardsStore.setPrimary(card.value.userCardId);
   } catch (err) {
     console.error('대표 카드 설정 실패', err.message);
-    alert('대표 카드 설정에 실패했습니다. 다시 시도해주세요.');
+    toast.error('대표 카드 설정에 실패했습니다. 다시 시도해주세요.');
   }
 };
 
 const handleDeleteCard = async () => {
   if (!card.value) return;
-  if (!confirm('이 카드를 삭제할까요? 되돌릴 수 없습니다.')) return;
+  if (!(await confirmDialog.confirm('이 카드를 삭제할까요? 되돌릴 수 없습니다.', { danger: true }))) return;
   try {
     await cardsStore.deleteCard(card.value.userCardId);
     router.push('/cards');
   } catch (err) {
     console.error('카드 삭제 실패', err.message);
-    alert('카드 삭제에 실패했습니다. 다시 시도해주세요.');
+    toast.error('카드 삭제에 실패했습니다. 다시 시도해주세요.');
   }
 };
 </script>
@@ -221,42 +288,63 @@ const handleDeleteCard = async () => {
 }
 .benefit-row + .benefit-row { border-top: 1px solid var(--line, #e7e4de); }
 .benefit-cat { font-weight: 700; flex: 0 0 auto; }
-.benefit-rate { color: var(--orange, #d98d00); font-weight: 700; }
+.benefit-rate { color: var(--dark, #545045); font-weight: 700; }
 
-.exclude-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.exclude-title { margin: 0 0 4px; font-size: 14px; font-weight: 700; color: var(--charcoal, #24211d); }
-.exclude-desc { margin: 0; font-size: 12px; line-height: 1.5; }
-
-.exclude-toggle-btn {
+.recommendation-row {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 6px;
-  padding: 9px 14px;
+  gap: 16px;
+}
+
+.recommendation-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--charcoal, #24211d);
+}
+
+.recommendation-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 추천 카드 ON/OFF 토글 */
+.recommendation-toggle {
+  position: relative;
+  width: 52px;
+  height: 30px;
+  padding: 0;
+  border: none;
   border-radius: 999px;
-  border: 1.5px solid var(--line, #e7e4de);
-  background: var(--surface, #ffffff);
-  color: var(--muted, #8f897f);
-  font-size: 12.5px;
-  font-weight: 800;
+  background: #e8e6e2;
   cursor: pointer;
   flex: 0 0 auto;
-  white-space: nowrap;
-  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition: background 0.2s ease;
 }
-.exclude-toggle-btn--on {
-  border-color: var(--orange, #ffbc00);
-  background: #fff6dd;
-  color: #8a5a00;
-}
-.exclude-toggle-dot {
-  width: 8px;
-  height: 8px;
+
+/* 토글 안의 흰색 원 */
+.recommendation-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--muted, #8f897f);
-  flex: 0 0 auto;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+  transition: transform 0.2s ease;
 }
-.exclude-toggle-btn--on .exclude-toggle-dot {
-  background: var(--orange, #ffbc00);
+
+/* ON 상태 background: var(--dark, #545045);*/
+.recommendation-toggle--on {
+  background: var(--dark, #545045);
+}
+
+/* ON이면 원을 오른쪽으로 이동 */
+.recommendation-toggle--on .recommendation-toggle-knob {
+  transform: translateX(22px);
 }
 
 .primary-badge-row { display: flex; justify-content: center; padding: 10px 0 4px; }

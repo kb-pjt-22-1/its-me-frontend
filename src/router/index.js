@@ -14,7 +14,15 @@ const router = createRouter({
         // guestOnly: 이미 로그인된 사용자가 들어오면 홈으로 돌려보낸다.
         {path: '/login', name: 'login', component: Login, meta: {guestOnly: true}},
         {path: '/signup', name: 'signup', component: Signup, meta: {guestOnly: true}},
-        // 햄버거 메뉴 '개인정보 및 보안'에서 진입 (SidebarMenu.vue)
+        // 헤더 '메뉴' 아이콘에서 진입하는 메뉴 페이지 (Menu.vue). 예전엔 SidebarMenu.vue가
+        // 오버레이(모달)로 떴었는데, 단일 라우트 페이지로 바꿨다.
+        {
+            path: '/menu',
+            name: 'menu',
+            component: () => import('@/pages/Menu.vue'),
+            meta: {requiresAuth: true},
+        },
+        // 메뉴 페이지 '개인정보 및 보안'에서 진입
         {
             path: '/member-profile',
             name: 'member-profile',
@@ -42,6 +50,8 @@ const router = createRouter({
                 {path: '', name: 'home', component: Home},
                 {path: 'map', name: 'map', component: Map},
                 {path: 'pay', name: 'pay', component: Payments},
+                // 결제(pay)와 카드(cards) 사이 하단 탭에 들어가는 혜택 화면
+                {path: 'benefits', name: 'benefits', component: () => import('@/pages/Benefits.vue')},
                 {path: 'cards', name: 'cards', component: Cards},
                 {path: 'bookmarks', name: 'bookmarks', component: () => import('@/pages/Bookmarks.vue')},
             ],

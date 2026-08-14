@@ -1,14 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { useHomeStore } from '@/stores/home'
+import { fetchTodayRecommendation } from '@/services/recommendationService'
+import { fetchExpiringBenefits } from '@/services/benefitService'
 
 const routerMock = { push: vi.fn() }
 vi.mock('vue-router', () => ({
   useRouter: () => routerMock,
 }))
 
+vi.mock('@/services/recommendationService', () => ({
+  fetchTodayRecommendation: vi.fn(),
+}))
+vi.mock('@/services/benefitService', () => ({
+  fetchExpiringBenefits: vi.fn(),
+}))
+
+// 오늘의 추천(onMounted에서 조회)이 실제 네트워크/localStorage를 안 건드리도록 목 처리.
+vi.mock('@/services/merchantsService', async () => {
+  const actual = await vi.importActual('@/services/merchantsService')
+  return {
+    ...actual,
+    fetchTodayRecommendedMerchants: vi.fn().mockResolvedValue([]),
+    fetchMerchantCategories: vi.fn().mockResolvedValue([]),
+  }
+})
+
 import Home from '@/pages/Home.vue'
 import { useCardsStore } from '@/stores/cards'
+import { fetchTodayRecommendedMerchants } from '@/services/merchantsService'
+import { flushPromises } from '@vue/test-utils'
 
 function mountPage(cards) {
   setActivePinia(createPinia())
@@ -19,44 +41,143 @@ function mountPage(cards) {
 }
 
 beforeEach(() => {
+  setActivePinia(createPinia())
   vi.clearAllMocks()
+  routerMock.push.mockClear()
+  window.console.error = vi.fn()
 })
 
-describe('주 사용 카드 실적 프로그레스바', () => {
-  it('목표 금액이 0원이면 100%로 채운다', () => {
-    const { wrapper } = mountPage([
-      { userCardId: 1, isPrimary: true, cardName: '가온 올포인트 체크카드', targetAmount: 0, currentAmount: 0 },
-    ])
+describe('fetchRecommendation', () => {
+  it('성공하면 recommendation을 채우고 로딩/에러를 정리한다', async () => {
+    const store = useHomeStore()
+    fetchTodayRecommendation.mockResolvedValue({ categoryName: '카페', cardName: '청춘대로 톡톡카드' })
 
-    const fill = wrapper.find('.progress-fill')
-    expect(fill.attributes('style')).toContain('width: 100%')
-    expect(wrapper.text()).toContain('목표 0원')
+    const promise = store.fetchRecommendation()
+    expect(store.recommendationLoading).toBe(true)
+    await promise
+
+    expect(store.recommendation).toEqual({ categoryName: '카페', cardName: '청춘대로 톡톡카드' })
+    expect(store.recommendationLoading).toBe(false)
+    expect(store.recommendationError).toBe(false)
   })
 
-  it('실적이 목표의 절반이면 50%로 채우고 남은 금액을 보여준다', () => {
-    const { wrapper } = mountPage([
-      { userCardId: 2, isPrimary: true, cardName: '굿데이 플래티늄카드', targetAmount: 300000, currentAmount: 150000 },
-    ])
+  it('실패하면 recommendationError를 세우고 콘솔에 로그를 남긴다', async () => {
+    const store = useHomeStore()
+    fetchTodayRecommendation.mockRejectedValue(new Error('network error'))
 
-    const fill = wrapper.find('.progress-fill')
-    expect(fill.attributes('style')).toContain('width: 50%')
-    expect(wrapper.text()).toContain('실적 충족까지 150,000원')
+    await store.fetchRecommendation()
+
+    expect(store.recommendationError).toBe(true)
+    expect(store.recommendationLoading).toBe(false)
+    expect(console.error).toHaveBeenCalledWith('[home store] 오늘의 카드 추천 조회 실패', 'network error')
   })
 
-  it('주 사용 카드가 없으면 스켈레톤 문구를 보여주고 프로그레스바는 렌더링하지 않는다', () => {
+  it('재시도 시 이전 에러 상태를 초기화한다', async () => {
+    const store = useHomeStore()
+    fetchTodayRecommendation.mockRejectedValueOnce(new Error('fail'))
+    await store.fetchRecommendation()
+    expect(store.recommendationError).toBe(true)
+
+    fetchTodayRecommendation.mockResolvedValueOnce({ categoryName: '카페' })
+    await store.fetchRecommendation()
+
+    expect(store.recommendationError).toBe(false)
+    expect(store.recommendation).toEqual({ categoryName: '카페' })
+  })
+})
+
+describe('fetchExpiring', () => {
+  it('성공하면 expiring을 채우고 로딩/에러를 정리한다', async () => {
+    const store = useHomeStore()
+    fetchExpiringBenefits.mockResolvedValue({ daysRemaining: 4, expiringBenefits: [], nearbyMerchantBenefits: [] })
+
+    const promise = store.fetchExpiring()
+    expect(store.expiringLoading).toBe(true)
+    await promise
+
+    expect(store.expiring).toEqual({ daysRemaining: 4, expiringBenefits: [], nearbyMerchantBenefits: [] })
+    expect(store.expiringLoading).toBe(false)
+    expect(store.expiringError).toBe(false)
+  })
+
+  it('실패하면 expiringError를 세우고 콘솔에 로그를 남긴다', async () => {
+    const store = useHomeStore()
+    fetchExpiringBenefits.mockRejectedValue(new Error('timeout'))
+
+    await store.fetchExpiring()
+
+    expect(store.expiringError).toBe(true)
+    expect(store.expiringLoading).toBe(false)
+    expect(console.error).toHaveBeenCalledWith('[home store] 놓치기 쉬운 혜택 조회 실패', 'timeout')
+  })
+})
+
+describe('오늘의 추천', () => {
+  it('조회 중에는 로딩 문구를, 결과가 없으면 빈 문구를 보여준다', async () => {
     const { wrapper } = mountPage([])
+    expect(wrapper.text()).toContain('추천 매장을 찾는 중...')
 
-    expect(wrapper.text()).toContain('카드 정보를 불러오는 중...')
-    expect(wrapper.find('.progress-fill').exists()).toBe(false)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('주변에 추천할 매장이 없어요.')
   })
 
-  it('실적이 목표를 충족하면 초록색(progress-fill--met) 클래스가 붙는다', () => {
-    const { wrapper } = mountPage([
-      { userCardId: 3, isPrimary: true, cardName: '마이핏카드', targetAmount: 100000, currentAmount: 100000 },
+  it('혜택 매장은 뱃지와 혜택 요약을, 혜택 없는 매장은 이름/거리만 보여준다', async () => {
+    fetchTodayRecommendedMerchants.mockResolvedValueOnce([
+      {
+        id: 1,
+        name: '커피빈 무교동',
+        categoryCode: '5813',
+        distanceMeters: 135,
+        recommended: true,
+        benefitSummary: '다음 달 기대 25원',
+        recommendedCardName: '굿데이 플래티늄카드',
+      },
+      {
+        id: 2,
+        name: '어떤 편의점',
+        categoryCode: '5499',
+        distanceMeters: 200,
+        recommended: false,
+        benefitSummary: null,
+        recommendedCardName: null,
+      },
     ])
 
-    const fill = wrapper.find('.progress-fill')
-    expect(fill.classes()).toContain('progress-fill--met')
-    expect(wrapper.text()).toContain('전월 실적 충족')
+    const { wrapper } = mountPage([])
+    await flushPromises()
+
+    const cards = wrapper.findAll('.today-recommend-card')
+    expect(cards).toHaveLength(2)
+    expect(cards[0].text()).toContain('커피빈 무교동')
+    expect(cards[0].text()).toContain('혜택 매장')
+    expect(cards[0].text()).toContain('굿데이 플래티늄카드')
+    expect(cards[0].text()).toContain('다음 달 기대 25원')
+    expect(cards[1].text()).toContain('어떤 편의점')
+    expect(cards[1].text()).not.toContain('혜택 매장')
+  })
+
+  it('추천 매장을 클릭하면 매장 상세 페이지 대신, 그 매장이 선택된 채로 지도 화면으로 이동한다', async () => {
+    fetchTodayRecommendedMerchants.mockResolvedValueOnce([
+      {
+        id: 42,
+        name: '맥도날드 을지로1가',
+        categoryCode: '5812',
+        lat: 37.567,
+        lng: 126.995,
+        distanceMeters: 137,
+        recommended: true,
+      },
+    ])
+
+    const { wrapper } = mountPage([])
+    await flushPromises()
+
+    await wrapper.find('.today-recommend-card').trigger('click')
+
+    expect(routerMock.push).toHaveBeenCalledWith({
+      path: '/map',
+      query: { merchantId: 42, lat: 37.567, lng: 126.995 },
+    })
   })
 })

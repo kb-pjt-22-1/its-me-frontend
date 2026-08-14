@@ -4,6 +4,8 @@ import {
   fetchPayableCards,
   fetchRecommendedCard,
   fetchPaymentTokenStatus,
+  completePaymentToken,
+  cancelPaymentToken,
   fetchPaymentHistory,
 } from '@/services/paymentService'
 import { verifyPin as verifyPinRequest } from '@/services/paymentAuthService'
@@ -40,6 +42,21 @@ export const usePaymentStore = defineStore('payment', {
 
     async fetchTokenStatus(paymentTokenId) {
       return fetchPaymentTokenStatus(paymentTokenId)
+    },
+
+    // 결제 완료 - 성공하면 방금 만든 결제 건을 history 맨 앞에 바로 얹어둔다.
+    // (다음에 결제내역/홈 화면 들어갔을 때 새로고침 없이도 바로 보이게)
+    async completePaymentToken(paymentTokenId) {
+      const payment = await completePaymentToken(paymentTokenId)
+      this.currentToken = null
+      this.history = [payment, ...this.history]
+      return payment
+    },
+
+    async cancelPaymentToken(paymentTokenId) {
+      const result = await cancelPaymentToken(paymentTokenId)
+      this.currentToken = null
+      return result
     },
 
     async fetchHistory(params) {

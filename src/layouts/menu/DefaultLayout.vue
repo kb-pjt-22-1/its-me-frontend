@@ -3,7 +3,15 @@
   <div class="layout-container">
     <Header />
     <main class="main-content">
-      <router-view /> <!-- 여기가 Home.vue 등이 들어오는 곳 -->
+      <!-- 홈/지도/결제/혜택/카드 등 탭 사이를 이동할 때, 헤더/하단바는 그대로 두고
+           이 안의 내용만 페이드됩니다 (main.css의 .page-fade-* 참고). -->
+      <router-view v-slot="{ Component, route }">
+        <transition name="page-fade">
+          <div :key="route.path" class="route-transition-wrap">
+            <component :is="Component" />
+          </div>
+        </transition>
+      </router-view>
     </main>
     <Footer />
   </div>
@@ -27,17 +35,18 @@ import Footer from './Footer.vue'
 }
 
 /* 2. 본문 영역 - 지도 화면과 같은 방식: 부모의 flex/overflow 계산에 기대지 않고
-   화면(뷰포트) 기준으로 헤더 아래(60px)부터 하단바 위(60px)까지 직접 고정합니다.
+   화면(뷰포트) 기준으로 헤더 아래(52px)부터 하단바 위(60px)까지 직접 고정합니다.
    이 안에서만 스크롤되고, 헤더/하단바는 항상 그 자리에 고정되어 있습니다. */
 .main-content {
   position: fixed;
-  top: 60px;
+  top: 52px;
   bottom: 60px;
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
   max-width: 440px;
   overflow-y: auto;
+  overflow-x: hidden; /* 탭 전환 슬라이드 애니메이션이 440px 밖으로 새어나가지 않도록 */
   color: var(--foreground);
 }
 </style>

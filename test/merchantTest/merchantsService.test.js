@@ -12,16 +12,11 @@ vi.mock('@/api', () => ({
 import api from '@/api/index.js'
 import {
   fetchMerchantList,
-  fetchNearbyMerchants,
-  fetchMerchantsWithinBounds,
-  searchMerchants,
+  fetchRecommendedNearbyMerchants,
+  fetchTodayRecommendedMerchants,
   fetchMerchantDetail,
-  createMerchant,
-  updateMerchant,
-  deleteMerchant,
   fetchMerchantCategories,
   fetchMerchantBrands,
-  getCategoryEmoji,
 } from '@/services/merchantsService.js'
 
 const rawMerchant = {
@@ -63,50 +58,88 @@ describe('fetchMerchantList', () => {
   })
 })
 
-describe('fetchNearbyMerchants', () => {
-  it('lat/lng와 함께 요청하고 기본 radiusMeters(1000)를 사용한다', async () => {
-    api.get.mockResolvedValueOnce({ data: [{ ...rawMerchant, distanceMeters: 250 }] })
-
-    const result = await fetchNearbyMerchants(37.5, 127.0)
-
-    expect(api.get).toHaveBeenCalledWith('/v1/merchants/nearby', {
-      params: { lat: 37.5, lng: 127.0, radiusMeters: 1000 },
+describe('fetchRecommendedNearbyMerchants', () => {
+  it('bounds 네 좌표와 center를 params로 넘기고, benefitAvailable을 recommended로 매핑해 정규화해서 반환한다', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [{
+        ...rawMerchant,
+        benefitAvailable: true,
+        benefitSummary: '이번 달 확정 100원',
+        recommendedCardName: '테스트카드',
+      }],
     })
-    expect(result).toEqual([{ ...normalizedMerchant, distanceMeters: 250 }])
+
+    const result = await fetchRecommendedNearbyMerchants(
+      { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 },
+      { lat: 37.5, lng: 127.1 },
+    )
+
+    expect(api.get).toHaveBeenCalledWith('/v1/merchants/recommendations', {
+      params: {
+        swLat: 37.4,
+        swLng: 127.0,
+        neLat: 37.6,
+        neLng: 127.2,
+        centerLat: 37.5,
+        centerLng: 127.1,
+        categoryCode: undefined,
+      },
+    })
+    expect(result).toEqual([{
+      ...normalizedMerchant,
+      recommended: true,
+      benefitSummary: '이번 달 확정 100원',
+      recommendedCardName: '테스트카드',
+    }])
   })
 
-  it('radiusMeters를 명시하면 해당 값을 그대로 사용한다', async () => {
+  it('categoryCode를 넘기면 그대로 params에 포함한다', async () => {
     api.get.mockResolvedValueOnce({ data: [] })
 
-    await fetchNearbyMerchants(37.5, 127.0, 500)
+    await fetchRecommendedNearbyMerchants(
+      { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 },
+      { lat: 37.5, lng: 127.1 },
+      '5812',
+    )
 
-    expect(api.get).toHaveBeenCalledWith('/v1/merchants/nearby', {
-      params: { lat: 37.5, lng: 127.0, radiusMeters: 500 },
+    expect(api.get).toHaveBeenCalledWith('/v1/merchants/recommendations', {
+      params: {
+        swLat: 37.4,
+        swLng: 127.0,
+        neLat: 37.6,
+        neLng: 127.2,
+        centerLat: 37.5,
+        centerLng: 127.1,
+        categoryCode: '5812',
+      },
     })
   })
 })
 
-describe('fetchMerchantsWithinBounds', () => {
-  it('bounds 네 좌표를 params로 넘기고 결과를 정규화해서 반환한다', async () => {
-    api.get.mockResolvedValueOnce({ data: [rawMerchant] })
-
-    const result = await fetchMerchantsWithinBounds({ swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 })
-
-    expect(api.get).toHaveBeenCalledWith('/v1/merchants/within-bounds', {
-      params: { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 },
+describe('fetchTodayRecommendedMerchants', () => {
+  it('lat/lng/categoryCode를 params로 넘기고, distanceMeters와 benefitAvailable을 정규화해서 반환한다', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [{
+        ...rawMerchant,
+        distanceMeters: 250,
+        benefitAvailable: true,
+        benefitSummary: '이번 달 확정 100원',
+        recommendedCardName: '테스트카드',
+      }],
     })
-    expect(result).toEqual([normalizedMerchant])
-  })
-})
 
-describe('searchMerchants', () => {
-  it('검색어를 q 파라미터로 넘기고 결과를 정규화해서 반환한다', async () => {
-    api.get.mockResolvedValueOnce({ data: [rawMerchant] })
+    const result = await fetchTodayRecommendedMerchants(37.5, 127.0, '5812')
 
-    const result = await searchMerchants('스타벅스')
-
-    expect(api.get).toHaveBeenCalledWith('/v1/merchants/search', { params: { q: '스타벅스' } })
-    expect(result).toEqual([normalizedMerchant])
+    expect(api.get).toHaveBeenCalledWith('/v1/merchants/today-recommendation', {
+      params: { lat: 37.5, lng: 127.0, categoryCode: '5812' },
+    })
+    expect(result).toEqual([{
+      ...normalizedMerchant,
+      distanceMeters: 250,
+      recommended: true,
+      benefitSummary: '이번 달 확정 100원',
+      recommendedCardName: '테스트카드',
+    }])
   })
 })
 
@@ -118,41 +151,6 @@ describe('fetchMerchantDetail', () => {
 
     expect(api.get).toHaveBeenCalledWith('/v1/merchants/5')
     expect(result).toEqual(normalizedMerchant)
-  })
-})
-
-describe('createMerchant', () => {
-  it('payload로 매장을 생성하고 정규화된 결과를 반환한다', async () => {
-    const payload = { categoryCode: '5812', merchantName: '새 매장' }
-    api.post.mockResolvedValueOnce({ data: rawMerchant })
-
-    const result = await createMerchant(payload)
-
-    expect(api.post).toHaveBeenCalledWith('/v1/merchants', payload)
-    expect(result).toEqual(normalizedMerchant)
-  })
-})
-
-describe('updateMerchant', () => {
-  it('merchantId로 매장을 수정하고 정규화된 결과를 반환한다', async () => {
-    const payload = { merchantName: '수정된 이름' }
-    api.put.mockResolvedValueOnce({ data: rawMerchant })
-
-    const result = await updateMerchant(5, payload)
-
-    expect(api.put).toHaveBeenCalledWith('/v1/merchants/5', payload)
-    expect(result).toEqual(normalizedMerchant)
-  })
-})
-
-describe('deleteMerchant', () => {
-  it('merchantId로 매장을 삭제하고 true를 반환한다', async () => {
-    api.delete.mockResolvedValueOnce({})
-
-    const result = await deleteMerchant(5)
-
-    expect(api.delete).toHaveBeenCalledWith('/v1/merchants/5')
-    expect(result).toBe(true)
   })
 })
 
@@ -177,18 +175,5 @@ describe('fetchMerchantBrands', () => {
 
     expect(api.get).toHaveBeenCalledWith('/v1/merchant-brands')
     expect(result).toEqual(brands)
-  })
-})
-
-describe('getCategoryEmoji', () => {
-  it('알려진 카테고리 코드는 매핑된 이모지를 반환한다', () => {
-    expect(getCategoryEmoji('5812')).toBe('🍽️')
-    expect(getCategoryEmoji('5813')).toBe('☕')
-    expect(getCategoryEmoji('5912')).toBe('💊')
-  })
-
-  it('알 수 없는 카테고리 코드는 기본 이모지(📍)를 반환한다', () => {
-    expect(getCategoryEmoji('9999')).toBe('📍')
-    expect(getCategoryEmoji(undefined)).toBe('📍')
   })
 })
