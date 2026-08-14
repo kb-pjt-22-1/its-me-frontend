@@ -206,6 +206,13 @@ async function handleDevLogin() {
   display: grid;
   gap: 12px;
 }
+/* grid item의 기본 min-width는 auto라 내용(아이콘+텍스트) 크기 밑으로 못 줄어든다 -
+   실기기 좁은 화면에서 이 최소 크기가 grid 컨테이너 폭을 넘기면 폼/버튼이 옆으로
+   넘쳐버린다(가로 스크롤 발생). 0으로 풀어서 위 .input-box/input의 flex:1;min-width:0가
+   실제로 줄어들 수 있게 한다. */
+.login-form > * {
+  min-width: 0;
+}
 
 .input-box {
   height: 55px;

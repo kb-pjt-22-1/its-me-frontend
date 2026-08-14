@@ -255,6 +255,11 @@ async function handleSignUp() {
   display: grid;
   gap: 12px;
 }
+/* grid item 기본 min-width:auto 때문에 좁은 화면에서 폼/버튼이 옆으로 넘칠 수 있다 -
+   Login.vue의 .login-form과 같은 이유로 0으로 풀어준다. */
+.signup-form > * {
+  min-width: 0;
+}
 
 .input-box {
   height: 55px;

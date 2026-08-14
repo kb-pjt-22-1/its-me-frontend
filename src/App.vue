@@ -35,6 +35,12 @@
         </router-view>
       </main>
     </template>
+
+    <!-- alert()/confirm() 대체용 전역 UI. 스플래시/본문 양쪽의 형제로 무조건 렌더링해야
+         /login, /cards/:id처럼 DefaultLayout 밖의 단독 라우트에서도 동작하고,
+         router-view 바깥이라 "토스트 띄우고 바로 navigate"해도 화면 전환에 안 딸려간다. -->
+    <ToastHost />
+    <ConfirmDialogHost />
   </div>
 </template>
 
@@ -48,6 +54,8 @@ import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
 import { useBookmarksStore } from '@/stores/bookmarks';
 import { usePaymentStore } from '@/stores/payment';
+import ToastHost from '@/components/common/ToastHost.vue';
+import ConfirmDialogHost from '@/components/common/ConfirmDialogHost.vue';
 
 const authStore = useAuthStore();
 const cardsStore = useCardsStore();

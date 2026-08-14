@@ -13,6 +13,11 @@ vi.mock('@/services/memberService', () => ({
   updatePin: vi.fn(),
 }))
 
+const { mockToastSuccess } = vi.hoisted(() => ({ mockToastSuccess: vi.fn() }))
+vi.mock('@/composables/useToast', () => ({
+  useToast: () => ({ success: mockToastSuccess, error: vi.fn(), info: vi.fn() }),
+}))
+
 import Pinsetting from '@/pages/Pinsetting.vue'
 import { getMyProfile, registerPin, updatePin } from '@/services/memberService'
 
@@ -34,7 +39,6 @@ async function pressDigits(wrapper, digits) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  window.alert = vi.fn()
 })
 
 describe('최초 등록 흐름 (pinRegistered: false)', () => {
@@ -61,6 +65,7 @@ describe('최초 등록 흐름 (pinRegistered: false)', () => {
 
     expect(registerPin).toHaveBeenCalledWith('481027')
     expect(updatePin).not.toHaveBeenCalled()
+    expect(mockToastSuccess).toHaveBeenCalledWith('간편 비밀번호가 설정되었어요.')
     expect(routerMock.replace).toHaveBeenCalledWith({ name: 'home' })
     expect(routerMock.back).not.toHaveBeenCalled()
   })
@@ -138,6 +143,7 @@ describe('변경 흐름 (pinRegistered: true)', () => {
 
     expect(updatePin).toHaveBeenCalledWith('111111', '481027')
     expect(registerPin).not.toHaveBeenCalled()
+    expect(mockToastSuccess).toHaveBeenCalledWith('간편 비밀번호가 설정되었어요.')
     expect(routerMock.back).toHaveBeenCalled()
     expect(routerMock.replace).not.toHaveBeenCalled()
   })

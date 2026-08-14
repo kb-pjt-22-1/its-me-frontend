@@ -17,8 +17,14 @@ vi.mock('@/services/merchantsService', async () => {
   }
 })
 
+const { mockToastError } = vi.hoisted(() => ({ mockToastError: vi.fn() }))
+vi.mock('@/composables/useToast', () => ({
+  useToast: () => ({ success: vi.fn(), error: mockToastError, info: vi.fn() }),
+}))
+
 import MapPage from '@/pages/Map.vue'
 import { useMerchantsStore } from '@/stores/merchants'
+import { useBookmarksStore } from '@/stores/bookmarks'
 import { fetchRecommendedNearbyMerchants, fetchMerchantCategories } from '@/services/merchantsService'
 
 // 카카오맵 SDK 대신 Marker/MarkerClusterer 생성과 이벤트 등록을 가로채서 검증하기 위한 최소 mock.
@@ -159,6 +165,7 @@ const MANY_MERCHANTS = Array.from({ length: 12 }, (_, i) => ({
 beforeEach(() => {
   setActivePinia(createPinia())
   routerMock.push.mockClear()
+  mockToastError.mockClear()
   fetchRecommendedNearbyMerchants.mockReset().mockResolvedValue([])
   fetchMerchantCategories.mockReset().mockResolvedValue(CATEGORIES)
 })
@@ -601,6 +608,44 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
 
     expect(routerMock.push).not.toHaveBeenCalled()
     expect(wrapper.find('.store-name').text()).toBe('동네 카페')
+  })
+})
+
+describe('북마크 토글 실패 처리', () => {
+  it('addBookmark가 실패하면 에러를 로깅하고 에러 토스트를 띄운다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
+    window.console.error = vi.fn()
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const bookmarksStore = useBookmarksStore()
+    vi.spyOn(bookmarksStore, 'addBookmark').mockRejectedValueOnce(new Error('network down'))
+
+    await wrapper.find('.sheet-bookmark').trigger('click')
+    await flushPromises()
+
+    expect(console.error).toHaveBeenCalledWith('북마크 처리 실패', 'network down')
+    expect(mockToastError).toHaveBeenCalledWith('북마크 처리에 실패했습니다. 다시 시도해주세요.')
+  })
+
+  it('addBookmark가 성공하면 에러 토스트를 띄우지 않는다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const bookmarksStore = useBookmarksStore()
+    const addSpy = vi.spyOn(bookmarksStore, 'addBookmark').mockResolvedValueOnce()
+
+    await wrapper.find('.sheet-bookmark').trigger('click')
+    await flushPromises()
+
+    expect(addSpy).toHaveBeenCalledTimes(1)
+    expect(addSpy.mock.calls[0][0]).toMatchObject({ id: CAFE_MERCHANT.id })
+    expect(mockToastError).not.toHaveBeenCalled()
   })
 })
 

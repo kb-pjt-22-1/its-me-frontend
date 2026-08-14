@@ -53,6 +53,9 @@
   box-sizing: border-box;
   margin: 0;
   font-weight: normal;
+  /* 안드로이드 Chrome이 터치 요소를 탭할 때 기본으로 씌우는 파란 하이라이트 박스 -
+     :focus-visible 아웃라인과는 별개 속성이라 그것만으로는 안 없어진다. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 html, body, #app { margin: 0; min-height: 100%; }

@@ -55,9 +55,11 @@ import { useBookmarksStore } from '@/stores/bookmarks';
 import { useMerchantsStore } from '@/stores/merchants';
 import { useCardsStore } from '@/stores/cards';
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService';
+import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
 const bookmarksStore = useBookmarksStore();
+const toast = useToast();
 const merchantsStore = useMerchantsStore();
 const cardsStore = useCardsStore();
 
@@ -106,7 +108,7 @@ const handleRemove = async (merchantId) => {
     await bookmarksStore.removeBookmark(merchantId);
   } catch (err) {
     console.error('북마크 해제 실패', err.message);
-    alert('북마크 해제에 실패했습니다. 다시 시도해주세요.');
+    toast.error('북마크 해제에 실패했습니다. 다시 시도해주세요.');
   }
 };
 </script>

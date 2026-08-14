@@ -123,9 +123,11 @@ import { verifyPin } from '@/services/paymentAuthService';
 import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService';
+import { useToast } from '@/composables/useToast';
 
 const route = useRoute();
 const cardsStore = useCardsStore();
+const toast = useToast();
 const merchantsStore = useMerchantsStore();
 
 const isAuthenticated = ref(false);
@@ -218,7 +220,7 @@ const checkPin = async () => {
 };
 
 const completePayment = () => {
-  alert('결제가 완료되었습니다!');
+  toast.success('결제가 완료되었습니다!');
   isAuthenticated.value = false;
 };
 
