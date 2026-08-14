@@ -235,8 +235,8 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     const { kakao, getClusterer } = createKakaoMock()
     window.kakao = kakao
     fetchMerchantBrands.mockResolvedValue([
-      { brandId: 1, brandCode: 'STARBUCKS', brandName: '스타벅스', brandLogo: 'Brands/starbucks.png' },
-      { brandId: 2, brandCode: 'NO_LOCAL_LOGO', brandName: '로고 파일 없는 브랜드', brandLogo: 'Brands/no-such-file.png' },
+      { brandId: 1, brandCode: 'STARBUCKS', brandName: '스타벅스', brandLogo: '/Brands/starbucks.png' }, // 인프라 쪽은 앞 슬래시를 붙여서 저장한다
+      { brandId: 2, brandCode: 'NO_LOCAL_LOGO', brandName: '로고 파일 없는 브랜드', brandLogo: '/Brands/no-such-file.png' },
     ])
     fetchRecommendedNearbyMerchants.mockResolvedValue([
       { ...CAFE_MERCHANT, brandId: 1 }, // src/images/Brands/starbucks.png와 매칭
