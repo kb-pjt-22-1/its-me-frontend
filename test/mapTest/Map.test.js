@@ -560,6 +560,33 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     }
   })
 
+  it('"내 위치로 이동" 버튼을 누르면 현재 위치로 지도 중심을 옮긴다', async () => {
+    const originalGeolocation = navigator.geolocation
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success) => success({ coords: { latitude: 37.1234, longitude: 127.5678 } }),
+      },
+    })
+
+    try {
+      const { kakao, mapInstance } = createKakaoMock()
+      window.kakao = kakao
+
+      const wrapper = mountMapPage()
+      await flushPromises()
+
+      await wrapper.find('.locate-btn').trigger('click')
+
+      expect(mapInstance.panTo).toHaveBeenCalledTimes(1)
+      const center = mapInstance.panTo.mock.calls[0][0]
+      expect(center.lat).toBe(37.1234)
+      expect(center.lng).toBe(127.5678)
+    } finally {
+      Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
+    }
+  })
+
   it('recommended=true면 목록에서도 혜택 매장 pill로 보여주고, 아니면 pill을 그리지 않는다', async () => {
     window.kakao = createKakaoMock().kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([
