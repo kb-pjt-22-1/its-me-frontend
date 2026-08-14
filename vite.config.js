@@ -42,6 +42,15 @@ export default defineConfig({
             provider: 'v8',
             reporter: ['text', 'lcov'],
             reportsDirectory: './coverage',
+            // 소나큐브 sonar.coverage.exclusions와 맞춘다 - 로컬 커버리지 리포트가
+            // 소나큐브가 보는 숫자와 어긋나지 않도록. 이유는 sonar-project.properties 주석 참고.
+            exclude: [
+                'src/config/index.js',
+                'src/stores/counter.js',
+                'src/layouts/menu/NavBar.vue',
+                'src/layouts/menu/DefaultLayout.vue',
+                'src/components/common/PageContainer.vue',
+            ],
         },
     },
 })
