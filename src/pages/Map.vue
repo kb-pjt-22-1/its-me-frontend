@@ -198,6 +198,7 @@ import { useBookmarksStore } from '@/stores/bookmarks'
 import { useCardsStore } from '@/stores/cards'
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
 import { getBrandImage } from '@/utils/brandImages'
+import { toDataUri } from '@/utils/imageDataUri'
 import { fetchRecommendedNearbyMerchants } from '@/services/merchantsService'
 import { useToast } from '@/composables/useToast'
 
@@ -643,13 +644,15 @@ async function loadBoundsMerchants() {
 // 나머지 매장도 똑같이 핀은 그려지고, 강조만 빠집니다(필터링이 아니라 하이라이트).
 const PIN_WIDTH = 32
 const PIN_HEIGHT = 40
-function buildMerchantMarkerImage(kakao, merchant) {
+// iconDataUri는 base64로 인코딩된 data URI만 받습니다(외부/절대 URL이 아님) - 브라우저가
+// <img src="data:image/svg+xml,...">로 쓰이는 SVG 안에서는 <image href="외부 URL">가
+// 가리키는 이미지를 보안상 아예 안 불러오기 때문에(같은 오리진이어도), 미리 fetch해서
+// base64로 SVG 안에 통째로 박아 넣어야 실제로 보입니다. createMerchantMarker 참고.
+function buildMerchantMarkerImage(kakao, merchant, iconDataUri) {
   const recommended = !!merchant.recommended
   const borderColor = recommended ? '#ffbc00' : '#8f897f'
   const glow = recommended ? '<circle cx="16" cy="15" r="15" fill="#ffbc00" fill-opacity="0.22"/>' : ''
-  const iconTag = merchant.displayImage
-    ? `<image href="${merchant.displayImage}" x="9" y="8" width="14" height="14"/>`
-    : ''
+  const iconTag = iconDataUri ? `<image href="${iconDataUri}" x="9" y="8" width="14" height="14"/>` : ''
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_WIDTH}" height="${PIN_HEIGHT}" viewBox="0 0 32 40">` +
     glow +
@@ -663,14 +666,24 @@ function buildMerchantMarkerImage(kakao, merchant) {
 }
 
 function createMerchantMarker(kakao, merchant) {
+  // 아이콘 없이(또는 이전에 캐시된 데이터 URI로) 먼저 핀을 그려서 지도가 이미지 로딩을
+  // 기다리며 멈추지 않게 하고, 실제 아이콘은 base64 변환이 끝나는 대로 setImage로 교체합니다.
   const marker = new kakao.maps.Marker({
     position: new kakao.maps.LatLng(merchant.lat, merchant.lng),
-    image: buildMerchantMarkerImage(kakao, merchant),
+    image: buildMerchantMarkerImage(kakao, merchant, null),
     title: merchant.name ?? '',
   })
   // 클러스터 클릭 시 그 안에 뭉친 매장이 무엇인지 되짚어 찾기 위해 마커에 직접 붙여둡니다.
   marker.merchantRef = merchant
   kakao.maps.event.addListener(marker, 'click', () => selectMerchant(merchant.id))
+
+  if (merchant.displayImage) {
+    toDataUri(merchant.displayImage).then((dataUri) => {
+      if (!dataUri) return
+      marker.setImage(buildMerchantMarkerImage(kakao, merchant, dataUri))
+    })
+  }
+
   return marker
 }
 
