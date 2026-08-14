@@ -144,15 +144,19 @@ describe('이번 달 이용실적 구간', () => {
   })
 })
 
-describe('추천 카드 제외 토글 실패 처리', () => {
+describe('추천 카드 포함 토글 실패 처리', () => {
   it('toggleRecommendation이 실패하면 에러를 로깅하고 알림을 표시한다', async () => {
     const { wrapper, cardsStore } = await mountPage()
     vi.spyOn(cardsStore, 'toggleRecommendation').mockRejectedValueOnce(new Error('locked'))
 
-    await wrapper.find('.exclude-toggle-btn').trigger('click')
+    const toggle = wrapper.find('.recommendation-toggle')
+
+    expect(toggle.exists()).toBe(true)
+
+    await toggle.trigger('click')
     await flushPromises()
 
-    expect(console.error).toHaveBeenCalledWith('추천 제외 설정 변경 실패', 'locked')
+    expect(console.error).toHaveBeenCalledWith('추천 카드 설정 변경 실패', 'locked')
     expect(mockToastError).toHaveBeenCalledWith('설정 변경에 실패했습니다. 다시 시도해주세요.')
   })
 })
