@@ -205,52 +205,70 @@ describe('fetchAiCoaching', () => {
 
 describe('fetchBenefitLimits', () => {
   it('yearMonth 없이 호출하면 파라미터 없이 요청한다', async () => {
-    api.get.mockResolvedValue({ data: { categories: [] } })
+    api.get.mockResolvedValue({ data: [] })
 
     await fetchBenefitLimits()
 
-    expect(api.get).toHaveBeenCalledWith('/v1/benefits/limits', { params: undefined })
+    expect(api.get).toHaveBeenCalledWith('/v1/benefits/category-status', { params: undefined })
   })
 
   it("yearMonth를 넘기면 'yyyyMM' 형식으로 변환해서 보낸다", async () => {
-    api.get.mockResolvedValue({ data: { categories: [] } })
+    api.get.mockResolvedValue({ data: [] })
 
     await fetchBenefitLimits('2026-08')
 
-    expect(api.get).toHaveBeenCalledWith('/v1/benefits/limits', { params: { yearMonth: '202608' } })
+    expect(api.get).toHaveBeenCalledWith('/v1/benefits/category-status', { params: { yearMonth: '202608' } })
   })
 
-  it('카테고리별 사용/한도를 정규화하고, 알려진 카테고리명은 이모지를 매핑한다', async () => {
+  it('카드+카테고리+혜택 단위 응답을 정규화하고, 알려진 카테고리명은 이모지를 매핑한다', async () => {
     api.get.mockResolvedValue({
-      data: {
-        categories: [
-          { categoryCode: 'FOOD', categoryName: '음식점', usedAmount: 7500, limitAmount: 15000 },
-          { categoryCode: 'CAFE', categoryName: '카페', usedAmount: 8000, limitAmount: 10000 },
-        ],
-      },
+      data: [
+        {
+          userCardId: 123, cardId: 45, cardName: '청춘대로 톡톡카드', cardImageUrl: 'https://img',
+          yearMonth: '2026-08', categoryCode: '5813', categoryName: '카페', serviceName: '카페 5% 청구할인',
+          amountLimit: 30000, usedAmount: 12000, remainingAmount: 18000, amountLimitReached: false,
+          countLimit: 5, usedCount: 3, remainingCount: 2, countLimitReached: false,
+        },
+      ],
     })
 
     const result = await fetchBenefitLimits()
 
-    expect(result).toEqual([
-      { category: '음식점', categoryCode: 'FOOD', icon: '🍽️', used: 7500, limit: 15000 },
-      { category: '카페', categoryCode: 'CAFE', icon: '☕', used: 8000, limit: 10000 },
-    ])
+    expect(result).toEqual([{
+      key: '123-5813-카페 5% 청구할인',
+      userCardId: 123,
+      cardName: '청춘대로 톡톡카드',
+      serviceName: '카페 5% 청구할인',
+      category: '카페',
+      categoryCode: '5813',
+      icon: '☕',
+      used: 12000,
+      limit: 30000,
+      remaining: 18000,
+      limitReached: false,
+      countLimit: 5,
+      usedCount: 3,
+      remainingCount: 2,
+      countLimitReached: false,
+    }])
   })
 
-  it('배열을 바로 응답으로 줘도(categories로 안 감싸도) 처리한다', async () => {
+  it('같은 categoryCode가 카드/혜택별로 여러 번 나오면 각각 다른 key를 만든다', async () => {
     api.get.mockResolvedValue({
-      data: [{ categoryCode: 'CVS', categoryName: '편의점', usedAmount: 100, limitAmount: 200 }],
+      data: [
+        { userCardId: 1, categoryCode: 'CAFE', categoryName: '카페', serviceName: '혜택A', usedAmount: 0, amountLimit: null, remainingAmount: null, amountLimitReached: false, countLimit: null, usedCount: 0, remainingCount: null, countLimitReached: false },
+        { userCardId: 2, categoryCode: 'CAFE', categoryName: '카페', serviceName: '혜택B', usedAmount: 0, amountLimit: null, remainingAmount: null, amountLimitReached: false, countLimit: null, usedCount: 0, remainingCount: null, countLimitReached: false },
+      ],
     })
 
     const result = await fetchBenefitLimits()
 
-    expect(result).toEqual([{ category: '편의점', categoryCode: 'CVS', icon: '🏪', used: 100, limit: 200 }])
+    expect(result[0].key).not.toBe(result[1].key)
   })
 
   it('알 수 없는 카테고리명은 기본 이모지(🎁)를 쓴다', async () => {
     api.get.mockResolvedValue({
-      data: { categories: [{ categoryCode: 'ETC', categoryName: '알수없는카테고리', usedAmount: 0, limitAmount: 0 }] },
+      data: [{ userCardId: 1, categoryCode: 'ETC', categoryName: '알수없는카테고리', usedAmount: 0, amountLimit: null }],
     })
 
     const result = await fetchBenefitLimits()
@@ -258,13 +276,33 @@ describe('fetchBenefitLimits', () => {
     expect(result[0].icon).toBe('🎁')
   })
 
-  it('금액 필드가 없으면 0으로 처리한다', async () => {
-    api.get.mockResolvedValue({ data: { categories: [{ categoryCode: 'CAFE', categoryName: '카페' }] } })
+  it('amountLimit/countLimit이 null이면(한도 없음) limit/remaining/countLimit/remainingCount를 null로 유지한다', async () => {
+    api.get.mockResolvedValue({
+      data: [{
+        userCardId: 1, categoryCode: 'CAFE', categoryName: '카페', serviceName: '혜택A',
+        usedAmount: 5000, amountLimit: null, remainingAmount: null, amountLimitReached: false,
+        countLimit: null, usedCount: 2, remainingCount: null, countLimitReached: false,
+      }],
+    })
+
+    const result = await fetchBenefitLimits()
+
+    expect(result[0].limit).toBeNull()
+    expect(result[0].remaining).toBeNull()
+    expect(result[0].countLimit).toBeNull()
+    expect(result[0].remainingCount).toBeNull()
+    expect(result[0].limitReached).toBe(false)
+  })
+
+  it('사용 금액/횟수 필드가 없으면 0으로 처리한다', async () => {
+    api.get.mockResolvedValue({
+      data: [{ userCardId: 1, categoryCode: 'CAFE', categoryName: '카페' }],
+    })
 
     const result = await fetchBenefitLimits()
 
     expect(result[0].used).toBe(0)
-    expect(result[0].limit).toBe(0)
+    expect(result[0].usedCount).toBe(0)
   })
 })
 
