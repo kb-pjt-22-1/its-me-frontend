@@ -110,10 +110,14 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useCardsStore } from '@/stores/cards';
 import { getCurrentTier, formatBenefit } from '@/services/cardService';
+import { useToast } from '@/composables/useToast';
+import { useConfirmDialog } from '@/composables/useConfirmDialog';
 
 const route = useRoute();
 const router = useRouter();
 const cardsStore = useCardsStore();
+const toast = useToast();
+const confirmDialog = useConfirmDialog();
 
 const isLoading = ref(false);
 
@@ -144,7 +148,7 @@ const handleToggleRecommendation = async () => {
     await cardsStore.toggleRecommendation(card.value.userCardId);
   } catch (err) {
     console.error('추천 제외 설정 변경 실패', err.message);
-    alert('설정 변경에 실패했습니다. 다시 시도해주세요.');
+    toast.error('설정 변경에 실패했습니다. 다시 시도해주세요.');
   }
 };
 
@@ -154,19 +158,19 @@ const handleSetPrimary = async () => {
     await cardsStore.setPrimary(card.value.userCardId);
   } catch (err) {
     console.error('대표 카드 설정 실패', err.message);
-    alert('대표 카드 설정에 실패했습니다. 다시 시도해주세요.');
+    toast.error('대표 카드 설정에 실패했습니다. 다시 시도해주세요.');
   }
 };
 
 const handleDeleteCard = async () => {
   if (!card.value) return;
-  if (!confirm('이 카드를 삭제할까요? 되돌릴 수 없습니다.')) return;
+  if (!(await confirmDialog.confirm('이 카드를 삭제할까요? 되돌릴 수 없습니다.', { danger: true }))) return;
   try {
     await cardsStore.deleteCard(card.value.userCardId);
     router.push('/cards');
   } catch (err) {
     console.error('카드 삭제 실패', err.message);
-    alert('카드 삭제에 실패했습니다. 다시 시도해주세요.');
+    toast.error('카드 삭제에 실패했습니다. 다시 시도해주세요.');
   }
 };
 </script>

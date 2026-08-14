@@ -56,8 +56,10 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { getMyProfile, registerPin, updatePin } from '@/services/memberService';
+import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
+const toast = useToast();
 
 // getMyProfile()로 PIN이 이미 등록돼 있는지 확인하기 전엔 어떤 흐름을 보여줄지 알 수 없다.
 // pinHash 자체는 응답에 안 담기니(UserResponseDto 참고) 있냐/없냐만 본다.
@@ -182,7 +184,7 @@ async function submitNewPin() {
     } else {
       await registerPin(firstPin.value);
     }
-    alert('간편 비밀번호가 설정되었어요.');
+    toast.success('간편 비밀번호가 설정되었어요.');
     // 최초 설정 흐름은 로그인 직후라 뒤로 갈 곳이 로그인 화면뿐이라 홈으로 보낸다.
     // 변경 흐름은 사이드 메뉴에서 들어왔으니 원래 있던 곳으로 돌아간다.
     if (pinAlreadyRegistered.value) {

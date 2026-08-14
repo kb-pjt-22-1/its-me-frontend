@@ -7,6 +7,11 @@ vi.mock('vue-router', () => ({
   useRouter: () => routerMock,
 }))
 
+const { mockToastError } = vi.hoisted(() => ({ mockToastError: vi.fn() }))
+vi.mock('@/composables/useToast', () => ({
+  useToast: () => ({ success: vi.fn(), error: mockToastError, info: vi.fn() }),
+}))
+
 import Bookmarks from '@/pages/Bookmarks.vue'
 import { useBookmarksStore } from '@/stores/bookmarks'
 
@@ -20,7 +25,6 @@ function mountPage() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  window.alert = vi.fn()
   window.console.error = vi.fn()
 })
 
@@ -33,7 +37,7 @@ describe('북마크 해제 실패 처리', () => {
     await flushPromises()
 
     expect(console.error).toHaveBeenCalledWith('북마크 해제 실패', 'network down')
-    expect(window.alert).toHaveBeenCalledWith('북마크 해제에 실패했습니다. 다시 시도해주세요.')
+    expect(mockToastError).toHaveBeenCalledWith('북마크 해제에 실패했습니다. 다시 시도해주세요.')
   })
 
   it('removeBookmark가 성공하면 알림을 띄우지 않는다', async () => {
@@ -43,6 +47,6 @@ describe('북마크 해제 실패 처리', () => {
     await wrapper.find('.bookmark-badge').trigger('click')
     await flushPromises()
 
-    expect(window.alert).not.toHaveBeenCalled()
+    expect(mockToastError).not.toHaveBeenCalled()
   })
 })
