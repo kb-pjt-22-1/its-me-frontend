@@ -175,10 +175,14 @@ export const useCardsStore = defineStore('cards', {
     async toggleRecommendation(userCardId) {
       const card = this.getById(userCardId)
       if (!card) return
-      const prevValue = card.recommendationEnabled
+
+      const prevValue = card.recommendationEnabled ?? true
       card.recommendationEnabled = !prevValue
       try {
-        await updateRecommendationEnabled(userCardId, card.recommendationEnabled)
+        await updateRecommendationEnabled(
+            userCardId,
+            card.recommendationEnabled
+        )
       } catch (err) {
         card.recommendationEnabled = prevValue
         throw err

@@ -78,20 +78,24 @@
       <p v-else class="muted-text">현재 실적 구간의 혜택이 없어요.</p>
     </section>
 
-    <!-- 추천 카드에서 제외 -->
-    <section class="surface-card exclude-section">
-      <div class="exclude-row">
+    <!-- 추천 카드에 포함 -->
+    <section class="surface-card recommendation-section">
+      <div class="recommendation-row">
         <div>
-          <p class="exclude-title">추천 카드에서 제외</p>
-          <p class="exclude-desc muted-text">카드 추천 시 이 카드를 추천 대상에서 제외합니다.</p>
+          <p class="recommendation-title">추천 카드에 포함</p>
+          <p class="recommendation-desc muted-text">
+            카드 추천 시 이 카드를 추천 대상에 포함합니다.
+          </p>
         </div>
         <button
-          class="exclude-toggle-btn"
-          :class="{ 'exclude-toggle-btn--on': isExcludedFromRecommendation }"
-          @click="handleToggleRecommendation"
+            class="recommendation-toggle"
+            :class="{ 'recommendation-toggle--on': isRecommendationEnabled }"
+            role="switch"
+            :aria-checked="isRecommendationEnabled"
+            aria-label="추천 카드 포함 여부"
+            @click="handleToggleRecommendation"
         >
-          <span class="exclude-toggle-dot"></span>
-          {{ isExcludedFromRecommendation ? '제외됨' : '포함 중' }}
+          <span class="recommendation-toggle-knob"></span>
         </button>
       </div>
     </section>
@@ -187,12 +191,18 @@ const tierPercent = computed(() => {
 
 const currentTierBenefits = computed(() => currentTier.value?.benefits ?? []);
 
-const isExcludedFromRecommendation = computed(() => card.value && !card.value.recommendationEnabled);
+const isRecommendationEnabled = computed(() => card.value?.recommendationEnabled === true);
 
 onMounted(async () => {
   isLoading.value = true;
-  await cardsStore.fetchCardFullDetail(route.params.userCardId);
-  isLoading.value = false;
+  try {
+    await cardsStore.fetchCardFullDetail(route.params.userCardId);
+  } catch (err) {
+    console.error('카드 상세 조회 실패', err);
+    toast.error('카드 정보를 불러오지 못했습니다.');
+  } finally {
+    isLoading.value = false;
+  }
 });
 
 const handleToggleRecommendation = async () => {
@@ -200,7 +210,7 @@ const handleToggleRecommendation = async () => {
   try {
     await cardsStore.toggleRecommendation(card.value.userCardId);
   } catch (err) {
-    console.error('추천 제외 설정 변경 실패', err.message);
+    console.error('추천 카드 설정 변경 실패', err.message);
     toast.error('설정 변경에 실패했습니다. 다시 시도해주세요.');
   }
 };
@@ -278,42 +288,63 @@ const handleDeleteCard = async () => {
 }
 .benefit-row + .benefit-row { border-top: 1px solid var(--line, #e7e4de); }
 .benefit-cat { font-weight: 700; flex: 0 0 auto; }
-.benefit-rate { color: var(--orange, #d98d00); font-weight: 700; }
+.benefit-rate { color: var(--dark, #545045); font-weight: 700; }
 
-.exclude-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.exclude-title { margin: 0 0 4px; font-size: 14px; font-weight: 700; color: var(--charcoal, #24211d); }
-.exclude-desc { margin: 0; font-size: 12px; line-height: 1.5; }
-
-.exclude-toggle-btn {
+.recommendation-row {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 6px;
-  padding: 9px 14px;
+  gap: 16px;
+}
+
+.recommendation-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--charcoal, #24211d);
+}
+
+.recommendation-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 추천 카드 ON/OFF 토글 */
+.recommendation-toggle {
+  position: relative;
+  width: 52px;
+  height: 30px;
+  padding: 0;
+  border: none;
   border-radius: 999px;
-  border: 1.5px solid var(--line, #e7e4de);
-  background: var(--surface, #ffffff);
-  color: var(--muted, #8f897f);
-  font-size: 12.5px;
-  font-weight: 800;
+  background: #e8e6e2;
   cursor: pointer;
   flex: 0 0 auto;
-  white-space: nowrap;
-  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition: background 0.2s ease;
 }
-.exclude-toggle-btn--on {
-  border-color: var(--orange, #ffbc00);
-  background: #fff6dd;
-  color: #8a5a00;
-}
-.exclude-toggle-dot {
-  width: 8px;
-  height: 8px;
+
+/* 토글 안의 흰색 원 */
+.recommendation-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--muted, #8f897f);
-  flex: 0 0 auto;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+  transition: transform 0.2s ease;
 }
-.exclude-toggle-btn--on .exclude-toggle-dot {
-  background: var(--orange, #ffbc00);
+
+/* ON 상태 background: var(--dark, #545045);*/
+.recommendation-toggle--on {
+  background: var(--dark, #545045);
+}
+
+/* ON이면 원을 오른쪽으로 이동 */
+.recommendation-toggle--on .recommendation-toggle-knob {
+  transform: translateX(22px);
 }
 
 .primary-badge-row { display: flex; justify-content: center; padding: 10px 0 4px; }
