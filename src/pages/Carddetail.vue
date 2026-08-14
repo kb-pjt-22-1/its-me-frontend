@@ -75,7 +75,7 @@
           <span class="benefit-rate">{{ formatBenefit(b) }}</span>
         </div>
       </template>
-      <p v-else class="muted-text">지금 구간에서 적용되는 혜택이 없어요.</p>
+      <p v-else class="muted-text">현재 실적 구간의 혜택이 없어요.</p>
     </section>
 
     <!-- 추천 카드에서 제외 -->

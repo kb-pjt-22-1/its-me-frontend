@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
@@ -22,41 +22,88 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('주 사용 카드 실적 프로그레스바', () => {
-  it('목표 금액이 0원이면 100%로 채운다', () => {
+describe('홈 주 사용 카드 전월 실적', () => {
+  it('전월 실적 금액과 백엔드 달성률로 진행 상태를 표시한다', () => {
     const { wrapper } = mountPage([
-      { userCardId: 1, isPrimary: true, cardName: '가온 올포인트 체크카드', targetAmount: 0, currentAmount: 0 },
+      {
+        userCardId: 1,
+        isPrimary: true,
+        cardName: '굿데이올림카드',
+        targetAmount: 300000,
+        currentAmount: 0,
+        previousMonthAmount: 150000,
+        previousRemainingAmount: 150000,
+        previousAchievementRate: 50,
+        previousPerformanceMet: false,
+      },
     ])
 
-    const fill = wrapper.find('.progress-fill')
-    expect(fill.attributes('style')).toContain('width: 100%')
-    expect(wrapper.text()).toContain('목표 0원')
-  })
-
-  it('실적이 목표의 절반이면 50%로 채우고 남은 금액을 보여준다', () => {
-    const { wrapper } = mountPage([
-      { userCardId: 2, isPrimary: true, cardName: '굿데이 플래티늄카드', targetAmount: 300000, currentAmount: 150000 },
-    ])
-
-    const fill = wrapper.find('.progress-fill')
-    expect(fill.attributes('style')).toContain('width: 50%')
+    expect(wrapper.text()).toContain('전월 실적 미달')
     expect(wrapper.text()).toContain('실적 충족까지 150,000원')
+    expect(wrapper.text()).toContain('목표 300,000원')
+    expect(wrapper.find('.progress-fill').attributes('style')).toContain('width: 50%')
   })
 
-  it('주 사용 카드가 없으면 스켈레톤 문구를 보여주고 프로그레스바는 렌더링하지 않는다', () => {
+  it('현재월 금액이 아니라 백엔드의 전월 performanceMet 값으로 충족 여부를 표시한다', () => {
+    const { wrapper } = mountPage([
+      {
+        userCardId: 2,
+        isPrimary: true,
+        cardName: '굿데이 플래티늄카드',
+        targetAmount: 300000,
+        currentAmount: 0,
+        previousMonthAmount: 300000,
+        previousRemainingAmount: 0,
+        previousAchievementRate: 100,
+        previousPerformanceMet: true,
+      },
+    ])
+
+    expect(wrapper.text()).toContain('전월 실적 충족')
+    expect(wrapper.text()).toContain('혜택 적용 중')
+    expect(wrapper.find('.progress-fill').classes()).toContain('progress-fill--met')
+    expect(wrapper.find('.progress-fill').attributes('style')).toContain('width: 100%')
+  })
+
+  it('전월 실적 정보가 없으면 실적 영역을 렌더링하지 않는다', () => {
+    const { wrapper } = mountPage([
+      {
+        userCardId: 3,
+        isPrimary: true,
+        cardName: '마이핏카드',
+        targetAmount: 300000,
+        currentAmount: 200000,
+      },
+    ])
+
+    expect(wrapper.find('.progress-fill').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('전월 실적 충족')
+    expect(wrapper.text()).not.toContain('전월 실적 미달')
+  })
+
+  it('주 사용 카드가 없으면 카드 정보 로딩 문구를 표시한다', () => {
     const { wrapper } = mountPage([])
 
     expect(wrapper.text()).toContain('카드 정보를 불러오는 중...')
     expect(wrapper.find('.progress-fill').exists()).toBe(false)
   })
 
-  it('실적이 목표를 충족하면 초록색(progress-fill--met) 클래스가 붙는다', () => {
+  it('주 사용 카드를 누르면 카드 상세 화면으로 이동한다', async () => {
     const { wrapper } = mountPage([
-      { userCardId: 3, isPrimary: true, cardName: '마이핏카드', targetAmount: 100000, currentAmount: 100000 },
+      {
+        userCardId: 7,
+        isPrimary: true,
+        cardName: '굿데이올림카드',
+        targetAmount: 300000,
+        previousMonthAmount: 300000,
+        previousRemainingAmount: 0,
+        previousAchievementRate: 100,
+        previousPerformanceMet: true,
+      },
     ])
 
-    const fill = wrapper.find('.progress-fill')
-    expect(fill.classes()).toContain('progress-fill--met')
-    expect(wrapper.text()).toContain('전월 실적 충족')
+    await wrapper.find('.card-box').trigger('click')
+
+    expect(routerMock.push).toHaveBeenCalledWith('/cards/7')
   })
 })
