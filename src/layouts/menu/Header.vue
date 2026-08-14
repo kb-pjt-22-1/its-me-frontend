@@ -64,7 +64,7 @@ const goToMenu = () => {
   width: 100%;
   max-width: 440px;
   margin: 0;
-  height: 60px;
+  height: 52px;
   background-color: var(--page, #f7f7f5);
   display: flex;
   justify-content: space-between;
