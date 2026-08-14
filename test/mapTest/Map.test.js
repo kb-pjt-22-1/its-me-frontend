@@ -3,9 +3,13 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 
 const routerMock = { push: vi.fn() }
+// 기본값은 쿼리 없음(홈 화면 "오늘의 추천"에서 넘어온 게 아닌 일반 진입) - merchantId를 쓰는
+// 테스트는 이 객체의 query를 직접 바꿔서 검증한다.
+const routeMock = { query: {} }
 
 vi.mock('vue-router', () => ({
   useRouter: () => routerMock,
+  useRoute: () => routeMock,
 }))
 
 vi.mock('@/services/merchantsService', async () => {
@@ -166,6 +170,7 @@ beforeEach(() => {
   setActivePinia(createPinia())
   routerMock.push.mockClear()
   mockToastError.mockClear()
+  routeMock.query = {}
   fetchRecommendedNearbyMerchants.mockReset().mockResolvedValue([])
   fetchMerchantCategories.mockReset().mockResolvedValue(CATEGORIES)
 })

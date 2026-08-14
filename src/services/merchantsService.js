@@ -37,16 +37,23 @@ export async function fetchRecommendedNearbyMerchants(bounds, center, categoryCo
 }
 
 /**
- * 홈 화면 오늘의 추천: 사용자 위치+카테고리로 가장 가까운 추천 매장 2곳 조회
- * [GET /api/v1/merchants/today-recommendation?lat=&lng=&categoryCode=]
- * 응답(NearbyMerchantResponseDto[]): 일반 매장 조회와 필드가 같고 distanceMeters(m)만 추가로 옴.
- * 백엔드가 이미 거리순으로 정렬해서 내려줍니다.
+ * 홈 화면 오늘의 추천: 사용자 위치 기준 가까운 매장 후보 중, 지금 당장 보유 카드로 혜택 받을 수
+ * 있는 매장을 우선으로 최대 2곳 조회 [GET /api/v1/merchants/today-recommendation?lat=&lng=&categoryCode=]
+ * 응답(NearbyMerchantRecommendationResponseDto[])은 일반 매장 조회와 필드가 같고 distanceMeters(m),
+ * benefitAvailable(boolean), benefitSummary, recommendedCardName이 추가로 옵니다. 백엔드가 이미
+ * 혜택 매장 우선 + 거리순으로 정렬해서 내려줍니다.
  */
 export async function fetchTodayRecommendedMerchants(lat, lng, categoryCode) {
   const { data } = await api.get('/v1/merchants/today-recommendation', {
     params: { lat, lng, categoryCode },
   })
-  return data.map((dto) => ({ ...normalizeMerchant(dto), distanceMeters: dto.distanceMeters }))
+  return data.map((dto) => ({
+    ...normalizeMerchant(dto),
+    distanceMeters: dto.distanceMeters,
+    recommended: dto.benefitAvailable,
+    benefitSummary: dto.benefitSummary,
+    recommendedCardName: dto.recommendedCardName,
+  }))
 }
 
 /** 특정 매장 조회 [GET /api/v1/merchants/{merchantId}] */

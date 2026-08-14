@@ -192,7 +192,7 @@
 
 <script setup>
 import { onMounted, onUnmounted, ref, watch, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { useCardsStore } from '@/stores/cards'
@@ -200,6 +200,7 @@ import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
 import { fetchRecommendedNearbyMerchants } from '@/services/merchantsService'
 import { useToast } from '@/composables/useToast'
 
+const route = useRoute()
 const router = useRouter()
 const merchantsStore = useMerchantsStore()
 const bookmarksStore = useBookmarksStore()
@@ -506,6 +507,35 @@ function initMap(kakao, center) {
   // 줌/드래그가 끝날 때마다(idle) 화면에 보이는 영역의 매장만 새로 받아옵니다.
   kakao.maps.event.addListener(map, 'idle', scheduleLoadBoundsMerchants)
   loadBoundsMerchants()
+
+  focusMerchantFromQuery()
+}
+
+// 홈 화면 "오늘의 추천"에서 매장을 누르면 매장 상세 페이지 대신 이 화면으로 넘어오면서
+// ?merchantId=&lat=&lng=를 함께 받습니다. 내 위치 기준 지도는 그대로 두고(내 위치 마커도
+// 유지), 그 매장 좌표로 지도만 옮겨서 bounds 조회가 그 매장을 포함하게 만든 뒤,
+// bounds 결과에 실제로 그 매장이 들어오면(비동기라 즉시는 아님) 상세(추천 카드 리스트)를 엽니다.
+async function focusMerchantFromQuery() {
+  const merchantId = route.query.merchantId ? Number(route.query.merchantId) : null
+  if (!merchantId || !kakaoInstance || !mapInstance) return
+
+  let lat = route.query.lat != null ? Number(route.query.lat) : null
+  let lng = route.query.lng != null ? Number(route.query.lng) : null
+  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) {
+    const detail = await merchantsStore.fetchMerchantDetail(merchantId)
+    if (!detail) return
+    lat = detail.lat
+    lng = detail.lng
+  }
+
+  mapInstance.setCenter(new kakaoInstance.maps.LatLng(lat, lng))
+
+  const stopWatchingBounds = watch(boundsMerchants, (list) => {
+    if (list.some((m) => m.id === merchantId)) {
+      selectMerchant(merchantId)
+      stopWatchingBounds()
+    }
+  })
 }
 
 // 클러스터 핀 클릭 시, 그 안에 뭉쳐있던 매장들만 하단 "제휴 매장" 목록에 보여줍니다.
