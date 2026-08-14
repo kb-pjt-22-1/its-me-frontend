@@ -27,6 +27,12 @@ vi.mock('@/composables/useToast', () => ({
   useToast: () => ({ success: vi.fn(), error: mockToastError, info: vi.fn() }),
 }))
 
+// 실제 fetch/FileReader 없이도 마커 아이콘 교체 흐름을 검증할 수 있도록, 받은 URL을 그대로
+// "데이터 URI"인 것처럼 돌려준다 - 어떤 이미지가 선택됐는지는 URL 문자열로 계속 판별 가능하다.
+vi.mock('@/utils/imageDataUri', () => ({
+  toDataUri: vi.fn((url) => Promise.resolve(url ?? null)),
+}))
+
 import MapPage from '@/pages/Map.vue'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
@@ -86,6 +92,9 @@ function createKakaoMock({ level = 3 } = {}) {
       this.title = options.title
       this.image = options.image
       markerInstances.push(this)
+    }
+    setImage(image) {
+      this.image = image
     }
   }
   class MarkerClusterer {
@@ -154,8 +163,10 @@ function mountMapPage() {
 const CAFE_MERCHANT = { id: 1, name: '동네 카페', categoryCode: '5813', lat: 37.5, lng: 127.1 }
 const MART_MERCHANT = { id: 2, name: '동네 마트', categoryCode: '5411', lat: 37.51, lng: 127.11 }
 const CATEGORIES = [
-  { categoryCode: '5813', categoryName: '카페', categoryIcon: '☕' },
-  { categoryCode: '5411', categoryName: '마트', categoryIcon: '🛒' },
+  // 실제 응답처럼(twemoji CDN) 절대 URL로 - SVG 핀에 상대경로가 아니라 절대 URL이 그대로
+  // 들어가는지 검증하는 게 목적이라, 실제 카테고리 아이콘 형태와 맞춰야 의미가 있다.
+  { categoryCode: '5813', categoryName: '카페', categoryIcon: 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/2615.svg' },
+  { categoryCode: '5411', categoryName: '마트', categoryIcon: 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f6d2.svg' },
 ]
 
 // 페이징 테스트용 - 12개 매장(이름순 정렬 시 001~012 순서 그대로 유지되도록 이름을 채움)
@@ -198,7 +209,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
 
     const pin = getClusterer().markers[0]
     expect(pin.title).toBe('동네 카페')
-    expect(decodedPinSvg(pin)).toContain('<image href="☕"')
+    expect(decodedPinSvg(pin)).toContain('<image href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/2615.svg"')
 
     trigger(pin, 'click')
     await flushPromises()
@@ -250,7 +261,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(decodedPinSvg(starbucksPin)).toMatch(/<image href="[^"]*starbucks[^"]*\.png"/)
 
     const noLogoPin = getClusterer().markers.find((m) => m.title === '동네 마트')
-    expect(decodedPinSvg(noLogoPin)).toContain('<image href="🛒"')
+    expect(decodedPinSvg(noLogoPin)).toContain('<image href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f6d2.svg"')
 
     const cafeItem = wrapper.findAll('.sheet-item').find((item) => item.find('strong').text() === '동네 카페')
     expect(cafeItem.find('.sheet-item-icon img').attributes('src')).toContain('starbucks')
