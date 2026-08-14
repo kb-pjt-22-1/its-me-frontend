@@ -93,7 +93,7 @@
           </button>
 
           <div class="store-banner">
-            <span class="banner-icon"><img :src="selectedMerchant.categoryIcon" alt="" /></span>
+            <span class="banner-icon"><img :src="selectedMerchant.displayImage" alt="" /></span>
           </div>
 
           <div class="store-info">
@@ -160,7 +160,7 @@
               class="sheet-item"
               @click="selectMerchant(shop.id)"
             >
-              <div class="sheet-item-icon"><img :src="shop.categoryIcon" alt="" /></div>
+              <div class="sheet-item-icon"><img :src="shop.displayImage" alt="" /></div>
               <div class="sheet-item-info">
                 <strong>{{ shop.name }}</strong>
                 <p class="muted-text">
@@ -197,6 +197,7 @@ import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { useCardsStore } from '@/stores/cards'
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
+import { getBrandImage } from '@/utils/brandImages'
 import { fetchRecommendedNearbyMerchants } from '@/services/merchantsService'
 import { useToast } from '@/composables/useToast'
 
@@ -299,12 +300,19 @@ const boundsMerchants = ref([])
 
 // 매장 응답엔 categoryCode만 오고 categoryName은 안 와서, 검색/필터/표시에 필요한
 // categoryName을 카테고리 사전(merchantsStore.categories)으로 붙여줍니다.
+// displayImage: 프랜차이즈 매장(brandId 있음)은 브랜드 로고를, 개인 매장(brandId 없음)이거나
+// 로고 파일이 없는 브랜드는 카테고리 아이콘을 씁니다 - 핀/목록/상세 세 군데가 전부 이 값 하나만 봅니다.
 const boundsMerchantsWithCategory = computed(() =>
-  boundsMerchants.value.map((m) => ({
-    ...m,
-    categoryName: merchantsStore.getCategoryByCode(m.categoryCode)?.categoryName,
-    categoryIcon: merchantsStore.getCategoryByCode(m.categoryCode)?.categoryIcon,
-  })),
+  boundsMerchants.value.map((m) => {
+    const category = merchantsStore.getCategoryByCode(m.categoryCode)
+    const brandImage = getBrandImage(merchantsStore.getBrandById(m.brandId)?.brandLogo)
+    return {
+      ...m,
+      categoryName: category?.categoryName,
+      categoryIcon: category?.categoryIcon,
+      displayImage: brandImage ?? category?.categoryIcon,
+    }
+  }),
 )
 
 const merchants = computed(() => {
@@ -628,10 +636,9 @@ async function loadBoundsMerchants() {
   }
 }
 
-// 핀 모양(물방울 + 카테고리 아이콘)을 SVG로 그려서 MarkerImage로 씁니다. MarkerClusterer가
+// 핀 모양(물방울 + 아이콘)을 SVG로 그려서 MarkerImage로 씁니다. MarkerClusterer가
 // CustomOverlay를 못 받고 Marker만 받아서(SDK 제약) DOM 대신 이 방식을 씁니다.
-// 카테고리 아이콘은 merchant_categories.category_icon(실제 CDN URL)을 SVG <image>로
-// 그대로 참조합니다 - 하드코딩 이모지 매핑은 더 이상 안 씁니다.
+// displayImage(브랜드 로고 우선, 없으면 카테고리 아이콘)를 SVG <image>로 그대로 참조합니다.
 // recommended=true인 매장만 테두리 색과 은은한 후광으로 강조합니다 -
 // 나머지 매장도 똑같이 핀은 그려지고, 강조만 빠집니다(필터링이 아니라 하이라이트).
 const PIN_WIDTH = 32
@@ -640,8 +647,8 @@ function buildMerchantMarkerImage(kakao, merchant) {
   const recommended = !!merchant.recommended
   const borderColor = recommended ? '#ffbc00' : '#8f897f'
   const glow = recommended ? '<circle cx="16" cy="15" r="15" fill="#ffbc00" fill-opacity="0.22"/>' : ''
-  const iconTag = merchant.categoryIcon
-    ? `<image href="${merchant.categoryIcon}" x="9" y="8" width="14" height="14"/>`
+  const iconTag = merchant.displayImage
+    ? `<image href="${merchant.displayImage}" x="9" y="8" width="14" height="14"/>`
     : ''
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_WIDTH}" height="${PIN_HEIGHT}" viewBox="0 0 32 40">` +
@@ -756,6 +763,7 @@ function onChipClick(cat) {
 
 onMounted(async () => {
   merchantsStore.fetchCategories()
+  merchantsStore.fetchBrands()
   // 매장 상세(추천 카드)에 쓸 보유 카드 - Storedetail.vue와 동일하게, 이미 있으면 다시 안 받습니다.
   if (cardsStore.cards.length === 0) cardsStore.fetchCards()
 
