@@ -60,12 +60,18 @@ const paymentStore = usePaymentStore();
 
 const userName = computed(() => authStore.userName);
 
-// 이번 달 혜택 = paymentStore.history 중 승인건의 discountAmount 합계
-const monthlyBenefit = computed(() =>
-  paymentStore.history
+// 이번 달 혜택 = paymentStore.history 중 "이번 달" + 승인건의 discountAmount 합계
+// (전에는 월 필터 없이 전체 누적으로 계산되고 있었음 - Home.vue에서 같은 문제 고쳤던 것과 동일)
+const monthlyBenefit = computed(() => {
+  const now = new Date();
+  return paymentStore.history
     .filter((item) => (item.status ?? item.paymentStatus) === 'APPROVED')
-    .reduce((sum, item) => sum + (item.discountAmount ?? 0), 0)
-);
+    .filter((item) => {
+      const d = new Date(item.paymentTime);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    })
+    .reduce((sum, item) => sum + (item.discountAmount ?? 0), 0);
+});
 
 onMounted(() => {
   if (authStore.isAuthenticated && paymentStore.history.length === 0) {
