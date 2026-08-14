@@ -5,6 +5,11 @@ import { useHomeStore } from '@/stores/home'
 import { fetchTodayRecommendation } from '@/services/recommendationService'
 import { fetchExpiringBenefits } from '@/services/benefitService'
 
+const routerMock = { push: vi.fn() }
+vi.mock('vue-router', () => ({
+  useRouter: () => routerMock,
+}))
+
 vi.mock('@/services/recommendationService', () => ({
   fetchTodayRecommendation: vi.fn(),
 }))
@@ -38,6 +43,7 @@ function mountPage(cards) {
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
+  routerMock.push.mockClear()
   window.console.error = vi.fn()
 })
 

@@ -34,7 +34,16 @@ export default defineConfig({
     },
     test: {
         environment: 'jsdom',
+        // jsdom은 기본적으로 about:blank를 URL로 쓰는데, localStorage/sessionStorage는
+        // 오리진이 있어야 동작해서 about:blank에선 window.localStorage 자체가 undefined다.
+        // 실제 origin을 지정해줘야 로그인/토큰 저장 등 localStorage를 쓰는 테스트가 돌아간다.
+        environmentOptions: {
+            jsdom: {
+                url: 'http://localhost:3000',
+            },
+        },
         globals: true,
+        setupFiles: ['./test/setup.js'],
         // 아직 작성된 테스트가 없어도 CI가 실패하지 않도록 함.
         // 테스트가 하나라도 생기면 자동으로 정상 동작.
         passWithNoTests: true,
