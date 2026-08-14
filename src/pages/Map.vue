@@ -167,6 +167,9 @@
                   {{ shop.categoryName }} · {{ shop.distanceLabel }}
                 </p>
                 <span v-if="shop.recommended" class="pill pill--gold">혜택 매장</span>
+                <p v-if="shop.recommended && shop.benefitSummary" class="sheet-item-benefit">
+                  <strong v-if="shop.recommendedCardName">{{ shop.recommendedCardName }}</strong> {{ shop.benefitSummary }}
+                </p>
               </div>
               <span class="sheet-bookmark" :class="{ active: bookmarksStore.isBookmarked(shop.id) }" @click.stop="toggleBookmark(shop)">
                 <svg width="18" height="18" viewBox="0 0 24 24" :fill="bookmarksStore.isBookmarked(shop.id) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
@@ -925,6 +928,12 @@ onUnmounted(() => {
 .sheet-item-info { flex: 1; min-width: 0; }
 .sheet-item-info strong { font-size: 14px; color: var(--charcoal, #24211d); }
 .sheet-item-info p { margin: 4px 0 6px; font-size: 11.5px; }
+.sheet-item-benefit {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: #b67a00;
+}
+.sheet-item-benefit strong { color: inherit; }
 .sheet-bookmark {
   width: 34px;
   height: 34px;
