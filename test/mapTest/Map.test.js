@@ -3,9 +3,13 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 
 const routerMock = { push: vi.fn() }
+// 기본값은 쿼리 없음(홈 화면 "오늘의 추천"에서 넘어온 게 아닌 일반 진입) - merchantId를 쓰는
+// 테스트는 이 객체의 query를 직접 바꿔서 검증한다.
+const routeMock = { query: {} }
 
 vi.mock('vue-router', () => ({
   useRouter: () => routerMock,
+  useRoute: () => routeMock,
 }))
 
 vi.mock('@/services/merchantsService', async () => {
@@ -14,6 +18,7 @@ vi.mock('@/services/merchantsService', async () => {
     ...actual,
     fetchRecommendedNearbyMerchants: vi.fn(),
     fetchMerchantCategories: vi.fn(),
+    fetchMerchantBrands: vi.fn(),
   }
 })
 
@@ -25,7 +30,7 @@ vi.mock('@/composables/useToast', () => ({
 import MapPage from '@/pages/Map.vue'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
-import { fetchRecommendedNearbyMerchants, fetchMerchantCategories } from '@/services/merchantsService'
+import { fetchRecommendedNearbyMerchants, fetchMerchantCategories, fetchMerchantBrands } from '@/services/merchantsService'
 
 // 카카오맵 SDK 대신 Marker/MarkerClusterer 생성과 이벤트 등록을 가로채서 검증하기 위한 최소 mock.
 // Map.vue의 loadKakaoMapScript()는 window.kakao.maps가 이미 있으면 그대로 resolve하므로
@@ -166,8 +171,10 @@ beforeEach(() => {
   setActivePinia(createPinia())
   routerMock.push.mockClear()
   mockToastError.mockClear()
+  routeMock.query = {}
   fetchRecommendedNearbyMerchants.mockReset().mockResolvedValue([])
   fetchMerchantCategories.mockReset().mockResolvedValue(CATEGORIES)
+  fetchMerchantBrands.mockReset().mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -222,6 +229,31 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     const martPin = getClusterer().markers.find((m) => m.title === '동네 마트')
     expect(decodedPinSvg(cafePin)).toContain('stroke="#ffbc00"')
     expect(decodedPinSvg(martPin)).toContain('stroke="#8f897f"')
+  })
+
+  it('brandId의 brandLogo가 로컬 브랜드 이미지와 매칭되면 카테고리 아이콘 대신 브랜드 로고를 쓰고, 매칭되는 파일이 없으면 카테고리 아이콘으로 폴백한다', async () => {
+    const { kakao, getClusterer } = createKakaoMock()
+    window.kakao = kakao
+    fetchMerchantBrands.mockResolvedValue([
+      { brandId: 1, brandCode: 'STARBUCKS', brandName: '스타벅스', brandLogo: 'Brands/starbucks.png' },
+      { brandId: 2, brandCode: 'NO_LOCAL_LOGO', brandName: '로고 파일 없는 브랜드', brandLogo: 'Brands/no-such-file.png' },
+    ])
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      { ...CAFE_MERCHANT, brandId: 1 }, // src/images/Brands/starbucks.png와 매칭
+      { ...MART_MERCHANT, brandId: 2 }, // brandLogo는 있지만 실제 파일이 없어 카테고리 아이콘으로 폴백
+    ])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const starbucksPin = getClusterer().markers.find((m) => m.title === '동네 카페')
+    expect(decodedPinSvg(starbucksPin)).toMatch(/<image href="[^"]*starbucks[^"]*\.png"/)
+
+    const noLogoPin = getClusterer().markers.find((m) => m.title === '동네 마트')
+    expect(decodedPinSvg(noLogoPin)).toContain('<image href="🛒"')
+
+    const cafeItem = wrapper.findAll('.sheet-item').find((item) => item.find('strong').text() === '동네 카페')
+    expect(cafeItem.find('.sheet-item-icon img').attributes('src')).toContain('starbucks')
   })
 
   it('마운트 시 전체 매장이 아니라 카테고리 목록만 가볍게 불러온다', async () => {

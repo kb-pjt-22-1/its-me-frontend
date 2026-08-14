@@ -158,6 +158,40 @@
         </div>
       </section>
 
+      <!-- 오늘의 추천 -->
+      <section class="today-recommend-section">
+        <div class="section-header">
+          <h3>오늘의 추천</h3>
+          <Button variant="link-muted" size="sm" @click="router.push('/map')">지도에서 보기</Button>
+        </div>
+
+        <div v-if="todayRecommendLoading" class="empty-text muted-text">추천 매장을 찾는 중...</div>
+        <div v-else-if="todayRecommendations.length === 0" class="empty-text muted-text">
+          주변에 추천할 매장이 없어요.
+        </div>
+
+        <div v-else class="today-recommend-list">
+          <button
+            v-for="shop in todayRecommendations"
+            :key="shop.id"
+            class="today-recommend-card"
+            @click="goToMerchantOnMap(shop)"
+          >
+            <div class="today-recommend-top">
+              <span v-if="shop.categoryIcon" class="today-recommend-icon"><img :src="shop.categoryIcon" alt="" /></span>
+              <div class="today-recommend-info">
+                <strong>{{ shop.name }}</strong>
+                <p class="muted-text">{{ shop.categoryName }} · {{ shop.distanceLabel }}</p>
+              </div>
+              <span v-if="shop.recommended" class="pill pill--gold">혜택 매장</span>
+            </div>
+            <p v-if="shop.recommended && shop.benefitSummary" class="today-recommend-benefit">
+              <strong v-if="shop.recommendedCardName">{{ shop.recommendedCardName }}</strong> {{ shop.benefitSummary }}
+            </p>
+          </button>
+        </div>
+      </section>
+
       <!-- 최근 결제 내역 -->
       <section class="transaction-section">
         <div class="section-header">
@@ -187,17 +221,20 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import Button from '@/components/common/Button.vue';
 import { useAuthStore } from '@/stores/auth';
 import { usePaymentStore } from '@/stores/payment';
+import { useMerchantsStore } from '@/stores/merchants';
+import { fetchTodayRecommendedMerchants } from '@/services/merchantsService';
 import { useHomeStore } from '@/stores/home';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const paymentStore = usePaymentStore();
+const merchantsStore = useMerchantsStore();
 const homeStore = useHomeStore();
 
 const { recommendation, recommendationLoading, recommendationError, expiring, expiringLoading, expiringError } =
@@ -249,6 +286,61 @@ const formatPaymentTime = (value) => {
   return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
+
+// 매장 상세 페이지 대신 지도 화면으로 보내, 그 매장이 선택된 상태(추천 카드 리스트 포함)로
+// 바로 뜨게 합니다. lat/lng를 같이 넘겨 Map.vue가 매장 상세를 다시 조회하지 않고
+// 바로 그 위치로 지도를 옮길 수 있게 합니다.
+function goToMerchantOnMap(shop) {
+  router.push({ path: '/map', query: { merchantId: shop.id, lat: shop.lat, lng: shop.lng } });
+}
+
+// 오늘의 추천: 백엔드가 이미 혜택 매장 우선 + 거리순으로 정렬해서 최대 2곳을 내려준다.
+// categories는 비동기로 따로 로드되므로, todayRecommendationsRaw를 computed로 감싸서
+// categories가 나중에 도착해도(오늘의 추천 응답보다 늦게 와도) 이름/아이콘이 자동으로 채워지게 한다.
+const todayRecommendationsRaw = ref([]);
+const todayRecommendLoading = ref(true);
+
+function formatDistance(meters) {
+  if (meters == null) return '거리 정보 없음';
+  if (meters < 1000) return `${Math.round(meters)}m`;
+  return `${(meters / 1000).toFixed(1)}km`;
+}
+
+const todayRecommendations = computed(() =>
+  todayRecommendationsRaw.value.map((m) => ({
+    ...m,
+    categoryName: merchantsStore.getCategoryByCode(m.categoryCode)?.categoryName,
+    categoryIcon: merchantsStore.getCategoryByCode(m.categoryCode)?.categoryIcon,
+    distanceLabel: formatDistance(m.distanceMeters),
+  }))
+);
+
+async function loadTodayRecommendations(lat, lng) {
+  todayRecommendLoading.value = true;
+  try {
+    todayRecommendationsRaw.value = await fetchTodayRecommendedMerchants(lat, lng);
+  } catch (err) {
+    console.warn('오늘의 추천 조회 실패', err);
+    todayRecommendationsRaw.value = [];
+  } finally {
+    todayRecommendLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  merchantsStore.fetchCategories();
+
+  const defaultCenter = { lat: 37.5665, lng: 126.978 }; // 서울시청
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => loadTodayRecommendations(position.coords.latitude, position.coords.longitude),
+      () => loadTodayRecommendations(defaultCenter.lat, defaultCenter.lng),
+    );
+  } else {
+    loadTodayRecommendations(defaultCenter.lat, defaultCenter.lng);
+  }
+});
 onMounted(() => {
   homeStore.fetchRecommendation();
   homeStore.fetchExpiring();
@@ -350,7 +442,83 @@ onMounted(() => {
 .expiring-main p { margin: 0; font-size: 12px; }
 .expiring-chevron { flex: 0 0 auto; color: var(--muted, #8f897f); }
 
-/* 최근 결제 내역 */
+.benefit-amount {
+  margin: 0 0 2px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.benefit-caption {
+  font-size: 11px;
+}
+
+.today-recommend-section {
+  margin-top: 30px;
+}
+
+.today-recommend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.today-recommend-card {
+  width: 100%;
+  text-align: left;
+  padding: 14px;
+  border-radius: 16px;
+  border: none;
+  background: #ffffff;
+  box-shadow: 0 2px 12px rgba(46, 42, 36, 0.06);
+  cursor: pointer;
+}
+
+.today-recommend-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.today-recommend-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--inactive, #f0efec);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.today-recommend-icon img {
+  width: 20px;
+  height: 20px;
+}
+
+.today-recommend-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.today-recommend-info strong {
+  font-size: 14px;
+  color: var(--charcoal, #24211d);
+}
+
+.today-recommend-info p {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+}
+
+.today-recommend-benefit {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: #b67a00;
+}
+
+.today-recommend-benefit strong {
+  color: inherit;
+}
+
 .transaction-section {
   margin-top: 0;
 }

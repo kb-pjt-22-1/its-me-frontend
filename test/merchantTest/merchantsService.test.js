@@ -59,8 +59,15 @@ describe('fetchMerchantList', () => {
 })
 
 describe('fetchRecommendedNearbyMerchants', () => {
-  it('bounds 네 좌표와 center를 params로 넘기고, recommended 플래그를 포함해 정규화해서 반환한다', async () => {
-    api.get.mockResolvedValueOnce({ data: [{ ...rawMerchant, recommended: true }] })
+  it('bounds 네 좌표와 center를 params로 넘기고, benefitAvailable을 recommended로 매핑해 정규화해서 반환한다', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [{
+        ...rawMerchant,
+        benefitAvailable: true,
+        benefitSummary: '이번 달 확정 100원',
+        recommendedCardName: '테스트카드',
+      }],
+    })
 
     const result = await fetchRecommendedNearbyMerchants(
       { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 },
@@ -78,7 +85,12 @@ describe('fetchRecommendedNearbyMerchants', () => {
         categoryCode: undefined,
       },
     })
-    expect(result).toEqual([{ ...normalizedMerchant, recommended: true }])
+    expect(result).toEqual([{
+      ...normalizedMerchant,
+      recommended: true,
+      benefitSummary: '이번 달 확정 100원',
+      recommendedCardName: '테스트카드',
+    }])
   })
 
   it('categoryCode를 넘기면 그대로 params에 포함한다', async () => {
@@ -105,15 +117,29 @@ describe('fetchRecommendedNearbyMerchants', () => {
 })
 
 describe('fetchTodayRecommendedMerchants', () => {
-  it('lat/lng/categoryCode를 params로 넘기고, distanceMeters를 포함해 정규화해서 반환한다', async () => {
-    api.get.mockResolvedValueOnce({ data: [{ ...rawMerchant, distanceMeters: 250 }] })
+  it('lat/lng/categoryCode를 params로 넘기고, distanceMeters와 benefitAvailable을 정규화해서 반환한다', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [{
+        ...rawMerchant,
+        distanceMeters: 250,
+        benefitAvailable: true,
+        benefitSummary: '이번 달 확정 100원',
+        recommendedCardName: '테스트카드',
+      }],
+    })
 
     const result = await fetchTodayRecommendedMerchants(37.5, 127.0, '5812')
 
     expect(api.get).toHaveBeenCalledWith('/v1/merchants/today-recommendation', {
       params: { lat: 37.5, lng: 127.0, categoryCode: '5812' },
     })
-    expect(result).toEqual([{ ...normalizedMerchant, distanceMeters: 250 }])
+    expect(result).toEqual([{
+      ...normalizedMerchant,
+      distanceMeters: 250,
+      recommended: true,
+      benefitSummary: '이번 달 확정 100원',
+      recommendedCardName: '테스트카드',
+    }])
   })
 })
 
