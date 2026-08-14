@@ -27,17 +27,19 @@
             </span>
           </div>
 
-          <template v-if="typeof primaryCard.targetAmount === 'number'">
+          <template v-if="typeof primaryCard.previousMonthAmount === 'number' && typeof primaryCard.targetAmount === 'number'">
             <div class="status-row">
-              <span :class="primaryCard.currentAmount >= primaryCard.targetAmount ? 'success-text' : 'danger-text'">
-                {{ primaryCard.currentAmount >= primaryCard.targetAmount ? '전월 실적 충족' : '전월 실적 미달' }}
+              <span :class="primaryCard.previousPerformanceMet ? 'success-text' : 'danger-text'">
+                {{ primaryCard.previousPerformanceMet ? '전월 실적 충족' : '전월 실적 미달' }}
               </span>
-              <span class="muted-text">실적 충족까지 {{ remainingAmount.toLocaleString() }}원</span>
+              <span class="muted-text">
+                {{ primaryCard.previousPerformanceMet ? '혜택 적용 중' : `실적 충족까지 ${remainingAmount.toLocaleString()}원` }}
+              </span>
             </div>
             <div class="progress-track">
               <div
                 class="progress-fill"
-                :class="{ 'progress-fill--met': primaryCard.currentAmount >= primaryCard.targetAmount }"
+                :class="{ 'progress-fill--met': primaryCard.previousPerformanceMet }"
                 :style="{ width: progressPercentage + '%' }"
               ></div>
             </div>
@@ -118,15 +120,9 @@ const paymentStore = usePaymentStore();
 const userName = computed(() => authStore.userName);
 const primaryCard = computed(() => cardsStore.primaryCard);
 
-const remainingAmount = computed(() =>
-  primaryCard.value ? Math.max(primaryCard.value.targetAmount - primaryCard.value.currentAmount, 0) : 0
-);
-const progressPercentage = computed(() => {
-  if (!primaryCard.value) return 0;
-  // 목표가 0원이면 나눗셈이 무의미하다 - 채울 목표가 없으니 이미 다 채운 것으로 본다.
-  if (primaryCard.value.targetAmount === 0) return 100;
-  return Math.min((primaryCard.value.currentAmount / primaryCard.value.targetAmount) * 100, 100);
-});
+const remainingAmount = computed(() => primaryCard.value?.previousRemainingAmount ?? 0);
+
+const progressPercentage = computed(() => primaryCard.value?.previousAchievementRate ?? 0);
 
 const recentSavedStore = computed(() => bookmarksStore.bookmarks[0]?.merchantName ?? bookmarksStore.bookmarks[0]?.name ?? null);
 

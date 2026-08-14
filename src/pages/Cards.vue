@@ -40,7 +40,7 @@
         </div>
 
         <template v-if="card.status === 'ACTIVE'">
-          <template v-if="typeof card.targetAmount === 'number'">
+          <template v-if="card.hasPreviousPerformance">
             <div class="status-row">
               <span :class="card.isMet ? 'success-text' : 'danger-text'">
                 {{ card.isMet ? '전월 실적 충족' : '전월 실적 미달' }}
@@ -119,17 +119,18 @@ function calcPercentage(card, hasTarget) {
 }
 
 const myCards = computed(() =>
-  cardsStore.cards.map((card) => {
-    const hasTarget = typeof card.targetAmount === 'number';
-    const isMet = card.performanceMet ?? (hasTarget && card.currentAmount >= card.targetAmount);
-    return {
-      ...card,
-      isMet,
-      remaining: hasTarget ? Math.max(card.targetAmount - card.currentAmount, 0) : 0,
-      percentage: calcPercentage(card, hasTarget),
-      statusText: CARD_STATUS_TEXT[card.status] ?? card.status,
-    };
-  })
+    cardsStore.cards.map((card) => {
+      const hasPreviousPerformance = typeof card.previousMonthAmount === 'number' && typeof card.targetAmount === 'number'
+
+      return {
+        ...card,
+        hasPreviousPerformance,
+        isMet: card.previousPerformanceMet ?? false,
+        remaining: card.previousRemainingAmount ?? 0,
+        percentage: card.previousAchievementRate ?? 0,
+        statusText: CARD_STATUS_TEXT[card.status] ?? card.status,
+      }
+    })
 );
 
 const goToCardDetail = (userCardId) => {

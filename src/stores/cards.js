@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import {
   fetchMyCards,
   fetchCardPerformance,
+  getCurrentYearMonth,
+  getPreviousYearMonth,
   registerCard,
   syncCards,
   fetchCardBenefits,
@@ -35,22 +37,65 @@ export const useCardsStore = defineStore('cards', {
       this.error = null
       try {
         const list = await fetchMyCards()
-        const results = await Promise.allSettled(
-          list.map((c) => fetchCardPerformance(c.userCardId))
-        )
-        this.cards = list.map((card, i) => {
-          const result = results[i]
-          if (result.status !== 'fulfilled') return card
-          const p = result.value
+
+        const currentYearMonth = getCurrentYearMonth()
+        const previousYearMonth = getPreviousYearMonth()
+
+        const [currentResults, previousResults] = await Promise.all([
+          Promise.allSettled(
+              list.map((card) =>
+                  fetchCardPerformance(card.userCardId, currentYearMonth)
+              )
+          ),
+          Promise.allSettled(
+              list.map((card) =>
+                  fetchCardPerformance(card.userCardId, previousYearMonth)
+              )
+          ),
+        ])
+
+        this.cards = list.map((card, index) => {
+          const currentResult = currentResults[index]
+          const previousResult = previousResults[index]
+
+          const current =
+              currentResult.status === 'fulfilled'
+                  ? currentResult.value
+                  : null
+
+          const previous =
+              previousResult.status === 'fulfilled'
+                  ? previousResult.value
+                  : null
+
           return {
             ...card,
-            currentAmount: p.currentAmount,
-            targetAmount: p.targetAmount,
-            performanceMet: p.performanceMet,
+
+            // 이번 달 이용실적
+            currentAmount: current?.currentAmount,
+            currentRemainingAmount: current?.remainingAmount,
+            currentAchievementRate: current?.achievementRate,
+            currentPerformanceMet: current?.performanceMet,
+            currentTargetYearMonth: current?.targetYearMonth,
+
+            // 전월 실적 및 이번 달 혜택 적용 여부
+            previousMonthAmount: previous?.currentAmount,
+            previousRemainingAmount: previous?.remainingAmount,
+            previousAchievementRate: previous?.achievementRate,
+            previousPerformanceMet: previous?.performanceMet,
+            previousTargetYearMonth: previous?.targetYearMonth,
+
+            // 카드 요구 실적은 월과 관계없이 동일
+            targetAmount:
+                current?.targetAmount ??
+                previous?.targetAmount ??
+                card.targetAmount,
           }
         })
       } catch (err) {
-        this.error = err.response?.data?.message ?? '카드 목록을 불러오지 못했습니다.'
+        this.error =
+            err.response?.data?.message ??
+            '카드 목록을 불러오지 못했습니다.'
       } finally {
         this.isLoading = false
       }
@@ -61,22 +106,32 @@ export const useCardsStore = defineStore('cards', {
       this.isLoading = true
       this.error = null
       try {
+        const currentYearMonth = getCurrentYearMonth()
         const [performance, benefitsInfo] = await Promise.all([
-          fetchCardPerformance(userCardId),
+          fetchCardPerformance(userCardId, currentYearMonth),
           fetchCardBenefits(userCardId),
         ])
 
-        const index = this.cards.findIndex((c) => c.userCardId === Number(userCardId))
+        const index = this.cards.findIndex(
+            (card) => card.userCardId === Number(userCardId)
+        )
+
         const merged = {
           ...(index !== -1 ? this.cards[index] : {}),
           currentAmount: performance.currentAmount,
-          targetAmount: performance.targetAmount,
-          performanceMet: performance.performanceMet,
-          benefitsInfo, // { performanceTiers: [...] }
+          currentRemainingAmount: performance.remainingAmount,
+          currentAchievementRate: performance.achievementRate,
+          currentPerformanceMet: performance.performanceMet,
+          currentTargetYearMonth: performance.targetYearMonth,
+
+          targetAmount: performance.targetAmount, benefitsInfo,
         }
 
-        if (index === -1) this.cards.push(merged)
-        else this.cards[index] = merged
+        if (index === -1) {
+          this.cards.push(merged)
+        } else {
+          this.cards[index] = merged
+        }
 
         return merged
       } catch (err) {
