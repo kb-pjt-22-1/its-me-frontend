@@ -16,6 +16,7 @@ import {
     getPreviousYearMonth,
     getCurrentTier,
     findBenefitForCategory,
+    formatBenefit,
 } from '@/services/cardService'
 
 beforeEach(() => {
@@ -127,5 +128,29 @@ describe('getCurrentTier / findBenefitForCategory (전월 실적 기준)', () =>
     it('카테고리 코드가 안 맞으면 구간을 찾아도 혜택은 null이다', () => {
         const benefit = findBenefitForCategory(MY_FIT_BENEFITS_INFO, '9999', 300000)
         expect(benefit).toBeNull()
+    })
+})
+
+// discountMethod === 'POINT_ACCUMULATION'(포인트 적립형)이면 "할인" 대신 "적립"으로 표기한다.
+// 백엔드에서 discountMethod 필드를 내려주도록 수정한 뒤 반영한 변경.
+describe('formatBenefit', () => {
+    it('discountMethod가 없거나 청구할인(STATEMENT_DISCOUNT)이면 "% 할인"으로 표기한다', () => {
+        expect(formatBenefit({ discountRate: 5 })).toBe('5% 할인')
+        expect(formatBenefit({ discountRate: 5, discountMethod: 'STATEMENT_DISCOUNT' })).toBe('5% 할인')
+        expect(formatBenefit({ discountAmount: 3000 })).toBe('3,000원 할인')
+    })
+
+    it('discountMethod가 POINT_ACCUMULATION이면 "% 적립"/"원 적립"으로 표기한다', () => {
+        expect(formatBenefit({ discountRate: 0.2, discountMethod: 'POINT_ACCUMULATION' })).toBe('0.2% 적립')
+        expect(formatBenefit({ discountAmount: 1000, discountMethod: 'POINT_ACCUMULATION' })).toBe('1,000원 적립')
+    })
+
+    it('discountRate/discountAmount가 둘 다 없으면 description으로 폴백한다', () => {
+        expect(formatBenefit({ description: '혜택 설명' })).toBe('혜택 설명')
+        expect(formatBenefit({})).toBe('혜택 있음')
+    })
+
+    it('benefit이 없으면 null을 반환한다', () => {
+        expect(formatBenefit(null)).toBeNull()
     })
 })

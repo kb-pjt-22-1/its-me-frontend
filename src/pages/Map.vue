@@ -1091,7 +1091,14 @@ onUnmounted(() => {
 .reco-name-block { flex: 1; min-width: 0; }
 .reco-name-block strong { display: block; font-size: 13.5px; color: var(--charcoal, #24211d); margin-bottom: 3px; }
 .reco-name-block p { margin: 0; font-size: 11px; color: var(--muted, #8f897f); }
-.reco-rate { font-size: 12.5px; font-weight: 800; color: var(--orange, #d98d00); white-space: nowrap; flex: 0 0 auto; }
+.reco-rate {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--orange, #d98d00);
+  flex: 0 1 auto;
+  max-width: 38%;
+  text-align: right;
+}
 .reco-rate--none { color: var(--muted, #8f897f); font-weight: 600; }
 
 .pay-btn {

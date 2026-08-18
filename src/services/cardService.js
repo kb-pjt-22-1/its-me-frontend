@@ -152,10 +152,14 @@ export function findBenefitForCategory(benefitsInfo, categoryCode, previousMonth
   return tier.benefits?.find((b) => b.categoryCodes?.includes(categoryCode)) ?? null
 }
 
-/** 혜택 하나를 "10% 할인" / "4,000원 할인" 문구로 바꿔줍니다 */
+/**
+ * 혜택 하나를 "10% 할인" / "4,000원 할인" 문구로 바꿔줍니다.
+ * discountMethod === 'POINT_ACCUMULATION'(포인트 적립형)이면 "할인" 대신 "적립"으로 표기합니다.
+ */
 export function formatBenefit(benefit) {
   if (!benefit) return null
-  if (benefit.discountRate != null) return `${benefit.discountRate}% 할인`
-  if (benefit.discountAmount != null) return `${benefit.discountAmount.toLocaleString()}원 할인`
+  const label = benefit.discountMethod === 'POINT_ACCUMULATION' ? '적립' : '할인'
+  if (benefit.discountRate != null) return `${benefit.discountRate}% ${label}`
+  if (benefit.discountAmount != null) return `${benefit.discountAmount.toLocaleString()}원 ${label}`
   return benefit.description ?? '혜택 있음'
 }
