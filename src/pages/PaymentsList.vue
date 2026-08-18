@@ -48,7 +48,7 @@
               class="history-item"
               @click="goToDetail(item.paymentId)"
             >
-              <div class="item-icon"><img :src="item.categoryIcon" alt="" /></div>
+              <div class="item-icon">{{ item.categoryIcon }}</div>
               <div class="item-info">
                 <p class="name">{{ item.merchantName }}</p>
                 <p class="desc muted-text">{{ item.time }} · {{ item.cardName }}</p>
@@ -76,11 +76,10 @@ import { useRouter } from 'vue-router';
 import Button from '@/components/common/Button.vue';
 import Footer from '@/layouts/menu/Footer.vue';
 import { usePaymentStore } from '@/stores/payment';
-import { useMerchantsStore } from '@/stores/merchants';
+import { getCategoryIcon } from '@/utils/categoryIcons';
 
 const router = useRouter();
 const paymentStore = usePaymentStore();
-const merchantsStore = useMerchantsStore();
 
 const viewYear = ref(new Date().getFullYear());
 const viewMonth = ref(new Date().getMonth() + 1);
@@ -107,14 +106,12 @@ const normalizedHistory = computed(() =>
     const paymentTime = item.paymentTime ?? item.paidAt ?? '';
     const d = new Date(paymentTime);
     const hasValidDate = !Number.isNaN(d.getTime());
-    const merchantId = item.merchantId ?? item.merchant?.id;
-    const merchant = merchantId ? merchantsStore.getByIdWithCategory(merchantId) : null;
 
     return {
       paymentId: item.paymentId ?? item.id,
-      merchantName: item.merchantName ?? item.merchant?.name ?? merchant?.name ?? '알 수 없는 매장',
-      categoryCode: item.categoryCode ?? merchant?.categoryCode ?? null,
-      categoryIcon: merchant?.icon,
+      merchantName: item.merchantName ?? item.merchant?.name ?? '알 수 없는 매장',
+      categoryCode: item.categoryCode ?? null,
+      categoryIcon: getCategoryIcon(item.categoryCode),
       cardName: item.cardName ?? item.card?.cardName ?? '',
       finalAmount: item.finalAmount ?? item.amount ?? 0,
       discountAmount: item.discountAmount ?? 0,
@@ -150,7 +147,6 @@ const goToDetail = (paymentId) => router.push(`/payments/${paymentId}`);
 
 onMounted(() => {
   fetchHistoryForCurrentMonth();
-  if (merchantsStore.merchants.length === 0) merchantsStore.fetchMerchants();
 });
 </script>
 
@@ -240,7 +236,6 @@ onMounted(() => {
   width: 42px; height: 42px; border-radius: 12px; background: var(--page, #f7f7f5);
   display: grid; place-items: center; font-size: 1.2rem; flex: 0 0 auto;
 }
-.item-icon img { width: 20px; height: 20px; }
 .item-info { flex: 1; min-width: 0; }
 .name { font-weight: 700; margin: 0 0 4px; color: var(--charcoal, #24211d); font-size: 0.95rem; }
 .desc { font-size: 0.8rem; margin: 0; }
