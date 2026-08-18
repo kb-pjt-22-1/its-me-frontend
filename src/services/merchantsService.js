@@ -62,6 +62,37 @@ export async function fetchMerchantDetail(merchantId) {
   return normalizeMerchant(data)
 }
 
+// 카테고리 칩의 기본 정렬 순서(개인화 이전 기준값). 실생활에서 카드 혜택을 자주 챙기는
+// 순서(식사/카페/편의점 같은 일상 소비 -> 병원/약국 -> 쇼핑/외식 -> 여가/뷰티 -> 상황성 ->
+// 교육)로 고정 배치함. 이 목록에 없는 카테고리(백엔드에 새로 추가된 경우)는 정렬 뒤에도
+// 원래 순서 그대로 맨 뒤에 붙는다(stable sort).
+export const DEFAULT_CATEGORY_ORDER = [
+  '음식점', '카페', '편의점', '마트', '주유소',
+  '병원', '약국', '백화점', '패스트푸드', '빵집',
+  '영화관', '여가', '뷰티', '피트니스센터',
+  '주차장', '숙박', '학원', '독서실', '문구점',
+]
+
+// categoryName -> DEFAULT_CATEGORY_ORDER 인덱스. 목록에 없으면 맨 뒤 순위.
+function defaultCategoryRank(category) {
+  const index = DEFAULT_CATEGORY_ORDER.indexOf(category.categoryName)
+  return index === -1 ? DEFAULT_CATEGORY_ORDER.length : index
+}
+
+/**
+ * 카테고리 목록을 정렬한다. rankFn은 카테고리 객체({categoryCode, categoryName, categoryIcon})를
+ * 받아 순위(숫자, 작을수록 앞)를 반환하는 함수 - 기본은 위 DEFAULT_CATEGORY_ORDER 고정 순서다.
+ *
+ * 나중에 "사용자 결제 빈도순" 정렬을 붙일 때는 이 함수의 rankFn 자리에, 결제 빈도 맵(예:
+ * categoryCode -> 이번 달 결제 횟수)을 참조해서 순위를 매기는 함수를 넘기면 된다
+ * (예: (c) => -(frequencyByCode[c.categoryCode] ?? 0)). fetchMerchantCategories나
+ * 호출부(merchants 스토어, Map.vue)는 그대로 두고 이 함수 하나만 재사용하면 되도록
+ * 정렬 로직을 분리해뒀다.
+ */
+export function sortCategories(categories, rankFn = defaultCategoryRank) {
+  return [...categories].sort((a, b) => rankFn(a) - rankFn(b))
+}
+
 /**
  * 매장 카테고리 목록 [GET /api/v1/merchant-categories]
  * 응답: [{ categoryCode, categoryName, categoryIcon }]
@@ -70,7 +101,7 @@ export async function fetchMerchantDetail(merchantId) {
  */
 export async function fetchMerchantCategories() {
   const { data } = await api.get('/v1/merchant-categories')
-  return data
+  return sortCategories(data)
 }
 
 /** 매장 브랜드 목록 [GET /api/v1/merchant-brands] (매장 등록 폼에서 씀) */
