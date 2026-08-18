@@ -50,3 +50,14 @@ export async function fetchPaymentHistory(params) {
   const { data } = await api.get('/v1/payments', { params })
   return data
 }
+
+/**
+ * 결제 단건 상세 [GET /api/v1/payments/{paymentId}]
+ * 응답(PaymentHistoryResponseDto): paymentId, merchantName, categoryCode, cardName,
+ *   maskedCardNumber, paymentTime, originalAmount, discountAmount, finalAmount,
+ *   paymentStatus, paymentMethod
+ */
+export async function fetchPaymentDetail(paymentId) {
+  const { data } = await api.get(`/v1/payments/${paymentId}`)
+  return data
+}

@@ -62,6 +62,13 @@ const router = createRouter({
             component: () => import('@/pages/PaymentsList.vue'),
             meta: {requiresAuth: true},
         },
+        // 결제 내역 목록(/payments)에서 항목을 눌렀을 때 들어가는 상세 화면
+        {
+            path: '/payments/:id',
+            name: 'payment-detail',
+            component: () => import('@/pages/Paymentdetail.vue'),
+            meta: {requiresAuth: true},
+        },
         // 카드 목록(/cards)에서 카드를 눌렀을 때 들어가는 상세 화면
         {
             path: '/cards/:userCardId',

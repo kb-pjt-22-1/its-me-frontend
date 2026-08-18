@@ -7,6 +7,7 @@ import {
   completePaymentToken,
   cancelPaymentToken,
   fetchPaymentHistory,
+  fetchPaymentDetail,
 } from '@/services/paymentService'
 import { verifyPin as verifyPinRequest } from '@/services/paymentAuthService'
 import { useAuthStore } from './auth'
@@ -72,6 +73,12 @@ export const usePaymentStore = defineStore('payment', {
       } finally {
         this.isLoading = false
       }
+    },
+
+    // 결제 단건 상세 조회. 목록에서 클릭해서 들어왔어도 상세 페이지가 새로고침/딥링크로
+    // 바로 진입할 수 있어서 별도 API로 조회한다 (history 캐시에 의존하지 않음).
+    async fetchPaymentDetail(paymentId) {
+      return fetchPaymentDetail(paymentId)
     },
   },
 })

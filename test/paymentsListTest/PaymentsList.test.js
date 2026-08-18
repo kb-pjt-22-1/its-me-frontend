@@ -9,37 +9,30 @@ vi.mock('vue-router', () => ({
 
 import PaymentsList from '@/pages/PaymentsList.vue'
 import { usePaymentStore } from '@/stores/payment'
-import { useMerchantsStore } from '@/stores/merchants'
 
 const baseItem = {
   paymentId: 1,
-  merchantId: 1,
+  merchantName: '스타벅스',
+  categoryCode: '5812',
   finalAmount: 5000,
   discountAmount: 500,
   paymentTime: '2026-08-05T13:30:00',
   cardName: '가온카드',
 }
 
-function mountPage({
-  history = [],
-  isLoading = false,
-  merchants = [{ id: 1, name: '스타벅스', categoryCode: '5812' }],
-} = {}) {
+function mountPage({ history = [], isLoading = false } = {}) {
   setActivePinia(createPinia())
   const paymentStore = usePaymentStore()
-  const merchantsStore = useMerchantsStore()
 
   paymentStore.history = history
   paymentStore.isLoading = isLoading
   paymentStore.fetchHistory = vi.fn()
-  merchantsStore.merchants = merchants
-  merchantsStore.fetchMerchants = vi.fn()
 
   const wrapper = mount(PaymentsList, {
     global: { stubs: { Footer: true } },
   })
 
-  return { wrapper, paymentStore, merchantsStore }
+  return { wrapper, paymentStore }
 }
 
 beforeEach(() => {
@@ -62,16 +55,28 @@ describe('로딩/빈 상태', () => {
 })
 
 describe('결제 내역 정규화', () => {
-  it('merchantsStore에서 매장 이름을 채워 넣는다', () => {
+  it('응답의 매장명을 그대로 보여준다', () => {
     const { wrapper } = mountPage({ history: [{ ...baseItem }] })
 
     expect(wrapper.text()).toContain('스타벅스')
   })
 
-  it('매칭되는 매장이 없으면 "알 수 없는 매장"을 보여준다', () => {
-    const { wrapper } = mountPage({ history: [{ ...baseItem, merchantId: 999 }] })
+  it('매장명이 없으면 "알 수 없는 매장"을 보여준다', () => {
+    const { wrapper } = mountPage({ history: [{ ...baseItem, merchantName: undefined }] })
 
     expect(wrapper.text()).toContain('알 수 없는 매장')
+  })
+
+  it('categoryCode에 맞는 아이콘을 보여준다', () => {
+    const { wrapper } = mountPage({ history: [{ ...baseItem, categoryCode: '5812' }] })
+
+    expect(wrapper.find('.item-icon').text()).toBe('🍽️')
+  })
+
+  it('categoryCode가 없거나 매칭되지 않으면 기본 아이콘을 보여준다', () => {
+    const { wrapper } = mountPage({ history: [{ ...baseItem, categoryCode: null }] })
+
+    expect(wrapper.find('.item-icon').text()).toBe('🏷️')
   })
 
   it('paymentTime이 없으면 paidAt을 대신 쓴다', () => {
@@ -113,20 +118,6 @@ describe('결제 내역 정규화', () => {
     const groupLabels = wrapper.findAll('.history-group h4').map((el) => el.text())
     expect(groupLabels[0]).toContain('5일')
     expect(groupLabels[1]).toContain('1일')
-  })
-})
-
-describe('매장 목록 프리페치', () => {
-  it('매장 목록이 이미 있으면 다시 불러오지 않는다', () => {
-    const { merchantsStore } = mountPage({ merchants: [{ id: 1, name: '스타벅스' }] })
-
-    expect(merchantsStore.fetchMerchants).not.toHaveBeenCalled()
-  })
-
-  it('매장 목록이 비어 있으면 새로 불러온다', () => {
-    const { merchantsStore } = mountPage({ merchants: [] })
-
-    expect(merchantsStore.fetchMerchants).toHaveBeenCalledTimes(1)
   })
 })
 
