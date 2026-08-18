@@ -189,7 +189,7 @@ const paymentRows = computed(() => {
 
   const rows = activeCards.map((card) => {
     const benefit = merchant.value
-      ? findBenefitForCategory(card.benefitsInfo, merchant.value.categoryCode, card.currentAmount ?? 0)
+      ? findBenefitForCategory(card.benefitsInfo, merchant.value.categoryCode, card.previousMonthAmount ?? 0)
       : null;
     return {
       card,
@@ -299,8 +299,13 @@ const completePayment = async () => {
   }
 };
 
-onMounted(() => {
-  if (cardsStore.cards.length === 0) cardsStore.fetchCards();
+onMounted(async () => {
+  if (cardsStore.cards.length === 0) await cardsStore.fetchCards();
+  // fetchCards()는 실적만 받아오고 benefitsInfo는 안 채운다 - paymentRows가 그걸로
+  // 매칭하니, 이 페이지가 뜨는 시점에 필요한 만큼만 받아온다.
+  cardsStore.ensureBenefitsLoaded(
+    cardsStore.cards.filter((c) => c.status === 'ACTIVE').map((c) => c.userCardId)
+  );
 });
 
 // 발급된 토큰(바코드)을 아직 결제 완료도 취소도 안 한 채로 페이지를 벗어나면, 서버에

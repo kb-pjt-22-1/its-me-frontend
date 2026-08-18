@@ -149,12 +149,18 @@ const performanceTiers = computed(() =>
         )
 );
 
-// 현재까지 사용한 금액으로 이번 달 현재 구간을 계산합니다.
+// 지금 적용 중인 할인 구간은 전월 실적 기준이다(performanceTiers[].minimumSpending이
+// 전월 실적 기준 - cardService.js의 getCurrentTier 주석 참고). 이번 달 사용액(currentAmount)은
+// 아직 진행 중이라 구간을 정하는 데 못 쓴다 - 아래 tierPercent/nextTier처럼 "다음 구간까지
+// 얼마 남았는지" 진행률을 보여줄 때만 쓴다.
+// 카드 목록(Cards.vue)을 거쳐 들어온 경우에만 previousMonthAmount가 있다 - 카드 상세로
+// 바로 딥링크된 경우엔 아직 없을 수 있음(별도 이슈, fetchCardFullDetail이 전월 실적을
+// 안 받아옴).
 const currentTier = computed(() =>
     card.value?.benefitsInfo
         ? getCurrentTier(
             card.value.benefitsInfo,
-            card.value.currentAmount ?? 0
+            card.value.previousMonthAmount ?? 0
         )
         : null
 );

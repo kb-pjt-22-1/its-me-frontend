@@ -167,6 +167,9 @@
                   {{ shop.categoryName }} · {{ shop.distanceLabel }}
                 </p>
                 <span v-if="shop.recommended" class="pill pill--gold">혜택 매장</span>
+                <p v-if="shop.recommended && shop.typicalPaymentAmount != null" class="sheet-item-typical-amount">
+                  {{ shop.typicalPaymentAmount.toLocaleString() }}원 기준
+                </p>
                 <p v-if="shop.recommended && shop.benefitSummary" class="sheet-item-benefit">
                   <strong v-if="shop.recommendedCardName">{{ shop.recommendedCardName }}</strong> {{ shop.benefitSummary }}
                 </p>
@@ -337,6 +340,11 @@ const selectedMerchant = computed(
 function selectMerchant(merchantId) {
   selectedMerchantId.value = merchantId
   sheetExpanded.value = true
+  // 매장 상세를 열 때만 카드별 혜택(benefitsInfo)을 채운다 - recommendedCardsForSelected가
+  // 이걸 써서 매칭하는데, fetchCards()는 실적만 받아오고 benefitsInfo는 안 채워준다.
+  cardsStore.ensureBenefitsLoaded(
+    cardsStore.cards.filter((c) => c.status === 'ACTIVE').map((c) => c.userCardId)
+  )
 }
 
 function closeMerchantDetail() {
@@ -362,7 +370,7 @@ const recommendedCardsForSelected = computed(() => {
   const rows = cardsStore.cards
     .filter((card) => card.status === 'ACTIVE')
     .map((card) => {
-      const match = findBenefitForCategory(card.benefitsInfo, selectedMerchant.value.categoryCode, card.currentAmount ?? 0)
+      const match = findBenefitForCategory(card.benefitsInfo, selectedMerchant.value.categoryCode, card.previousMonthAmount ?? 0)
       return {
         card,
         match,
@@ -979,6 +987,7 @@ onUnmounted(() => {
 .sheet-item-info { flex: 1; min-width: 0; }
 .sheet-item-info strong { font-size: 14px; color: var(--charcoal, #24211d); }
 .sheet-item-info p { margin: 4px 0 6px; font-size: 11.5px; }
+.sheet-item-info p.sheet-item-typical-amount { margin: 4px 0 0; font-size: 10.5px; font-weight: 700; color: var(--orange-deep, #e6aa00); }
 .sheet-item-benefit {
   margin: 4px 0 0;
   font-size: 11.5px;

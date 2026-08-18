@@ -88,9 +88,14 @@ const router = useRouter();
 const cardsStore = useCardsStore();
 const merchantsStore = useMerchantsStore();
 
-onMounted(() => {
+onMounted(async () => {
   if (merchantsStore.merchants.length === 0) merchantsStore.fetchMerchants();
-  if (cardsStore.cards.length === 0) cardsStore.fetchCards();
+  if (cardsStore.cards.length === 0) await cardsStore.fetchCards();
+  // fetchCards()는 실적만 받아오고 benefitsInfo는 안 채운다 - recommendedCards가 그걸로
+  // 매칭하니, 이 페이지가 뜨는 시점에 필요한 만큼만 받아온다.
+  cardsStore.ensureBenefitsLoaded(
+    cardsStore.cards.filter((c) => c.status === 'ACTIVE').map((c) => c.userCardId)
+  );
 });
 
 const merchant = computed(() => merchantsStore.getByIdWithCategory(route.params.merchantId));
@@ -101,7 +106,7 @@ const recommendedCards = computed(() => {
   const rows = cardsStore.cards
     .filter((card) => card.status === 'ACTIVE')
     .map((card) => {
-      const match = findBenefitForCategory(card.benefitsInfo, merchant.value.categoryCode, card.currentAmount ?? 0);
+      const match = findBenefitForCategory(card.benefitsInfo, merchant.value.categoryCode, card.previousMonthAmount ?? 0);
       return {
         card,
         match,

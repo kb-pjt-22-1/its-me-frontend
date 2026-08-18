@@ -41,6 +41,7 @@ const cardsStoreMock = {
     return this.cards.find((c) => c.userCardId === id)
   },
   fetchCards: vi.fn(),
+  ensureBenefitsLoaded: vi.fn(),
 }
 vi.mock('@/stores/cards', () => ({ useCardsStore: () => cardsStoreMock }))
 
