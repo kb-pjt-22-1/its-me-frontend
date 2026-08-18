@@ -127,19 +127,27 @@ function normalizeCard(dto) {
   }
 }
 
-/** 이번 달 사용액(currentSpending) 기준으로 지금 적용되는 실적 구간을 찾습니다 */
-export function getCurrentTier(benefitsInfo, currentSpending = 0) {
+/**
+ * 전월 실적(previousMonthSpending) 기준으로 지금 적용되는 실적 구간을 찾습니다.
+ * performanceTiers[].minimumSpending은 "전월" 실적 기준이다 - 카드 혜택 상세 응답의
+ * commonConditions.previousMonthSpendingPeriod("전월 1일부터 말일까지")가 이걸 명시함.
+ * 이번 달 사용액(currentAmount)은 아직 진행 중이라 할인 구간을 정하는 데 쓰면 안 되고,
+ * "다음 달에 어느 구간을 받을지"를 보여주는 용도로만 써야 한다 - 호출부에서 헷갈려서
+ * currentAmount를 넘기는 실수가 있었다(카드 혜택이 실제로는 적용되는데도 "혜택 없음"으로
+ * 잘못 뜨는 버그의 원인).
+ */
+export function getCurrentTier(benefitsInfo, previousMonthSpending = 0) {
   const tiers = benefitsInfo?.performanceTiers ?? []
-  const eligible = tiers.filter((t) => currentSpending >= (t.minimumSpending ?? 0))
+  const eligible = tiers.filter((t) => previousMonthSpending >= (t.minimumSpending ?? 0))
   if (eligible.length === 0) return null
   return eligible.reduce((best, t) =>
     (t.minimumSpending ?? 0) > (best.minimumSpending ?? 0) ? t : best
   )
 }
 
-/** 매장 카테고리(category_code)에 맞는 혜택을 찾습니다 (지금 적용 중인 구간 안에서만) */
-export function findBenefitForCategory(benefitsInfo, categoryCode, currentSpending = 0) {
-  const tier = getCurrentTier(benefitsInfo, currentSpending)
+/** 매장 카테고리(category_code)에 맞는 혜택을 찾습니다 (전월 실적 기준으로 지금 적용 중인 구간 안에서만) */
+export function findBenefitForCategory(benefitsInfo, categoryCode, previousMonthSpending = 0) {
+  const tier = getCurrentTier(benefitsInfo, previousMonthSpending)
   if (!tier) return null
   return tier.benefits?.find((b) => b.categoryCodes?.includes(categoryCode)) ?? null
 }

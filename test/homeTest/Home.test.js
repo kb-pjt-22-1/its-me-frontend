@@ -132,6 +132,7 @@ describe('오늘의 추천', () => {
         recommended: true,
         benefitSummary: '다음 달 기대 25원',
         recommendedCardName: '굿데이 플래티늄카드',
+        typicalPaymentAmount: 8000,
       },
       {
         id: 2,
@@ -141,6 +142,7 @@ describe('오늘의 추천', () => {
         recommended: false,
         benefitSummary: null,
         recommendedCardName: null,
+        typicalPaymentAmount: null,
       },
     ])
 
@@ -153,8 +155,10 @@ describe('오늘의 추천', () => {
     expect(cards[0].text()).toContain('혜택 매장')
     expect(cards[0].text()).toContain('굿데이 플래티늄카드')
     expect(cards[0].text()).toContain('다음 달 기대 25원')
+    expect(cards[0].find('.today-recommend-typical-amount').text()).toBe('8,000원 기준')
     expect(cards[1].text()).toContain('어떤 편의점')
     expect(cards[1].text()).not.toContain('혜택 매장')
+    expect(cards[1].find('.today-recommend-typical-amount').exists()).toBe(false)
   })
 
   it('추천 매장을 클릭하면 매장 상세 페이지 대신, 그 매장이 선택된 채로 지도 화면으로 이동한다', async () => {

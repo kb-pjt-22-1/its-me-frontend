@@ -166,3 +166,53 @@ describe('cards store 실적 조회', () => {
         })
     })
 })
+
+// fetchCards()가 채워주지 않는 benefitsInfo를, 지도/매장 상세/북마크/결제처럼 카테고리별
+// 혜택 매칭이 필요한 화면에서만 그때 불러오도록 만든 액션 - 마이핏카드(할인형) 등 카드의
+// benefitsInfo가 비어 있어서 "적용 가능한 혜택이 없다"고 잘못 뜨던 버그의 수정 대상.
+describe('ensureBenefitsLoaded', () => {
+    it('benefitsInfo가 없는 카드만 골라 fetchCardBenefits를 불러 채운다', async () => {
+        const benefitsInfo = { performanceTiers: [{ tierName: '1구간', minimumSpending: 0, benefits: [] }] }
+        serviceMocks.fetchCardBenefits.mockResolvedValue(benefitsInfo)
+
+        const store = useCardsStore()
+        store.cards = [
+            { userCardId: 1, cardName: '마이핏카드', status: 'ACTIVE' }, // benefitsInfo 없음
+            { userCardId: 2, cardName: '이미 로드된 카드', status: 'ACTIVE', benefitsInfo: { performanceTiers: [] } },
+        ]
+
+        await store.ensureBenefitsLoaded([1, 2])
+
+        expect(serviceMocks.fetchCardBenefits).toHaveBeenCalledTimes(1)
+        expect(serviceMocks.fetchCardBenefits).toHaveBeenCalledWith(1)
+        expect(store.getById(1).benefitsInfo).toEqual(benefitsInfo)
+    })
+
+    it('이미 모든 카드에 benefitsInfo가 있으면 아무 것도 호출하지 않는다', async () => {
+        const store = useCardsStore()
+        store.cards = [{ userCardId: 1, status: 'ACTIVE', benefitsInfo: { performanceTiers: [] } }]
+
+        await store.ensureBenefitsLoaded([1])
+
+        expect(serviceMocks.fetchCardBenefits).not.toHaveBeenCalled()
+    })
+
+    it('조회에 실패한 카드는 benefitsInfo를 null로 남겨 findBenefitForCategory가 안전하게 처리하게 한다', async () => {
+        serviceMocks.fetchCardBenefits.mockRejectedValue(new Error('network error'))
+
+        const store = useCardsStore()
+        store.cards = [{ userCardId: 1, status: 'ACTIVE' }]
+
+        await store.ensureBenefitsLoaded([1])
+
+        expect(store.getById(1).benefitsInfo).toBeNull()
+    })
+
+    it('존재하지 않는 userCardId는 조용히 무시한다', async () => {
+        const store = useCardsStore()
+        store.cards = []
+
+        await expect(store.ensureBenefitsLoaded([999])).resolves.toBeUndefined()
+        expect(serviceMocks.fetchCardBenefits).not.toHaveBeenCalled()
+    })
+})

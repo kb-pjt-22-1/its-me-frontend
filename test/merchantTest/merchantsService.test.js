@@ -67,6 +67,7 @@ describe('fetchRecommendedNearbyMerchants', () => {
         benefitAvailable: true,
         benefitSummary: '이번 달 확정 100원',
         recommendedCardName: '테스트카드',
+        typicalPaymentAmount: 10000,
       }],
     })
 
@@ -91,7 +92,40 @@ describe('fetchRecommendedNearbyMerchants', () => {
       recommended: true,
       benefitSummary: '이번 달 확정 100원',
       recommendedCardName: '테스트카드',
+      typicalPaymentAmount: 10000,
     }])
+  })
+
+  it('추천 카드가 없어 benefitAvailable=false면 typicalPaymentAmount가 없어도(null) 정상 처리한다', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [{
+        ...rawMerchant,
+        benefitAvailable: false,
+        benefitSummary: null,
+        recommendedCardName: null,
+        typicalPaymentAmount: null,
+      }],
+    })
+
+    const [result] = await fetchRecommendedNearbyMerchants(
+      { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 },
+      { lat: 37.5, lng: 127.1 },
+    )
+
+    expect(result.typicalPaymentAmount).toBeNull()
+  })
+
+  it('typicalPaymentAmount 필드가 응답에 아예 없으면 null로 정규화한다', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [{ ...rawMerchant, benefitAvailable: false }],
+    })
+
+    const [result] = await fetchRecommendedNearbyMerchants(
+      { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 },
+      { lat: 37.5, lng: 127.1 },
+    )
+
+    expect(result.typicalPaymentAmount).toBeNull()
   })
 
   it('categoryCode를 넘기면 그대로 params에 포함한다', async () => {
@@ -126,6 +160,7 @@ describe('fetchTodayRecommendedMerchants', () => {
         benefitAvailable: true,
         benefitSummary: '이번 달 확정 100원',
         recommendedCardName: '테스트카드',
+        typicalPaymentAmount: 10000,
       }],
     })
 
@@ -140,7 +175,18 @@ describe('fetchTodayRecommendedMerchants', () => {
       recommended: true,
       benefitSummary: '이번 달 확정 100원',
       recommendedCardName: '테스트카드',
+      typicalPaymentAmount: 10000,
     }])
+  })
+
+  it('추천 카드가 없으면 typicalPaymentAmount를 null로 정규화한다', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [{ ...rawMerchant, distanceMeters: 250, benefitAvailable: false }],
+    })
+
+    const [result] = await fetchTodayRecommendedMerchants(37.5, 127.0, '5812')
+
+    expect(result.typicalPaymentAmount).toBeNull()
   })
 })
 

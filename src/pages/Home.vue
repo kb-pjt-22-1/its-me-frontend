@@ -185,6 +185,9 @@
               </div>
               <span v-if="shop.recommended" class="pill pill--gold">혜택 매장</span>
             </div>
+            <p v-if="shop.recommended && shop.typicalPaymentAmount != null" class="today-recommend-typical-amount">
+              {{ shop.typicalPaymentAmount.toLocaleString() }}원 기준
+            </p>
             <p v-if="shop.recommended && shop.benefitSummary" class="today-recommend-benefit">
               <strong v-if="shop.recommendedCardName">{{ shop.recommendedCardName }}</strong> {{ shop.benefitSummary }}
             </p>
@@ -509,8 +512,15 @@ onMounted(() => {
   font-size: 11.5px;
 }
 
-.today-recommend-benefit {
+.today-recommend-typical-amount {
   margin: 8px 0 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--orange-deep, #e6aa00);
+}
+
+.today-recommend-benefit {
+  margin: 4px 0 0;
   font-size: 11.5px;
   color: #b67a00;
 }

@@ -66,6 +66,9 @@ const cardsStore = useCardsStore();
 onMounted(() => {
   bookmarksStore.fetchBookmarks();
   if (merchantsStore.merchants.length === 0) merchantsStore.fetchMerchants();
+  // fetchCards()는 실적만 받아오고 benefitsInfo는 안 채운다 - bestDiscountLabel이 그걸로
+  // 매칭하니, 이 페이지가 뜨는 시점에 지금 가진 카드만큼만 받아온다.
+  cardsStore.ensureBenefitsLoaded(cardsStore.cards.map((c) => c.userCardId));
 });
 
 // 보유 카드 중 이 매장 카테고리에 맞는 최고 혜택 찾기
@@ -74,7 +77,7 @@ function bestDiscountLabel(categoryCode) {
   let best = null;
   let bestCardName = '';
   for (const card of cardsStore.cards) {
-    const benefit = findBenefitForCategory(card.benefitsInfo, categoryCode, card.currentAmount ?? 0);
+    const benefit = findBenefitForCategory(card.benefitsInfo, categoryCode, card.previousMonthAmount ?? 0);
     const rate = benefit?.discountRate ?? benefit?.discountAmount ?? -1;
     const bestRate = best?.discountRate ?? best?.discountAmount ?? -1;
     if (benefit && rate > bestRate) {

@@ -142,6 +142,27 @@ export const useCardsStore = defineStore('cards', {
       }
     },
 
+    // fetchCards()로 받은 카드 목록엔 benefitsInfo가 없다(실적만 옴) - 매장 카테고리별
+    // 혜택 매칭(findBenefitForCategory)이 필요한 화면(지도/매장 상세/북마크/결제)에서, 정말
+    // 필요해지는 시점에만 이걸로 채운다. 이미 benefitsInfo가 있는 카드(카드 상세를 먼저 봤거나
+    // 이 액션을 이미 한 번 탄 카드)는 다시 부르지 않는다.
+    async ensureBenefitsLoaded(userCardIds) {
+      const targets = userCardIds
+        .map((userCardId) => this.getById(userCardId))
+        .filter((card) => card && card.benefitsInfo === undefined)
+
+      if (targets.length === 0) return
+
+      const results = await Promise.allSettled(
+        targets.map((card) => fetchCardBenefits(card.userCardId))
+      )
+
+      targets.forEach((card, index) => {
+        const result = results[index]
+        card.benefitsInfo = result.status === 'fulfilled' ? result.value : null
+      })
+    },
+
     async registerCard(payload) {
       const card = await registerCard(payload)
       this.cards.push(card)

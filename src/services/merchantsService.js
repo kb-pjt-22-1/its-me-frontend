@@ -13,8 +13,10 @@ export async function fetchMerchantList() {
  * 넓어져도 응답이 무한정 커지지 않도록 백엔드가 centerLat/centerLng 기준 거리순으로
  * 500개까지만 잘라서 내려줍니다 - 나머지는 화면에서 마커 클러스터링으로 뭉쳐 보여줍니다.
  * 필터링이 아니라 전체 목록 + 표시용 플래그입니다: 응답(NearbyMerchantRecommendationResponseDto[])은
- * 일반 매장 조회와 필드가 같고 benefitAvailable(boolean), benefitSummary, recommendedCardName이
- * 추가로 옵니다 - 사용자 보유 카드로 지금 당장 혜택 받을 수 있는 매장만 benefitAvailable=true.
+ * 일반 매장 조회와 필드가 같고 benefitAvailable(boolean), benefitSummary, recommendedCardName,
+ * typicalPaymentAmount(Long, nullable)이 추가로 옵니다 - 사용자 보유 카드로 지금 당장 혜택 받을 수
+ * 있는 매장만 benefitAvailable=true. typicalPaymentAmount는 recommendedCardName의 혜택을 계산할 때
+ * 기준으로 쓴 결제 금액(원)이고, benefitAvailable=false(추천 카드 없음)면 항상 null입니다.
  */
 export async function fetchRecommendedNearbyMerchants(bounds, center, categoryCode) {
   const { data } = await api.get('/v1/merchants/recommendations', {
@@ -33,6 +35,7 @@ export async function fetchRecommendedNearbyMerchants(bounds, center, categoryCo
     recommended: dto.benefitAvailable,
     benefitSummary: dto.benefitSummary,
     recommendedCardName: dto.recommendedCardName,
+    typicalPaymentAmount: dto.typicalPaymentAmount ?? null,
   }))
 }
 
@@ -40,8 +43,9 @@ export async function fetchRecommendedNearbyMerchants(bounds, center, categoryCo
  * 홈 화면 오늘의 추천: 사용자 위치 기준 가까운 매장 후보 중, 지금 당장 보유 카드로 혜택 받을 수
  * 있는 매장을 우선으로 최대 2곳 조회 [GET /api/v1/merchants/today-recommendation?lat=&lng=&categoryCode=]
  * 응답(NearbyMerchantRecommendationResponseDto[])은 일반 매장 조회와 필드가 같고 distanceMeters(m),
- * benefitAvailable(boolean), benefitSummary, recommendedCardName이 추가로 옵니다. 백엔드가 이미
- * 혜택 매장 우선 + 거리순으로 정렬해서 내려줍니다.
+ * benefitAvailable(boolean), benefitSummary, recommendedCardName, typicalPaymentAmount(Long,
+ * nullable)이 추가로 옵니다. 백엔드가 이미 혜택 매장 우선 + 거리순으로 정렬해서 내려줍니다.
+ * typicalPaymentAmount 의미는 위 fetchRecommendedNearbyMerchants 주석 참고.
  */
 export async function fetchTodayRecommendedMerchants(lat, lng, categoryCode) {
   const { data } = await api.get('/v1/merchants/today-recommendation', {
@@ -53,6 +57,7 @@ export async function fetchTodayRecommendedMerchants(lat, lng, categoryCode) {
     recommended: dto.benefitAvailable,
     benefitSummary: dto.benefitSummary,
     recommendedCardName: dto.recommendedCardName,
+    typicalPaymentAmount: dto.typicalPaymentAmount ?? null,
   }))
 }
 
