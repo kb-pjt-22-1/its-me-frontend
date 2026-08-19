@@ -54,8 +54,16 @@ describe('fetchMerchantList', () => {
 
     const result = await fetchMerchantList()
 
-    expect(api.get).toHaveBeenCalledWith('/v1/merchants')
+    expect(api.get).toHaveBeenCalledWith('/v1/merchants', { params: { categoryCode: undefined } })
     expect(result).toEqual([normalizedMerchant])
+  })
+
+  it('categoryCode를 넘기면 그대로 params에 포함한다', async () => {
+    api.get.mockResolvedValueOnce({ data: [rawMerchant] })
+
+    await fetchMerchantList('5812')
+
+    expect(api.get).toHaveBeenCalledWith('/v1/merchants', { params: { categoryCode: '5812' } })
   })
 })
 

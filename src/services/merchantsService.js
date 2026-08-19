@@ -1,8 +1,12 @@
 import api from '@/api'
 
-/** 매장 목록 조회 [GET /api/v1/merchants] */
-export async function fetchMerchantList() {
-  const { data } = await api.get('/v1/merchants')
+/**
+ * 매장 목록 조회 [GET /api/v1/merchants?categoryCode=]
+ * categoryCode를 주면 bounds/거리 제한 없이 그 카테고리 전체를 조회합니다(백엔드 LIMIT 없음) -
+ * 지도 화면 "카테고리 전체 검색"(재검색 버튼 + 카테고리 선택)에서 씁니다.
+ */
+export async function fetchMerchantList(categoryCode) {
+  const { data } = await api.get('/v1/merchants', { params: { categoryCode } })
   return data.map(normalizeMerchant)
 }
 
@@ -30,13 +34,7 @@ export async function fetchRecommendedNearbyMerchants(bounds, center, categoryCo
       categoryCode,
     },
   })
-  return data.map((dto) => ({
-    ...normalizeMerchant(dto),
-    recommended: dto.benefitAvailable,
-    benefitSummary: dto.benefitSummary,
-    recommendedCardName: dto.recommendedCardName,
-    typicalPaymentAmount: dto.typicalPaymentAmount ?? null,
-  }))
+  return data.map(normalizeRecommendedMerchant)
 }
 
 /**
@@ -51,14 +49,7 @@ export async function fetchTodayRecommendedMerchants(lat, lng, categoryCode) {
   const { data } = await api.get('/v1/merchants/today-recommendation', {
     params: { lat, lng, categoryCode },
   })
-  return data.map((dto) => ({
-    ...normalizeMerchant(dto),
-    distanceMeters: dto.distanceMeters,
-    recommended: dto.benefitAvailable,
-    benefitSummary: dto.benefitSummary,
-    recommendedCardName: dto.recommendedCardName,
-    typicalPaymentAmount: dto.typicalPaymentAmount ?? null,
-  }))
+  return data.map(normalizeRecommendedMerchant)
 }
 
 /** 특정 매장 조회 [GET /api/v1/merchants/{merchantId}] */
@@ -128,5 +119,18 @@ function normalizeMerchant(dto) {
     lat: dto.latitude,
     lng: dto.longitude,
     phone: dto.phone,
+  }
+}
+
+// fetchRecommendedNearbyMerchants/fetchTodayRecommendedMerchants 둘 다
+// NearbyMerchantRecommendationResponseDto[]를 받는 같은 응답 모양이라 매핑을 공유한다.
+function normalizeRecommendedMerchant(dto) {
+  return {
+    ...normalizeMerchant(dto),
+    distanceMeters: dto.distanceMeters,
+    recommended: dto.benefitAvailable,
+    benefitSummary: dto.benefitSummary,
+    recommendedCardName: dto.recommendedCardName,
+    typicalPaymentAmount: dto.typicalPaymentAmount ?? null,
   }
 }

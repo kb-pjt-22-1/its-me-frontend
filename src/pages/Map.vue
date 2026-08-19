@@ -42,6 +42,22 @@
       <!-- store-sheet의 자식으로 둬서, 시트가 펼쳐지든 접히든(transform) 시트와 함께
            같은 좌표계로 움직입니다 - 시트 높이가 내용에 따라 달라져도(매장이 적으면 50%보다
            작게 렌더링됨) 항상 시트 맨 위 12px 위에 붙어있습니다. -->
+
+      <!-- 재검색: 카테고리 미선택이면 현재 중심점 기준 최대 500곳, 선택 중이면 그 카테고리 전체.
+           locate-btn 바로 위에 두어 같은 우측 버튼 묶음으로 보이게 한다. -->
+      <button
+        class="research-btn"
+        :disabled="merchantsLoading"
+        :aria-label="selectedCategory ? `${selectedCategory} 전체 재검색` : '현재 화면에서 재검색'"
+        @click="onResearchClick"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+      </button>
+
       <button class="locate-btn" @click="recenterToMyLocation" aria-label="내 위치로 이동">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
@@ -202,7 +218,7 @@ import { useCardsStore } from '@/stores/cards'
 import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
 import { getBrandImage } from '@/utils/brandImages'
 import { toDataUri } from '@/utils/imageDataUri'
-import { fetchRecommendedNearbyMerchants } from '@/services/merchantsService'
+import { fetchRecommendedNearbyMerchants, fetchMerchantList } from '@/services/merchantsService'
 import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
@@ -353,9 +369,15 @@ function closeMerchantDetail() {
 
 // 카테고리 칩을 고르면 목록(merchants)이 바뀌는데, 매장 상세를 보던 중이었다면
 // selectedMerchantId가 그대로 남아 상세 화면이 계속 떠 있었다(클러스터 클릭과 같은 원인) - 같이 닫는다.
+// 칩을 고르거나 해제하는 순간 그에 맞는 검색을 바로 실행한다(칩 = 화면 안에서 검색).
 function selectCategory(cat) {
   selectedCategory.value = selectedCategory.value === cat ? null : cat
   selectedMerchantId.value = null
+  if (selectedCategory.value) {
+    searchCategoryInView(selectedCategory.value)
+  } else {
+    searchNearbyCurrentView()
+  }
 }
 
 // 검색어 입력도 카테고리 칩과 같은 이유로 목록을 바꾸므로, 매장 상세는 같이 닫는다.
@@ -455,17 +477,9 @@ function loadKakaoMapScript() {
   })
 }
 
-let boundsLoadTimer = null
-// loadBoundsMerchants 호출마다 증가시켜, 응답이 요청 순서와 다르게 도착해도
+// 검색 함수(withMerchantsLoading) 호출마다 증가시켜, 응답이 요청 순서와 다르게 도착해도
 // "마지막으로 보낸 요청"의 응답만 반영하기 위한 토큰.
 let boundsRequestId = 0
-
-// 줌 스크롤/드래그 중엔 idle 이벤트가 짧은 간격으로 여러 번 발생해서, 매번 새로 요청하면
-// 그 자체가 버벅임의 원인이 됩니다. 제스처가 끝나고 나서 한 번만 요청하도록 디바운스.
-function scheduleLoadBoundsMerchants() {
-  clearTimeout(boundsLoadTimer)
-  boundsLoadTimer = setTimeout(loadBoundsMerchants, 150)
-}
 
 // 카카오맵은 생성 시점의 컨테이너 크기로 내부 캔버스를 그려두고, 이후 컨테이너 크기가
 // 바뀌어도 스스로 다시 그리지 않는다. 이 페이지가 다른 탭에서 라우트 전환 애니메이션
@@ -521,17 +535,18 @@ function initMap(kakao, center) {
   // 추천 강조(테두리+후광)와 같은 시각 언어를 클러스터에도 얹는 것뿐입니다.
   kakao.maps.event.addListener(clusterer, 'clustered', onClustered)
 
-  // 줌/드래그가 끝날 때마다(idle) 화면에 보이는 영역의 매장만 새로 받아옵니다.
-  kakao.maps.event.addListener(map, 'idle', scheduleLoadBoundsMerchants)
-  loadBoundsMerchants()
+  // 최초 진입 시 1회만 자동으로 현재 위치 기준 검색합니다 - 이후 팬/줌으로는 더 이상
+  // 자동 재조회하지 않고, 재검색 버튼이나 카테고리 칩을 눌러야 다시 조회합니다.
+  searchNearbyCurrentView()
 
   focusMerchantFromQuery()
 }
 
-// 홈 화면 "오늘의 추천"에서 매장을 누르면 매장 상세 페이지 대신 이 화면으로 넘어오면서
-// ?merchantId=&lat=&lng=를 함께 받습니다. 내 위치 기준 지도는 그대로 두고(내 위치 마커도
-// 유지), 그 매장 좌표로 지도만 옮겨서 bounds 조회가 그 매장을 포함하게 만든 뒤,
-// bounds 결과에 실제로 그 매장이 들어오면(비동기라 즉시는 아님) 상세(추천 카드 리스트)를 엽니다.
+// 홈 화면 "오늘의 카드 추천"의 가까운 혜택 매장을 누르면 매장 상세 페이지 대신 이
+// 화면으로 넘어오면서 ?merchantId=(선택적으로 &lat=&lng=)를 함께 받습니다. 내
+// 위치 기준 지도는 그대로 두고(내 위치 마커도 유지), 그 매장 좌표로 지도만 옮겨서 bounds
+// 조회가 그 매장을 포함하게 만든 뒤, bounds 결과에 실제로 그 매장이 들어오면(비동기라
+// 즉시는 아님) 상세(추천 카드 리스트)를 엽니다.
 async function focusMerchantFromQuery() {
   const merchantId = route.query.merchantId ? Number(route.query.merchantId) : null
   if (!merchantId || !kakaoInstance || !mapInstance) return
@@ -546,6 +561,16 @@ async function focusMerchantFromQuery() {
   }
 
   mapInstance.setCenter(new kakaoInstance.maps.LatLng(lat, lng))
+  // setCenter 직후에 바로 getBounds()를 읽으면(currentViewBoundsAndCenter가 이걸 씀)
+  // 카카오맵이 내부 투영을 아직 새 중심 기준으로 갱신하지 못해 sw==ne인 크기 0짜리
+  // bounds가 나올 수 있다(그 상태로 검색하면 결과가 항상 0건) - 지도가 실제로 자리잡았다는
+  // 'idle' 이벤트를 한 번 기다린 뒤에 검색을 트리거한다. 일반적인 팬/줌에는 idle을 자동
+  // 재조회 트리거로 안 쓰지만(재검색 버튼으로 대체됨), 여기는 사용자 조작이 아니라
+  // 프로그램이 지도를 옮긴 직후 딱 한 번 필요한 경우라 다르다.
+  kakaoInstance.maps.event.addListener(mapInstance, 'idle', function onIdleOnce() {
+    kakaoInstance.maps.event.removeListener(mapInstance, 'idle', onIdleOnce)
+    searchNearbyCurrentView()
+  })
 
   const stopWatchingBounds = watch(boundsMerchants, (list) => {
     if (list.some((m) => m.id === merchantId)) {
@@ -593,55 +618,84 @@ function buildClusterBadgeContent(count, hasRecommended) {
   )
 }
 
-// 매장 전체를 미리 안 받고, 지금 화면(bounds)에 보이는 매장을 지도 중심에서 가까운 순으로
-// 최대 500개(백엔드 LIMIT) 받아옵니다. 축소해서 매장이 몰려도 검색 자체는 항상 동작하고,
-// 화면이 빽빽해지는 문제는 클러스터링(renderMerchantMarkers)이 시각적으로 해결합니다.
-// 응답의 recommended(boolean)로 "사용자 보유 카드로 지금 당장 혜택 받을 수 있는 매장"만
-// 하이라이트하고, 나머지도 전부 핀으로 보여줍니다(추천 매장만 남기는 필터링이 아닙니다).
-// 카카오맵은 숫자가 클수록 더 축소된 상태입니다(1이 가장 확대). 6 이상으로 축소하면
-// 화면에 잡히는 매장이 너무 많아져서 클러스터 숫자만 잔뜩 떠 있는 상태가 되고, 조회도
-// 무거워지니 아예 요청도 안 보내고 핀도 다 지웁니다 - 사용자가 다시 확대해야 보입니다.
-const MAX_VISIBLE_LEVEL = 6
+// 매장 전체를 미리 안 받고, 명시적으로 검색을 트리거했을 때만(초기 진입 1회 / 재검색 버튼 /
+// 카테고리 칩 클릭) 조회합니다 - 팬/줌 중에는 더 이상 자동으로 재조회하지 않습니다. 화면이
+// 빽빽해지는 문제는 클러스터링(renderMerchantMarkers)이 시각적으로 해결하므로, 줌 레벨(축소
+// 정도)과 무관하게 검색은 항상 동작합니다.
+const merchantsLoading = ref(false)
 
-async function loadBoundsMerchants() {
-  if (!kakaoInstance || !mapInstance) return
-
-  if (mapInstance.getLevel() >= MAX_VISIBLE_LEVEL) {
-    boundsMerchants.value = []
-    clusterFilterMerchantIds.value = null
-    return
-  }
-
-  const bounds = mapInstance.getBounds()
-  const sw = bounds.getSouthWest()
-  const ne = bounds.getNorthEast()
-  const center = mapInstance.getCenter()
-
-  // 지도 컨테이너가 아직 실제 크기로 자리잡기 전(레이아웃 트랜지션 등)엔 idle이
-  // SW===NE인 크기 0짜리 bounds를 보고할 때가 있다. 이 상태로 조회하면 항상 빈
-  // 배열을 받아서, 방금 정상적으로 그려진 매장을 지워버리므로 아예 요청하지 않는다.
-  if (sw.getLat() === ne.getLat() && sw.getLng() === ne.getLng()) {
-    return
-  }
-
-  // idle이 짧은 간격으로 여러 번 발생하면 요청도 여러 번 나가는데, 네트워크 응답은
-  // 요청을 보낸 순서대로 도착한다는 보장이 없다. 더 나중에 보낸 요청이 있다면 이번
-  // 응답은 낡은 것이니 반영하지 않는다(안 그러면 최신 화면이 예전 결과로 덮어써짐).
+async function withMerchantsLoading(run) {
+  merchantsLoading.value = true
+  // 여러 검색이 겹치면(재검색 연타, 칩 연속 클릭) 네트워크 응답이 보낸 순서대로 온다는
+  // 보장이 없다. 더 나중에 보낸 요청이 있다면 이번 응답은 낡은 것이니 반영하지 않는다
+  // (안 그러면 최신 화면이 예전 결과로 덮어써짐).
   const requestId = ++boundsRequestId
-
   try {
-    const result = await fetchRecommendedNearbyMerchants(
-      { swLat: sw.getLat(), swLng: sw.getLng(), neLat: ne.getLat(), neLng: ne.getLng() },
-      { lat: center.getLat(), lng: center.getLng() },
-    )
+    const result = await run()
     if (requestId !== boundsRequestId) return
     boundsMerchants.value = result
     clusterFilterMerchantIds.value = null // 화면이 갱신됐으니 이전 클러스터 선택은 해제
   } catch (err) {
     if (requestId !== boundsRequestId) return
-    console.warn('지도 영역 매장 조회 실패', err)
+    console.warn('매장 조회 실패', err)
     boundsMerchants.value = []
     clusterFilterMerchantIds.value = null
+  } finally {
+    if (requestId === boundsRequestId) merchantsLoading.value = false
+  }
+}
+
+function currentViewBoundsAndCenter() {
+  const bounds = mapInstance.getBounds()
+  const sw = bounds.getSouthWest()
+  const ne = bounds.getNorthEast()
+  const center = mapInstance.getCenter()
+  return {
+    bounds: { swLat: sw.getLat(), swLng: sw.getLng(), neLat: ne.getLat(), neLng: ne.getLng() },
+    center: { lat: center.getLat(), lng: center.getLng() },
+  }
+}
+
+// 지도 컨테이너가 아직 실제 크기를 잡기 전(마운트 직후, 라우트 전환 애니메이션 중 등)에는
+// getBounds()가 sw===ne인 크기 0짜리 bounds를 보고할 수 있다 - 그 상태로 검색하면 결과가
+// 항상 0건이라 조회 자체를 건너뛴다.
+function isDegenerateBounds(bounds) {
+  return bounds.swLat === bounds.neLat && bounds.swLng === bounds.neLng
+}
+
+// 재검색 버튼(카테고리 미선택): 현재 지도 중심점 기준 가까운 순 최대 500개(백엔드 LIMIT) -
+// bounds도 같이 넘기지만 응답은 항상 centerLat/centerLng 기준 거리순으로 잘린다.
+async function searchNearbyCurrentView() {
+  if (!kakaoInstance || !mapInstance) return
+  const { bounds, center } = currentViewBoundsAndCenter()
+  if (isDegenerateBounds(bounds)) return
+  await withMerchantsLoading(() => fetchRecommendedNearbyMerchants(bounds, center))
+}
+
+// 카테고리 칩 클릭: 그 카테고리로 지금 화면(bounds) 안에서 바로 검색합니다.
+async function searchCategoryInView(categoryName) {
+  if (!kakaoInstance || !mapInstance) return
+  const { bounds, center } = currentViewBoundsAndCenter()
+  const categoryCode = getCategoryCodeByName(categoryName)
+  await withMerchantsLoading(() => fetchRecommendedNearbyMerchants(bounds, center, categoryCode))
+}
+
+// 재검색 버튼(카테고리 선택 중): 화면/거리 제한 없이 그 카테고리 전체를 검색합니다.
+async function searchCategoryAll(categoryName) {
+  const categoryCode = getCategoryCodeByName(categoryName)
+  await withMerchantsLoading(() => fetchMerchantList(categoryCode))
+}
+
+function getCategoryCodeByName(categoryName) {
+  return merchantsStore.categories.find((c) => c.categoryName === categoryName)?.categoryCode
+}
+
+// 재검색 버튼: 카테고리를 고르고 있으면 그 카테고리 전체 검색, 아니면 현재 화면 기준 검색.
+function onResearchClick() {
+  if (selectedCategory.value) {
+    searchCategoryAll(selectedCategory.value)
+  } else {
+    searchNearbyCurrentView()
   }
 }
 
@@ -862,9 +916,17 @@ onUnmounted(() => {
 }
 .chip.active { background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); }
 
-/* store-sheet의 자식이라 top이 store-sheet 자신의 (변환 전) 박스 기준입니다 - 버튼 높이(46px)
-   + 간격(12px)만큼 위에 두면, store-sheet에 걸린 transform(펼침/접힘)이 부모-자식을 함께
-   움직여서 시트 실제 높이(내용에 따라 50%보다 작을 수도 있음)와 무관하게 항상 시트 바로 위에 있습니다. */
+/* 둘 다 store-sheet의 자식이라 top이 store-sheet 자신의 (변환 전) 박스 기준입니다 - 시트에
+   걸린 transform(펼침/접힘)이 부모-자식을 함께 움직여서 시트 실제 높이(내용에 따라 50%보다
+   작을 수도 있음)와 무관하게 항상 시트 바로 위에 있습니다. locate-btn(46px)과 같은 크기로
+   맞추고, 그 위에 12px 간격을 두고 쌓았습니다: -58(locate-btn top) - 12(간격) - 46(자기 높이) = -116px. */
+.research-btn {
+  position: absolute; right: 18px; top: -116px; width: 46px; height: 46px; border-radius: 50%;
+  border: none; background: var(--surface, #ffffff); box-shadow: 0 6px 16px rgba(0, 0, 0, .15);
+  display: grid; place-items: center; color: var(--charcoal, #24211d); z-index: 20; cursor: pointer;
+}
+.research-btn:disabled { opacity: .6; cursor: default; }
+
 .locate-btn {
   position: absolute; right: 18px; top: -58px; width: 46px; height: 46px; border-radius: 50%;
   border: none; background: var(--surface, #ffffff); box-shadow: 0 6px 16px rgba(0, 0, 0, .15);

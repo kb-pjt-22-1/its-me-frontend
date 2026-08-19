@@ -40,7 +40,10 @@ beforeEach(() => {
   window.console.error = vi.fn()
   fetchTodayRecommendation.mockResolvedValue(null)
   fetchExpiringBenefits.mockResolvedValue({ daysRemaining: 0, expiringBenefits: [], nearbyMerchantBenefits: [] })
-  Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { getCurrentPosition: vi.fn() } })
+  Object.defineProperty(navigator, 'geolocation', {
+    configurable: true,
+    value: { getCurrentPosition: (success) => success({ coords: { latitude: 37.5665, longitude: 126.978 } }) },
+  })
 })
 
 describe('fetchRecommendation', () => {
@@ -136,7 +139,7 @@ describe('오늘의 추천', () => {
     expect(merchants[1].text()).toContain('최대 5% 할인')
   })
 
-  it('가까운 혜택 매장을 클릭하면 매장 상세 화면으로 이동한다', async () => {
+  it('가까운 혜택 매장을 클릭하면 매장 상세 페이지 대신 지도 화면(해당 매장 포커스)으로 이동한다', async () => {
     fetchTodayRecommendation.mockResolvedValueOnce({
       ...recommendation,
       nearbyMerchants: [{ merchantId: 42, name: '맥도날드 을지로1가', distanceMeters: 137, benefitLabel: '10% 할인' }],
@@ -147,6 +150,6 @@ describe('오늘의 추천', () => {
 
     await wrapper.find('.reco-merchant-item').trigger('click')
 
-    expect(routerMock.push).toHaveBeenCalledWith('/stores/42')
+    expect(routerMock.push).toHaveBeenCalledWith({ path: '/map', query: { merchantId: 42 } })
   })
 })
