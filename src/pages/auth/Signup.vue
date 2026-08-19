@@ -94,17 +94,39 @@
         <form class="stack-form" @submit.prevent="goToPinStep">
           <div class="input-box">
             <label for="signup-login-id" class="sr-only">아이디</label>
-            <input id="signup-login-id" v-model="loginId" type="text" placeholder="아이디 (영문·숫자, 4~20자)" autocapitalize="none" />
+            <input
+              id="signup-login-id"
+              :value="loginId"
+              type="text"
+              placeholder="아이디 (영문·숫자, 4~20자)"
+              autocapitalize="none"
+              maxlength="20"
+              @input="onLoginIdInput"
+            />
           </div>
 
           <div class="input-box">
             <label for="signup-password" class="sr-only">비밀번호</label>
-            <input id="signup-password" v-model="password" type="password" placeholder="비밀번호 (문자·숫자·특수문자 포함 8자 이상)" />
+            <input
+              id="signup-password"
+              :value="password"
+              type="password"
+              placeholder="비밀번호 (대/소문자·숫자·특수문자 포함 8~20자)"
+              maxlength="20"
+              @input="onPasswordInput"
+            />
           </div>
 
           <div class="input-box">
             <label for="signup-password-confirm" class="sr-only">비밀번호 확인</label>
-            <input id="signup-password-confirm" v-model="passwordConfirm" type="password" placeholder="비밀번호 확인" />
+            <input
+              id="signup-password-confirm"
+              :value="passwordConfirm"
+              type="password"
+              placeholder="비밀번호 확인"
+              maxlength="20"
+              @input="onPasswordConfirmInput"
+            />
           </div>
 
           <p v-if="accountError" class="error-text">{{ accountError }}</p>
@@ -267,12 +289,37 @@ const password = ref('');
 const passwordConfirm = ref('');
 const accountError = ref('');
 
-const LOGIN_ID_PATTERN = /^[a-zA-Z0-9_-]{4,20}$/;
-const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,64}$/;
+// 아이디: 영문·숫자만, 특수문자 불가, 20자 이내(과입력 방지는 input의 maxlength로도 막지만,
+// 붙여넣기로 우회될 수 있으니 여기서도 자른다).
+const LOGIN_ID_PATTERN = /^[A-Za-z0-9]{4,20}$/;
+// 비밀번호: 대문자/소문자/숫자/특수문자를 각각 1개 이상 포함, 그 네 종류로만 구성, 8~20자.
+const PASSWORD_SPECIAL_CHARS = '!@#$%^&*()_+\\-=\\[\\]{}:;,.<>?';
+const PASSWORD_PATTERN = new RegExp(
+  `^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[${PASSWORD_SPECIAL_CHARS}])[A-Za-z0-9${PASSWORD_SPECIAL_CHARS}]{8,20}$`
+);
+
+// 붙여넣기 등으로 20자를 넘기거나 허용되지 않은 문자(특수문자 등)가 들어와도 즉시 잘라낸다 -
+// maxlength만으로는 붙여넣기 시 초과분이 막히지 않는 입력 방식(IME 등)이 있어 이중으로 막는다.
+function onLoginIdInput(event) {
+  loginId.value = event.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 20);
+  event.target.value = loginId.value;
+}
+
+// 비밀번호는 어떤 문자를 지웠는지 알기 어려워지므로(보안 입력이라 눈에 안 보임) 문자를
+// 걸러내진 않고, 붙여넣기로 20자를 넘기는 것만 자른다 - 문자 구성 검증은 제출 시 한다.
+function onPasswordInput(event) {
+  password.value = event.target.value.slice(0, 20);
+  event.target.value = password.value;
+}
+
+function onPasswordConfirmInput(event) {
+  passwordConfirm.value = event.target.value.slice(0, 20);
+  event.target.value = passwordConfirm.value;
+}
 
 function validateAccount() {
-  if (!LOGIN_ID_PATTERN.test(loginId.value)) return '아이디는 영문·숫자·-·_ 4~20자로 입력해주세요';
-  if (!PASSWORD_PATTERN.test(password.value)) return '비밀번호는 문자·숫자·특수문자를 포함해 8자 이상이어야 해요';
+  if (!LOGIN_ID_PATTERN.test(loginId.value)) return '아이디는 영문·숫자로만 4~20자 입력해주세요';
+  if (!PASSWORD_PATTERN.test(password.value)) return '비밀번호는 대문자·소문자·숫자·특수문자를 각각 1개 이상 포함해 8~20자로 입력해주세요';
   if (password.value !== passwordConfirm.value) return '비밀번호가 일치하지 않아요';
   return '';
 }

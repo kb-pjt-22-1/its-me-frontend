@@ -160,7 +160,44 @@ describe('2단계: 아이디/비밀번호 (접근성 라벨)', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('아이디는 영문·숫자·-·_ 4~20자로 입력해주세요')
+    expect(wrapper.text()).toContain('아이디는 영문·숫자로만 4~20자 입력해주세요')
+    expect(wrapper.find('.pin-dots').exists()).toBe(false)
+  })
+})
+
+describe('2단계: 과입력/부적절 입력 방지', () => {
+  it('아이디에 특수문자를 입력하면 즉시 걸러내고 20자를 넘으면 잘라낸다', async () => {
+    const wrapper = mountPage()
+    await completeStep1(wrapper)
+
+    const idInput = wrapper.find('#signup-login-id')
+    await idInput.setValue('my-id_123!@#') // 특수문자 섞어 입력
+    expect(idInput.element.value).toBe('myid123')
+
+    await idInput.setValue('a'.repeat(25)) // 25자 붙여넣기 시뮬레이션
+    expect(idInput.element.value).toBe('a'.repeat(20))
+  })
+
+  it('비밀번호에 20자를 넘겨 입력하면(붙여넣기 등) 20자로 잘라낸다', async () => {
+    const wrapper = mountPage()
+    await completeStep1(wrapper)
+
+    const pwInput = wrapper.find('#signup-password')
+    await pwInput.setValue('Pw123!@#'.repeat(3)) // 24자
+    expect(pwInput.element.value).toHaveLength(20)
+  })
+
+  it('비밀번호에 대문자/소문자/숫자/특수문자 중 하나라도 빠지면 제출을 막는다', async () => {
+    const wrapper = mountPage()
+    await completeStep1(wrapper)
+
+    await wrapper.find('#signup-login-id').setValue('myid123')
+    await wrapper.find('#signup-password').setValue('pw123!@#') // 대문자 없음
+    await wrapper.find('#signup-password-confirm').setValue('pw123!@#')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('비밀번호는 대문자·소문자·숫자·특수문자를 각각 1개 이상 포함해 8~20자로 입력해주세요')
     expect(wrapper.find('.pin-dots').exists()).toBe(false)
   })
 })
