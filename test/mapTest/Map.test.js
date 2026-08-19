@@ -417,20 +417,8 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(getClusterer().markers).toHaveLength(0)
   })
 
-  it('지도를 레벨 6 이상으로 심하게 축소하면 조회 자체를 하지 않고 기존 핀도 지운다', async () => {
+  it('많이 축소된 화면(레벨 6 이상)이어도 줌 레벨과 무관하게 그대로 조회해서 핀을 그린다', async () => {
     const { kakao, getClusterer } = createKakaoMock({ level: 6 })
-    window.kakao = kakao
-    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
-
-    mountMapPage()
-    await flushPromises()
-
-    expect(fetchRecommendedNearbyMerchants).not.toHaveBeenCalled()
-    expect(getClusterer().markers).toHaveLength(0)
-  })
-
-  it('레벨 6 미만이면(많이 축소되지 않았으면) 그대로 조회해서 핀을 그린다', async () => {
-    const { kakao, getClusterer } = createKakaoMock({ level: 5 })
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
 
@@ -508,8 +496,10 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
   })
 
-  it('지도가 다시 갱신되면(팬/줌) 이전 클러스터 선택은 초기화된다', async () => {
-    const { kakao, getClusterer, trigger, mapInstance } = createKakaoMock()
+  it('재검색 버튼을 누르면 새 조회 결과가 반영되면서 이전 클러스터 선택은 초기화된다', async () => {
+    // 팬/줌만으로는 더 이상 자동 재조회하지 않는다(재검색 버튼으로 대체됨) - 클러스터 선택
+    // 초기화도 idle이 아니라 새 검색이 실제로 완료됐을 때(withMerchantsLoading)만 일어난다.
+    const { kakao, getClusterer, trigger } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
 
@@ -522,11 +512,8 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
     await flushPromises()
     expect(wrapper.find('.cluster-filter-banner').exists()).toBe(true)
 
-    // idle(팬/줌 종료)이 다시 발생하면 loadBoundsMerchants가 150ms 디바운스 후 재조회하고,
-    // 새 결과가 반영되면서 이전 클러스터 선택은 해제된다.
     fetchRecommendedNearbyMerchants.mockResolvedValue([MART_MERCHANT])
-    trigger(mapInstance, 'idle')
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await wrapper.find('.research-btn').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('.cluster-filter-banner').exists()).toBe(false)

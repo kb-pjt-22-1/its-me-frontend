@@ -656,11 +656,19 @@ function currentViewBoundsAndCenter() {
   }
 }
 
+// 지도 컨테이너가 아직 실제 크기를 잡기 전(마운트 직후, 라우트 전환 애니메이션 중 등)에는
+// getBounds()가 sw===ne인 크기 0짜리 bounds를 보고할 수 있다 - 그 상태로 검색하면 결과가
+// 항상 0건이라 조회 자체를 건너뛴다.
+function isDegenerateBounds(bounds) {
+  return bounds.swLat === bounds.neLat && bounds.swLng === bounds.neLng
+}
+
 // 재검색 버튼(카테고리 미선택): 현재 지도 중심점 기준 가까운 순 최대 500개(백엔드 LIMIT) -
 // bounds도 같이 넘기지만 응답은 항상 centerLat/centerLng 기준 거리순으로 잘린다.
 async function searchNearbyCurrentView() {
   if (!kakaoInstance || !mapInstance) return
   const { bounds, center } = currentViewBoundsAndCenter()
+  if (isDegenerateBounds(bounds)) return
   await withMerchantsLoading(() => fetchRecommendedNearbyMerchants(bounds, center))
 }
 

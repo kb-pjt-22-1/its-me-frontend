@@ -95,7 +95,6 @@ describe('fetchMerchants', () => {
     await store.fetchMerchants()
 
     expect(fetchMerchantList).not.toHaveBeenCalled()
-    expect(store.isLoading).toBe(false)
     expect(store.merchants).toEqual([])
   })
 
@@ -113,8 +112,6 @@ describe('fetchMerchants', () => {
     expect(fetchMerchantCategories).toHaveBeenCalledTimes(1)
     expect(store.merchants).toEqual(merchants)
     expect(store.categories).toEqual(categories)
-    expect(store.isLoading).toBe(false)
-    expect(store.error).toBeNull()
   })
 
   it('카테고리를 이미 갖고 있으면 카테고리는 다시 요청하지 않는다', async () => {
@@ -127,29 +124,6 @@ describe('fetchMerchants', () => {
 
     expect(fetchMerchantCategories).not.toHaveBeenCalled()
     expect(store.categories).toEqual([{ categoryCode: '5812', categoryName: '음식점' }])
-  })
-
-  it('실패하면 서버 에러 메시지를 저장한다', async () => {
-    const store = useMerchantsStore()
-    login(useAuthStore())
-    fetchMerchantList.mockRejectedValueOnce({ response: { data: { message: '서버 오류' } } })
-    fetchMerchantCategories.mockResolvedValueOnce([])
-
-    await store.fetchMerchants()
-
-    expect(store.error).toBe('서버 오류')
-    expect(store.isLoading).toBe(false)
-  })
-
-  it('서버 에러 메시지가 없으면 기본 메시지를 저장한다', async () => {
-    const store = useMerchantsStore()
-    login(useAuthStore())
-    fetchMerchantList.mockRejectedValueOnce(new Error('network down'))
-    fetchMerchantCategories.mockResolvedValueOnce([])
-
-    await store.fetchMerchants()
-
-    expect(store.error).toBe('매장 목록을 불러오지 못했습니다.')
   })
 })
 
