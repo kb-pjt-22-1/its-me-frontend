@@ -22,21 +22,36 @@
         :disabled="card.status !== 'ACTIVE'"
         @click="goToCardDetail(card.userCardId)"
       >
-        <div class="card-top-row">
+        <div v-if="card.isPrimary || card.status !== 'ACTIVE'" class="card-top-row card-badge-row">
           <span v-if="card.isPrimary" class="pill pill--mint">주 사용 카드</span>
-          <span v-else-if="card.status !== 'ACTIVE'" class="pill pill--danger">{{ card.statusText }}</span>
+          <span v-else class="pill pill--danger">{{ card.statusText }}</span>
         </div>
 
         <div class="card-top-row">
-          <div>
-            <h3>{{ card.cardName }}</h3>
+          <div class="card-title-group">
+            <h3>{{ card.cardName }} </h3>
+            <p v-if="getCardLast4(card.panLast4)" class="card-last4">
+              {{ getCardLast4(card.panLast4) }}
+            </p>
           </div>
-          <span class="card-glyph" :class="{ 'glyph-primary': card.isPrimary, 'glyph-disabled': card.status !== 'ACTIVE' }">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <rect x="2" y="5" width="20" height="14" rx="3"></rect>
-              <line x1="2" y1="10" x2="22" y2="10"></line>
-            </svg>
-          </span>
+          <div class="card-image-frame">
+            <img
+                v-if="getCardImage(card)"
+                :src="getCardImage(card)"
+                :alt="`${card.cardName} 이미지`"
+                class="card-thumbnail"
+            />
+            <span
+                v-else
+                class="card-glyph"
+                :class="{ 'glyph-primary': card.isPrimary, 'glyph-disabled': card.status !== 'ACTIVE' }"
+            >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <rect x="2" y="5" width="20" height="14" rx="3"></rect>
+                  <line x1="2" y1="10" x2="22" y2="10"></line>
+                </svg>
+              </span>
+          </div>
         </div>
 
         <template v-if="card.status === 'ACTIVE'">
@@ -77,6 +92,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Button from '@/components/common/Button.vue';
 import { useCardsStore } from '@/stores/cards';
+import { getCardImage } from '@/utils/cardImages';
 
 const router = useRouter();
 const cardsStore = useCardsStore();
@@ -138,11 +154,13 @@ const goToCardDetail = (userCardId) => {
   if (card && card.status !== 'ACTIVE') return;
   router.push(`/cards/${userCardId}`);
 };
+
+const getCardLast4 = (value) => String(value ?? '').replace(/\D/g, '').slice(-4);
 </script>
 
 <style scoped>
 .layout-container {
-  padding: 18px 18px 24px;
+  padding: 8px 18px 24px;
 }
 
 .page-title {
@@ -212,10 +230,10 @@ const goToCardDetail = (userCardId) => {
   align-items: flex-start;
   width: 100%;
 }
-.card-top-row:first-child {
-  min-height: 20px;
-  margin-bottom: 6px;
-}
+.card-badge-row { min-height: 20px; margin-bottom: 6px; }
+.card-title-group { min-width: 0; text-align: left; }
+.card-title-group h3 { margin-bottom: 3px; }
+.card-last4 { margin: 0; color: var(--muted, #8f897f); font-size: 11px; letter-spacing: .4px; }
 
 .card-top-row h3 {
   margin: 0 0 4px;
@@ -241,6 +259,9 @@ const goToCardDetail = (userCardId) => {
 }
 .card-glyph.glyph-primary { background: var(--dark, #545045); }
 .card-glyph.glyph-disabled { background: #c7c7c7; }
+
+.card-image-frame { width: 88px; height: 56px; flex: 0 0 auto; display: flex; justify-content: center; align-items: center; }
+.card-thumbnail { width: 100%; height: 100%; display: block; object-fit: contain; }
 
 .status-row {
   display: flex;

@@ -13,59 +13,121 @@
         </div>
 
         <div class="surface-card reco-card">
-        <div v-if="recommendationLoading" class="empty-text muted-text">불러오는 중...</div>
-
-        <div v-else-if="recommendationError" class="empty-text muted-text">
-          추천 정보를 불러오지 못했어요.
-          <Button variant="link-muted" size="sm" @click="homeStore.fetchRecommendation">다시 시도</Button>
-        </div>
-
-        <div v-else-if="!recommendation" class="empty-text muted-text">
-          아직 추천할 카드가 없어요.
-        </div>
-
-        <template v-else>
-          <div class="reco-top-row">
-            <span class="pill pill--mint reco-badge">오늘의 추천</span>
-            <span class="reco-card-icon">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <rect x="2" y="5" width="20" height="14" rx="3"></rect>
-                <line x1="2" y1="10" x2="22" y2="10"></line>
-              </svg>
-            </span>
-          </div>
-          <h4 class="reco-title">{{ recommendation.categoryName }}에서는 {{ recommendation.cardName }}</h4>
-          <p class="reco-sub muted-text">{{ recommendation.benefitLabel }}</p>
-
-          <Button variant="box" class="reco-cta" @click="goToRecommendedPayment">추천 카드로 결제</Button>
-
-          <div class="reco-nearby-header">
-            <h5>가까운 혜택 매장</h5>
-            <Button variant="link-muted" size="sm" @click="router.push('/map')">더보기 &gt;</Button>
+          <div v-if="recommendationLoading" class="empty-text muted-text">불러오는 중...</div>
+          <div v-else-if="recommendationError" class="empty-text muted-text">추천 정보를 불러오지 못했어요.
+            <Button variant="link-muted" size="sm" @click="homeStore.fetchRecommendation">다시 시도</Button>
           </div>
 
-          <div v-if="recommendation.nearbyMerchants.length === 0" class="empty-text muted-text">
-            근처에 추천할 매장이 없어요.
-          </div>
+          <div v-else-if="!recommendation" class="empty-text muted-text">아직 추천할 카드가 없어요.</div>
 
-          <ul v-else class="reco-merchant-list">
-            <li v-for="m in recommendation.nearbyMerchants" :key="m.merchantId" @click="router.push(`/stores/${m.merchantId}`)">
-              <span class="reco-merchant-icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
-                  <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
-                </svg>
-              </span>
-              <span class="reco-merchant-name">{{ m.name }} <span class="muted-text">{{ m.distanceMeters }}m</span></span>
-              <span class="reco-merchant-benefit success-text">{{ m.benefitLabel }}</span>
-              <span class="reco-merchant-chevron">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </span>
-            </li>
-          </ul>
-        </template>
+          <template v-else>
+            <div class="reco-top-row">
+              <div class="reco-summary">
+          <span class="pill pill--mint reco-badge">
+            오늘의 추천
+          </span>
+                <h4 class="reco-title">
+                  {{ recommendation.categoryName }}에서는
+                  {{ recommendation.cardName }}
+                </h4>
+
+                <p class="reco-sub muted-text">
+                  {{ recommendation.benefitLabel }}
+                </p>
+              </div>
+
+              <span class="reco-card-icon">
+          <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+          >
+            <rect
+                x="2"
+                y="5"
+                width="20"
+                height="14"
+                rx="3"
+            />
+            <line x1="2" y1="10" x2="22" y2="10" />
+          </svg>
+        </span>
+            </div>
+
+            <Button
+                variant="box"
+                class="reco-cta"
+                @click="goToRecommendedPayment"
+            >
+              추천 카드로 결제
+            </Button>
+
+            <div class="reco-divider"></div>
+
+            <div class="reco-nearby-header">
+              <h5>가까운 혜택 매장</h5>
+
+              <Button
+                  variant="link-muted"
+                  size="sm"
+                  @click="router.push('/map')"
+              >
+                더보기 〉
+              </Button>
+            </div>
+
+            <div
+                v-if="!recommendation.nearbyMerchants?.length"
+                class="empty-text muted-text"
+            >
+              근처에 추천할 매장이 없어요.
+            </div>
+
+            <div v-else class="reco-merchant-list">
+              <button
+                  v-for="merchant in recommendation.nearbyMerchants"
+                  :key="merchant.merchantId"
+                  type="button"
+                  class="reco-merchant-item"
+                  @click="router.push(`/stores/${merchant.merchantId}`)"
+              >
+          <span class="reco-merchant-icon">
+            <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+            >
+              <path d="M3 9h18" />
+              <path d="M5 9v11h14V9" />
+              <path d="M4 9l2-5h12l2 5" />
+              <path d="M9 20v-6h6v6" />
+            </svg>
+          </span>
+
+                <span class="reco-merchant-info">
+            <strong>{{ merchant.name }}</strong>
+            <small>
+              {{ Math.round(merchant.distanceMeters) }}m
+            </small>
+          </span>
+
+                <span
+                    v-if="merchant.benefitLabel"
+                    class="reco-merchant-benefit"
+                >
+            {{ merchant.benefitLabel }}
+          </span>
+
+                <span class="reco-merchant-chevron">〉</span>
+              </button>
+            </div>
+          </template>
         </div>
       </section>
 
@@ -158,47 +220,10 @@
         </div>
       </section>
 
-      <!-- 오늘의 추천 -->
-      <section class="today-recommend-section">
-        <div class="section-header">
-          <h3>오늘의 추천</h3>
-          <Button variant="link-muted" size="sm" @click="router.push('/map')">지도에서 보기</Button>
-        </div>
-
-        <div v-if="todayRecommendLoading" class="empty-text muted-text">추천 매장을 찾는 중...</div>
-        <div v-else-if="todayRecommendations.length === 0" class="empty-text muted-text">
-          주변에 추천할 매장이 없어요.
-        </div>
-
-        <div v-else class="today-recommend-list">
-          <button
-            v-for="shop in todayRecommendations"
-            :key="shop.id"
-            class="today-recommend-card"
-            @click="goToMerchantOnMap(shop)"
-          >
-            <div class="today-recommend-top">
-              <span v-if="shop.categoryIcon" class="today-recommend-icon"><img :src="shop.categoryIcon" alt="" /></span>
-              <div class="today-recommend-info">
-                <strong>{{ shop.name }}</strong>
-                <p class="muted-text">{{ shop.categoryName }} · {{ shop.distanceLabel }}</p>
-              </div>
-              <span v-if="shop.recommended" class="pill pill--gold">혜택 매장</span>
-            </div>
-            <p v-if="shop.recommended && shop.typicalPaymentAmount != null" class="today-recommend-typical-amount">
-              {{ shop.typicalPaymentAmount.toLocaleString() }}원 기준
-            </p>
-            <p v-if="shop.recommended && shop.benefitSummary" class="today-recommend-benefit">
-              <strong v-if="shop.recommendedCardName">{{ shop.recommendedCardName }}</strong> {{ shop.benefitSummary }}
-            </p>
-          </button>
-        </div>
-      </section>
-
       <!-- 최근 결제 내역 -->
       <section class="transaction-section">
         <div class="section-header">
-          <h3>최근 결제 내역</h3>
+          <h3 class="section-title">최근 결제 내역</h3>
           <Button variant="link-muted" size="sm" @click="router.push('/payments')">전체보기</Button>
         </div>
 
@@ -207,15 +232,15 @@
         <Button v-else tag="div" variant="box-outline" style="min-height: auto;">
           <div v-for="item in recentTransactions" :key="item.paymentId" class="transaction-item">
             <div class="item-info">
-              <strong>{{ item.merchantName }}</strong>
-              <span class="amount">{{ item.finalAmount.toLocaleString() }}원</span>
+              <div class="item-left">
+                <strong>{{ item.merchantName }}</strong>
+                <p class="item-date muted-text">{{ formatPaymentTime(item.paymentTime) }} | {{ item.cardName }}</p>
+              </div>
+              <div class="item-payment">
+                <span class="amount">{{ item.finalAmount.toLocaleString() }}원</span>
+                <span v-if="item.discountAmount > 0" class="item-discount success-text">{{ item.discountAmount.toLocaleString() }}원 할인</span>
+              </div>
             </div>
-            <p class="item-date muted-text">
-              {{ formatPaymentTime(item.paymentTime) }} | {{ item.cardName }}
-              <span v-if="item.discountAmount > 0" class="item-discount success-text">
-                -{{ item.discountAmount.toLocaleString() }}원 할인
-              </span>
-            </p>
           </div>
         </Button>
       </section>
@@ -352,7 +377,7 @@ onMounted(() => {
 
 <style scoped>
 .layout-container {
-  padding: 18px 18px 24px;
+  padding: 5px 18px 24px;
 }
 
 .home-header {
@@ -388,29 +413,28 @@ onMounted(() => {
 /* 오늘의 카드 추천 - 제목은 흰 박스 밖에, gap:14px로 박스랑 간격 통일
    (최근 결제 내역이랑 같은 패턴) */
 .reco-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 15px; }
-.reco-card { padding: 20px; }
-.reco-top-row { display: flex; justify-content: space-between; align-items: flex-start; }
-.reco-badge { display: inline-flex; margin-bottom: 8px; }
-.reco-card-icon {
-  width: 34px; height: 34px; border-radius: 9px; background: var(--dark, #545045);
-  color: #ffffff; display: grid; place-items: center; flex: 0 0 auto;
-}
-.reco-title { margin: 0 0 4px; font-size: 16px; font-weight: 700; color: var(--charcoal, #24211d); }
-.reco-sub { margin: 0 0 16px; font-size: 12.5px; }
-.reco-cta { width: 100%; margin-bottom: 20px; }
+.reco-card { padding: 20px; border-radius: 22px; }
+.reco-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.reco-summary { flex: 1; min-width: 0; }
+.reco-badge { display: inline-flex; margin-bottom: 12px; }
+.reco-title { margin: 0 0 5px; color: var(--charcoal, #24211d); font-size: 16px; font-weight: 700; line-height: 1.45; }
+.reco-sub { margin: 0; font-size: 12.5px; }
+.reco-card-icon { width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; background: var(--dark, #545045); color: #ffffff; }
+:deep(.reco-cta) { width: 100%; min-height: 52px; margin: 20px 0; padding: 0 20px; align-items: center; justify-content: center; flex-direction: row; border-radius: 12px; background: var(--dark, #545045); color: var(--orange, #ffbc00); font-size: 15px; font-weight: 700; }
 
-.reco-nearby-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.reco-nearby-header h5 { margin: 0; font-size: 13px; font-weight: 700; color: var(--charcoal, #24211d); }
+.reco-divider { height: 1px; margin-bottom: 18px; background: var(--line, #e7e4de); }
+.reco-nearby-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.reco-nearby-header h5 { margin: 0; color: var(--charcoal, #24211d); font-size: 14px; font-weight: 700; }
 
-.reco-merchant-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
-.reco-merchant-list li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer; }
-.reco-merchant-icon {
-  width: 26px; height: 26px; border-radius: 8px; background: var(--page, #f7f7f5);
-  color: var(--muted, #8f897f); display: grid; place-items: center; flex: 0 0 auto;
-}
-.reco-merchant-name { flex: 1; color: var(--charcoal, #24211d); font-weight: 600; }
-.reco-merchant-benefit { font-size: 11.5px; font-weight: 700; white-space: nowrap; }
-.reco-merchant-chevron { flex: 0 0 auto; color: var(--muted, #8f897f); display: grid; place-items: center; }
+.reco-merchant-list { display: flex; flex-direction: column; gap: 9px; }
+.reco-merchant-item { width: 100%; min-height: 52px; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto 12px; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid var(--line, #e7e4de); border-radius: 12px; background: #ffffff; text-align: left; }
+.reco-merchant-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: var(--inactive, #f0efec); color: var(--dark, #545045); }
+.reco-merchant-info { min-width: 0; display: flex; align-items: baseline; gap: 5px; }
+.reco-merchant-info strong { overflow: hidden; color: var(--charcoal, #24211d); font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.reco-merchant-info small { flex: 0 0 auto; color: var(--muted, #8f897f); font-size: 11px; }
+
+.reco-merchant-benefit { padding: 5px 8px; border-radius: 8px; background: #ebf7f3; color: var(--green, #00a878); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.reco-merchant-chevron { color: var(--muted, #8f897f); font-size: 16px; }
 
 /* 간편결제 / 이번 달 혜택 (기존 박스를 작게 줄여서 유지) */
 .bottom-container {
@@ -545,33 +569,15 @@ onMounted(() => {
   margin-bottom: 15px;
 }
 
-.transaction-item {
-  width: 100%;
-  padding: 12px 0;
-}
-
+.transaction-item { width: 100%; padding: 10px 0; }
 .transaction-item:first-child { padding-top: 0; }
 .transaction-item:last-child { padding-bottom: 0; }
 .transaction-item + .transaction-item { border-top: 1px solid var(--line, #e7e4de); }
-
-.item-info {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  font-size: 1rem;
-  margin-bottom: 5px;
-  color: var(--charcoal, #24211d);
-}
-
-.item-date {
-  font-size: 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.item-discount {
-  font-weight: 700;
-  font-size: 0.8rem;
-}
+.item-info { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; width: 100%; color: var(--charcoal, #24211d); }
+.item-left { flex: 1; min-width: 0; }
+.item-left strong { display: block; margin-bottom: 4px; font-size: 14px; font-weight: 500; }
+.item-date { margin: 0; color: var(--muted, #8f897f); font-size: 12px; white-space: nowrap; }
+.item-payment { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.item-payment .amount { font-size: 14px; font-weight: 500; white-space: nowrap; }
+.item-discount { font-size: 12px; font-weight: 700; white-space: nowrap; }
 </style>

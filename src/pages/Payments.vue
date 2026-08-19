@@ -49,7 +49,13 @@
   <div v-else class="layout-container">
     <div v-if="!isAuthenticated" class="display-box surface-card">
       <div class="auth-prompt">
-        <div class="lock-icon">🔒</div>
+        <div class="lock-icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="5" y="10" width="14" height="11" rx="2"></rect>
+            <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+            <circle cx="12" cy="15" r="1"></circle>
+          </svg>
+        </div>
         <h3>간편 결제</h3>
         <p>간편 비밀번호 인증 후 바코드가 표시됩니다</p>
       </div>
@@ -321,15 +327,11 @@ onBeforeRouteLeave(() => {
 </script>
 
 <style scoped>
-.layout-container { padding: 18px 18px 100px; }
+.layout-container { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: 8px 18px 0; box-sizing: border-box; background: var(--page, #f2f4f6); }
 
-.display-box { padding: 40px 20px; text-align: center; margin-bottom: 24px; }
+.display-box { flex: 0 0 auto; padding: 32px 20px; text-align: center; margin-bottom: 16px; }
 .barcode-canvas { max-width: 100%; height: 60px; }
-.auth-prompt .lock-icon {
-  width: 64px; height: 64px; margin: 0 auto 14px;
-  border-radius: 50%; background: var(--inactive, #f0efec);
-  display: grid; place-items: center; font-size: 24px;
-}
+.auth-prompt .lock-icon { width: 64px; height: 64px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 50%; background: var(--inactive, #f5f5f5); color: var(--charcoal, #24211d); }
 .auth-prompt h3 { margin: 0 0 6px; font-size: 16px; }
 .auth-prompt p { margin: 0; color: var(--muted, #8f897f); font-size: 12px; }
 
@@ -375,7 +377,7 @@ onBeforeRouteLeave(() => {
 }
 .main-action-btn:disabled { opacity: .6; cursor: not-allowed; }
 
-.payment-methods { display: flex; flex-direction: column; gap: 12px; }
+.payment-methods { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 18px; }
 .loading-text { text-align: center; padding: 20px 0; font-size: 0.9rem; }
 
 .method-item {
@@ -402,9 +404,5 @@ onBeforeRouteLeave(() => {
 }
 .method-check.active { background: var(--orange, #ffbc00); border-color: var(--orange, #ffbc00); }
 
-.sticky-action {
-  position: fixed; left: 50%; transform: translateX(-50%); bottom: 0;
-  width: min(100%, 440px); padding: 14px 18px; background: rgba(250, 249, 246, .97);
-  border-top: 1px solid var(--line, #e7e4de); box-sizing: border-box; z-index: 25;
-}
+.sticky-action { position: static; flex: 0 0 auto; width: auto; margin: 0 -18px; padding: 12px 18px 14px; background: #ffffff; border-top: 1px solid rgba(36, 33, 29, .06); box-shadow: 0 -4px 16px rgba(36, 33, 29, .05); box-sizing: border-box; }
 </style>

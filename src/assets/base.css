@@ -13,7 +13,7 @@
   --font-default: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-family: "KBFGText", var(--font-default);
   color: #24211d;
-  background: #f7f7f5;
+  background: #f2f4f6;
   /* KBFGText는 Medium(500) 한 글자체만 로드돼 있다. weight 합성을 끄면 700/800 지정이
      전부 500로 납작하게 렌더링돼 버튼/헤딩의 강조가 사라지므로, 합성은 켜둔다. */
   font-synthesis: weight;
@@ -24,12 +24,13 @@
   --gold: #b67a00;         /* 하이라이트 텍스트(적립/혜택 강조) */
   --gold-bg: #fff6dd;      /* 하이라이트 배경 (pill--gold, info-strip--highlight) */
   --surface: #ffffff;
-  --page: #f7f7f5;         /* KB_BG */
+  --page: #f2f4f6;         /* KB_BG */
+  --background: #f2f4f6;
   --line: #e7e4de;         /* KB_BORDER */
-  --muted: #8f897f;        /* KB_SECONDARY - 라벨/힌트/타임스탬프 */
+  --muted: #8a8a8a;        /* KB_SECONDARY - 라벨/힌트/타임스탬프 */
   --charcoal: #24211d;     /* KB_TEXT - 본문/헤딩/버튼 글자 */
   --dark: #545045;         /* KB_DARK_GRAY - 어두운 카드(간편결제 박스 등) 배경 */
-  --inactive: #f0efec;     /* KB_INACTIVE - primary 버튼 비활성 배경 */
+  --inactive: #f5f5f5;     /* KB_INACTIVE - primary 버튼 비활성 배경 */
   --green: #00a878;        /* KB_SUCCESS */
   --danger: #d94343;       /* KB_ERROR */
 

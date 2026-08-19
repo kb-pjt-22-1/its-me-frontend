@@ -508,7 +508,7 @@ onMounted(() => {
 .danger-text { color: var(--danger, #d94343); }
 
 .page {
-  padding: 18px 18px 40px;
+  padding: 8px 18px 40px;
 }
 
 /* AI 혜택 코치 */
