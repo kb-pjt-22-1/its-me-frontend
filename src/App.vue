@@ -80,7 +80,15 @@ onMounted(() => {
 watch(
   () => authStore.isAuthenticated,
   (isAuth, wasAuth) => {
-    if (isAuth && !wasAuth) fetchAllUserData();
+    if (!isAuth || wasAuth) return;
+    fetchAllUserData();
+
+    // 방금 회원가입으로 로그인된 경우, KB 카드 자동 연동이 백엔드에서 비동기로 처리되므로
+    // 위 fetchAllUserData() 시점엔 아직 안 끝났을 수 있다 - 한 번 더 늦게 불러와 보정한다.
+    if (authStore.justSignedUp) {
+      authStore.justSignedUp = false;
+      setTimeout(() => cardsStore.fetchCards(), 3000);
+    }
   }
 );
 </script>

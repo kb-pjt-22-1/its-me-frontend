@@ -47,7 +47,6 @@
           </button>
         </div>
 
-        <p v-if="signupSuccessMessage" class="success-text">{{ signupSuccessMessage }}</p>
         <p v-if="authStore.errorMessage" class="error-text">{{ authStore.errorMessage }}</p>
 
         <Button
@@ -100,29 +99,21 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
-// 회원가입 완료 후 /login?signup=success&loginId=... 로 넘어온 경우, 방금 만든 아이디를
-// 채워두고 안내 문구를 보여준다. 가입 자체는 토큰을 안 주므로 자동 로그인은 안 된다.
-const userId = ref(route.query.signup === 'success' ? String(route.query.loginId ?? '') : '');
+const userId = ref('');
 const password = ref('');
 const showPassword = ref(false);
-const signupSuccessMessage = ref(
-  route.query.signup === 'success' ? '회원가입이 완료됐어요. 로그인해주세요.' : ''
-);
 
 const canSubmit = computed(() => userId.value.length > 0 && password.value.length > 0);
 
 // 라우터 가드가 로그인 화면으로 보낼 때 원래 가려던 경로를 redirect로 남겨둔다.
 // 외부 사이트로 튕기지 않도록 '/'로 시작하는 내부 경로만 받아들인다('//'는 프로토콜
-// 상대 URL이라 외부로 나간다).
+// 상대 URL이라 외부로 나간다). 회원가입은 이제 가입 즉시 자동 로그인되어 이 화면을
+// 거치지 않으므로(Signup.vue 참고), signup=success 관련 분기는 없다.
 const redirectTarget = computed(() => {
   const raw = route.query.redirect;
   const path = Array.isArray(raw) ? raw[0] : raw;
   const isInternalPath = typeof path === 'string' && path.startsWith('/') && !path.startsWith('//');
-  if (isInternalPath) return path;
-
-  // 방금 회원가입을 마치고 처음 로그인하는 거라면(redirect가 따로 없을 때) 홈 대신
-  // PIN 설정 화면부터 보여준다 - 가입 직후 계정엔 아직 PIN이 없다.
-  return route.query.signup === 'success' ? '/pin-setting' : '/';
+  return isInternalPath ? path : '/';
 });
 
 async function handleLogin() {
@@ -249,13 +240,6 @@ async function handleDevLogin() {
 
 .error-text {
   color: var(--danger, #d94343);
-  font-size: 0.85rem;
-  text-align: center;
-  margin: 0;
-}
-
-.success-text {
-  color: #00a878;
   font-size: 0.85rem;
   text-align: center;
   margin: 0;

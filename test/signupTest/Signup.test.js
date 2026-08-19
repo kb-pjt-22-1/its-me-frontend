@@ -1,25 +1,141 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
+const routerMock = { push: vi.fn(), replace: vi.fn() }
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => routerMock,
 }))
 
+vi.mock('@/services/authService', async () => {
+  const actual = await vi.importActual('@/services/authService')
+  return {
+    ...actual,
+    requestSignupIdentityCode: vi.fn(),
+    confirmSignupIdentityCode: vi.fn(),
+    signUpRequest: vi.fn(),
+  }
+})
+
 import Signup from '@/pages/auth/Signup.vue'
+import {
+  requestSignupIdentityCode,
+  confirmSignupIdentityCode,
+  signUpRequest,
+} from '@/services/authService'
 
 function mountPage() {
   setActivePinia(createPinia())
   return mount(Signup, { global: { stubs: ['router-link'] } })
 }
 
+// PinKeypad는 실제 컴포넌트를 그대로 쓴다 - 텍스트가 숫자 그대로 렌더링되니 순서대로 누르면 된다.
+async function pressPinDigits(wrapper, digits) {
+  for (const d of digits) {
+    const btn = wrapper.findAll('.keypad-key').find((b) => b.text() === d)
+    await btn.trigger('click')
+  }
+}
+
+async function goToStep1CodeEntry(wrapper) {
+  await wrapper.find('#signup-name').setValue('홍길동')
+  await wrapper.find('#signup-birth-date').setValue('19900101')
+  await wrapper.find('#signup-phone').setValue('01011112222')
+  await wrapper.find('form').trigger('submit')
+  await flushPromises()
+}
+
+async function completeStep1(wrapper) {
+  requestSignupIdentityCode.mockResolvedValueOnce(null)
+  await goToStep1CodeEntry(wrapper)
+
+  confirmSignupIdentityCode.mockResolvedValueOnce('verify-token-1')
+  await wrapper.find('#signup-code').setValue('123456')
+  await wrapper.find('form').trigger('submit')
+  await flushPromises()
+}
+
+async function completeStep2(wrapper) {
+  await wrapper.find('#signup-login-id').setValue('myid123')
+  await wrapper.find('#signup-password').setValue('Pw123!@#')
+  await wrapper.find('#signup-password-confirm').setValue('Pw123!@#')
+  await wrapper.find('form').trigger('submit')
+  await flushPromises()
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('회원가입 입력창 접근성 라벨', () => {
-  it('아이디/비밀번호/비밀번호 확인 입력창이 각각 라벨과 연결돼 있다', () => {
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+describe('1단계: 본인인증', () => {
+  it('이름/생년월일/휴대폰번호를 채우고 인증번호를 요청하면, 코드 입력란으로 넘어간다', async () => {
+    requestSignupIdentityCode.mockResolvedValueOnce(null)
     const wrapper = mountPage()
+
+    await goToStep1CodeEntry(wrapper)
+
+    expect(requestSignupIdentityCode).toHaveBeenCalledWith({
+      name: '홍길동',
+      birthDate: '19900101',
+      phoneNumber: '010-1111-2222',
+    })
+    expect(wrapper.find('#signup-code').exists()).toBe(true)
+  })
+
+  it('devVerificationCode가 오면 개발 환경 힌트를 보여주고 코드 입력란을 미리 채워준다', async () => {
+    requestSignupIdentityCode.mockResolvedValueOnce('654321')
+    const wrapper = mountPage()
+
+    await goToStep1CodeEntry(wrapper)
+
+    expect(wrapper.text()).toContain('654321')
+    expect(wrapper.find('#signup-code').element.value).toBe('654321')
+  })
+
+  it('인증번호 발송이 422로 실패하면 KB 미등록 회원 안내를 보여준다', async () => {
+    requestSignupIdentityCode.mockRejectedValueOnce({ response: { status: 422 } })
+    const wrapper = mountPage()
+
+    await goToStep1CodeEntry(wrapper)
+
+    expect(wrapper.text()).toContain('KB에 등록된 회원이 아닙니다')
+    expect(wrapper.find('#signup-code').exists()).toBe(false)
+  })
+
+  it('코드를 확인하면 2단계(아이디/비밀번호)로 넘어간다', async () => {
+    const wrapper = mountPage()
+    await completeStep1(wrapper)
+
+    expect(confirmSignupIdentityCode).toHaveBeenCalledWith({
+      phoneNumber: '010-1111-2222',
+      code: '123456',
+    })
+    expect(wrapper.find('#signup-login-id').exists()).toBe(true)
+  })
+
+  it('코드가 틀리면(400) 에러를 보여주고 1단계에 머무른다', async () => {
+    requestSignupIdentityCode.mockResolvedValueOnce(null)
+    const wrapper = mountPage()
+    await goToStep1CodeEntry(wrapper)
+
+    confirmSignupIdentityCode.mockRejectedValueOnce({ response: { status: 400 } })
+    await wrapper.find('#signup-code').setValue('000000')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('인증번호가 일치하지 않아요')
+    expect(wrapper.find('#signup-login-id').exists()).toBe(false)
+  })
+})
+
+describe('2단계: 아이디/비밀번호 (접근성 라벨)', () => {
+  it('아이디/비밀번호/비밀번호 확인 입력창이 각각 라벨과 연결돼 있다', async () => {
+    const wrapper = mountPage()
+    await completeStep1(wrapper)
 
     const idInput = wrapper.find('#signup-login-id')
     const pwInput = wrapper.find('#signup-password')
@@ -32,5 +148,113 @@ describe('회원가입 입력창 접근성 라벨', () => {
     expect(wrapper.find('label[for="signup-login-id"]').text()).toBe('아이디')
     expect(wrapper.find('label[for="signup-password"]').text()).toBe('비밀번호')
     expect(wrapper.find('label[for="signup-password-confirm"]').text()).toBe('비밀번호 확인')
+  })
+
+  it('형식이 안 맞으면 에러를 보여주고 3단계로 못 넘어간다', async () => {
+    const wrapper = mountPage()
+    await completeStep1(wrapper)
+
+    await wrapper.find('#signup-login-id').setValue('ab') // 4자 미만
+    await wrapper.find('#signup-password').setValue('Pw123!@#')
+    await wrapper.find('#signup-password-confirm').setValue('Pw123!@#')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('아이디는 영문·숫자·-·_ 4~20자로 입력해주세요')
+    expect(wrapper.find('.pin-dots').exists()).toBe(false)
+  })
+})
+
+describe('3단계: PIN 설정 및 최종 제출', () => {
+  it('PIN을 두 번 일치하게 입력하면 회원가입을 제출하고, 성공 시 4단계를 거쳐 홈으로 이동한다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    signUpRequest.mockResolvedValueOnce({
+      accessToken: 'access-1', refreshToken: 'refresh-1',
+      user: { userId: 1, loginId: 'myid123', name: 'myid123' },
+    })
+
+    const wrapper = mountPage()
+    await completeStep1(wrapper)
+    await completeStep2(wrapper)
+
+    await pressPinDigits(wrapper, '481027')
+    await pressPinDigits(wrapper, '481027')
+    await flushPromises()
+
+    expect(signUpRequest).toHaveBeenCalledWith({
+      loginId: 'myid123',
+      password: 'Pw123!@#',
+      pin: '481027',
+      verificationToken: 'verify-token-1',
+      fcmToken: undefined,
+    })
+    expect(wrapper.text()).toContain('가입이 완료됐어요')
+
+    await vi.advanceTimersByTimeAsync(1200)
+    expect(routerMock.replace).toHaveBeenCalledWith('/')
+  })
+
+  it('약한 패턴(연속·반복)의 PIN은 거부하고 다시 입력받는다', async () => {
+    const wrapper = mountPage()
+    await completeStep1(wrapper)
+    await completeStep2(wrapper)
+
+    await pressPinDigits(wrapper, '111027')
+
+    expect(wrapper.text()).toContain('연속되거나 반복되는 숫자는 사용할 수 없어요')
+    expect(signUpRequest).not.toHaveBeenCalled()
+  })
+
+  it('두 PIN이 다르면 새 PIN부터 다시 받는다', async () => {
+    const wrapper = mountPage()
+    await completeStep1(wrapper)
+    await completeStep2(wrapper)
+
+    await pressPinDigits(wrapper, '481027')
+    await pressPinDigits(wrapper, '999027')
+
+    expect(wrapper.text()).toContain('비밀번호가 일치하지 않아요. 새 비밀번호부터 다시 입력해주세요.')
+    expect(signUpRequest).not.toHaveBeenCalled()
+  })
+
+  it('verificationToken 만료(401)로 제출이 실패하면 1단계로 되돌아간다', async () => {
+    signUpRequest.mockRejectedValueOnce({ response: { status: 401, data: { message: '인증이 만료됐어요' } } })
+
+    const wrapper = mountPage()
+    await completeStep1(wrapper)
+    await completeStep2(wrapper)
+
+    await pressPinDigits(wrapper, '481027')
+    await pressPinDigits(wrapper, '481027')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('인증이 만료됐어요')
+    expect(wrapper.find('#signup-name').exists()).toBe(true)
+  })
+
+  it('아이디 중복(409) 등으로 제출이 실패하면 3단계에 머무르며 에러를 보여준다', async () => {
+    signUpRequest.mockRejectedValueOnce({ response: { status: 409, data: { message: '이미 사용 중인 아이디입니다' } } })
+
+    const wrapper = mountPage()
+    await completeStep1(wrapper)
+    await completeStep2(wrapper)
+
+    await pressPinDigits(wrapper, '481027')
+    await pressPinDigits(wrapper, '481027')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('이미 사용 중인 아이디입니다')
+    expect(wrapper.find('.pin-dots').exists()).toBe(true)
+  })
+
+  it('이전 단계로를 누르면 2단계로 돌아간다', async () => {
+    const wrapper = mountPage()
+    await completeStep1(wrapper)
+    await completeStep2(wrapper)
+
+    const backLink = wrapper.findAll('.text-link').find((b) => b.text() === '이전 단계로')
+    await backLink.trigger('click')
+
+    expect(wrapper.find('#signup-login-id').exists()).toBe(true)
   })
 })

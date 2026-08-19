@@ -28,7 +28,9 @@ export const useAuthStore = defineStore('auth', {
     refreshToken: null,
     isLoading: false,
     errorMessage: '',
+    errorStatus: null,     // 마지막 실패 응답의 HTTP 상태코드 - 호출부가 상태코드별로 분기해야 할 때 씀(예: Signup.vue의 401 처리)
     isBootstrapped: false, // 자동 로그인 판정이 끝났는가 (끝나기 전엔 화면을 그리지 않는다)
+    justSignedUp: false,   // 방금 회원가입으로 로그인됐는가 - App.vue가 카드 지연 재조회 트리거로 쓰고 즉시 리셋하는 1회성 신호
   }),
 
   getters: {
@@ -109,12 +111,14 @@ export const useAuthStore = defineStore('auth', {
     async login(loginId, password) {
       this.isLoading = true
       this.errorMessage = ''
+      this.errorStatus = null
       try {
         const session = await loginRequest(loginId, password)
         this.applySession(session)
         return true
       } catch (err) {
         this.errorMessage = err.response?.data?.message || err.message || '로그인에 실패했습니다.'
+        this.errorStatus = err.response?.status ?? null
         return false
       } finally {
         this.isLoading = false
@@ -126,28 +130,34 @@ export const useAuthStore = defineStore('auth', {
     async devLogin(slot) {
       this.isLoading = true
       this.errorMessage = ''
+      this.errorStatus = null
       try {
         const session = await devLoginRequest(slot)
         this.applySession(session)
         return true
       } catch (err) {
         this.errorMessage = err.response?.data?.message || err.message || '개발자 로그인에 실패했습니다.'
+        this.errorStatus = err.response?.status ?? null
         return false
       } finally {
         this.isLoading = false
       }
     },
 
-    // 회원가입은 UserResponseDto만 돌아오고 토큰이 없다 - 가입 후 자동 로그인은 안 되고,
-    // 방금 만든 아이디/비밀번호로 다시 /login을 호출해야 한다.
-    async signUp({ loginId, password, verificationToken, fcmToken }) {
+    // 회원가입 응답이 로그인 응답과 동일한 모양(토큰 포함)이라 login()과 같은 패턴으로
+    // 처리한다 - 가입 즉시 세션이 적용되고, 재로그인 화면을 거치지 않는다.
+    async signUp({ loginId, password, pin, verificationToken, fcmToken }) {
       this.isLoading = true
       this.errorMessage = ''
+      this.errorStatus = null
       try {
-        await signUpRequest({ loginId, password, verificationToken, fcmToken })
+        const session = await signUpRequest({ loginId, password, pin, verificationToken, fcmToken })
+        this.applySession(session)
+        this.justSignedUp = true
         return true
       } catch (err) {
         this.errorMessage = err.response?.data?.message || err.message || '회원가입에 실패했습니다.'
+        this.errorStatus = err.response?.status ?? null
         return false
       } finally {
         this.isLoading = false

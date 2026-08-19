@@ -5,7 +5,8 @@ import {
   devLoginRequest,
   refreshTokenRequest,
   fetchProfile,
-  verifyIdentityRequest,
+  requestSignupIdentityCode,
+  confirmSignupIdentityCode,
   signUpRequest,
   logoutRequest,
 } from '@/services/authService'
@@ -130,35 +131,58 @@ describe('fetchProfile', () => {
   })
 })
 
-describe('verifyIdentityRequest', () => {
-  it('PortOne 본인인증 요청 후 verificationToken만 꺼내 반환한다', async () => {
-    api.post.mockResolvedValue({ data: { verificationToken: 'verify-token-1' } })
+describe('requestSignupIdentityCode', () => {
+  it('이름/생년월일/휴대폰번호로 인증번호 발송을 요청하고, devVerificationCode를 반환한다', async () => {
+    api.post.mockResolvedValue({ data: { devVerificationCode: '123456' } })
 
-    const result = await verifyIdentityRequest({
-      impUid: 'imp-1',
+    const result = await requestSignupIdentityCode({
       name: '홍길동',
-      phoneNumber: '010-1111-2222',
       birthDate: '19900101',
+      phoneNumber: '010-1111-2222',
     })
 
-    expect(api.post).toHaveBeenCalledWith('/auth/portone/verify', {
-      impUid: 'imp-1',
+    expect(api.post).toHaveBeenCalledWith('/auth/signup/identity', {
       name: '홍길동',
-      phoneNumber: '010-1111-2222',
       birthDate: '19900101',
+      phoneNumber: '010-1111-2222',
+    })
+    expect(result).toBe('123456')
+  })
+
+  it('운영 환경 등 devVerificationCode가 없으면 null을 반환한다', async () => {
+    api.post.mockResolvedValue({ data: { devVerificationCode: null } })
+
+    const result = await requestSignupIdentityCode({ name: '홍길동', birthDate: '19900101', phoneNumber: '010-1111-2222' })
+
+    expect(result).toBeNull()
+  })
+})
+
+describe('confirmSignupIdentityCode', () => {
+  it('휴대폰번호/코드로 인증번호를 검증하고 verificationToken을 반환한다', async () => {
+    api.post.mockResolvedValue({ data: { verificationToken: 'verify-token-1' } })
+
+    const result = await confirmSignupIdentityCode({ phoneNumber: '010-1111-2222', code: '123456' })
+
+    expect(api.post).toHaveBeenCalledWith('/auth/signup/identity/confirm', {
+      phoneNumber: '010-1111-2222',
+      code: '123456',
     })
     expect(result).toBe('verify-token-1')
   })
 })
 
 describe('signUpRequest', () => {
-  it('회원가입 응답 데이터를 그대로 반환한다', async () => {
-    const responseData = { userId: 5, loginId: 'newuser', name: '홍길동' }
-    api.post.mockResolvedValue({ data: responseData })
+  it('회원가입 성공 시 로그인과 동일하게 토큰과 프로필을 합쳐 반환한다', async () => {
+    api.post.mockResolvedValue({
+      data: { accessToken: 'access-1', refreshToken: 'refresh-1', userId: 5, loginId: 'newuser' },
+    })
+    api.get.mockResolvedValue({ data: { userId: 5, loginId: 'newuser', name: '홍길동' } })
 
     const result = await signUpRequest({
       loginId: 'newuser',
       password: 'Test1234!',
+      pin: '481027',
       verificationToken: 'verify-token-1',
       fcmToken: 'fcm-1',
     })
@@ -166,10 +190,26 @@ describe('signUpRequest', () => {
     expect(api.post).toHaveBeenCalledWith('/auth/signup', {
       loginId: 'newuser',
       password: 'Test1234!',
+      pin: '481027',
       verificationToken: 'verify-token-1',
       fcmToken: 'fcm-1',
     })
-    expect(result).toBe(responseData)
+    expect(result).toEqual({
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+      user: { userId: 5, loginId: 'newuser', name: '홍길동' },
+    })
+  })
+
+  it('가입은 성공했지만 프로필 조회가 실패하면 loginId를 이름 대신 채운다', async () => {
+    api.post.mockResolvedValue({
+      data: { accessToken: 'access-1', refreshToken: 'refresh-1', userId: 5, loginId: 'newuser' },
+    })
+    api.get.mockRejectedValue(new Error('network down'))
+
+    const result = await signUpRequest({ loginId: 'newuser', password: 'Test1234!', pin: '481027', verificationToken: 'verify-token-1' })
+
+    expect(result.user).toEqual({ userId: 5, loginId: 'newuser', name: 'newuser' })
   })
 })
 

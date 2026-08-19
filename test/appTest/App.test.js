@@ -106,4 +106,42 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
 
     expect(stores.cardsStore.fetchCards).not.toHaveBeenCalled()
   })
+
+  it('방금 회원가입으로 로그인된 경우(justSignedUp), 카드 목록을 지연 후 한 번 더 불러오고 플래그를 끈다', async () => {
+    vi.useFakeTimers()
+    const stores = setupStores()
+    stores.authStore.isBootstrapped = true
+
+    mountApp()
+
+    stores.authStore.accessToken = 'token'
+    stores.authStore.user = { userId: 1, name: '홍길동' }
+    stores.authStore.justSignedUp = true
+    await nextTick()
+
+    expect(stores.cardsStore.fetchCards).toHaveBeenCalledTimes(1) // fetchAllUserData의 즉시 호출
+    expect(stores.authStore.justSignedUp).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(3000)
+
+    expect(stores.cardsStore.fetchCards).toHaveBeenCalledTimes(2) // 지연 재조회
+    vi.useRealTimers()
+  })
+
+  it('일반 로그인(justSignedUp 없음)은 카드 목록을 한 번만 불러온다', async () => {
+    vi.useFakeTimers()
+    const stores = setupStores()
+    stores.authStore.isBootstrapped = true
+
+    mountApp()
+
+    stores.authStore.accessToken = 'token'
+    stores.authStore.user = { userId: 1, name: '홍길동' }
+    await nextTick()
+
+    await vi.advanceTimersByTimeAsync(3000)
+
+    expect(stores.cardsStore.fetchCards).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
 })
