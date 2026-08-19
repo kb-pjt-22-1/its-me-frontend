@@ -82,31 +82,13 @@
               근처에 추천할 매장이 없어요.
             </div>
 
-          <ul v-else class="reco-merchant-list">
-            <li v-for="m in recommendation.nearbyMerchants" :key="m.merchantId" @click="goToMerchantOnMap(m.merchantId)">
-              <span class="reco-merchant-icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
-                  <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
-                </svg>
-              </span>
-              <span class="reco-merchant-name">{{ m.name }} <span class="muted-text">{{ m.distanceMeters }}m</span></span>
-              <span class="reco-merchant-benefit success-text">{{ m.benefitLabel }}</span>
-              <span class="reco-merchant-chevron">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </span>
-            </li>
-          </ul>
-        </template>
             <div v-else class="reco-merchant-list">
               <button
                   v-for="merchant in recommendation.nearbyMerchants"
                   :key="merchant.merchantId"
                   type="button"
                   class="reco-merchant-item"
-                  @click="router.push(`/stores/${merchant.merchantId}`)"
+                  @click="goToMerchantOnMap(merchant.merchantId)"
               >
           <span class="reco-merchant-icon">
             <svg
