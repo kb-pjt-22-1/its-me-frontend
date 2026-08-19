@@ -82,6 +82,24 @@
               근처에 추천할 매장이 없어요.
             </div>
 
+          <ul v-else class="reco-merchant-list">
+            <li v-for="m in recommendation.nearbyMerchants" :key="m.merchantId" @click="goToMerchantOnMap(m.merchantId)">
+              <span class="reco-merchant-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                  <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+                </svg>
+              </span>
+              <span class="reco-merchant-name">{{ m.name }} <span class="muted-text">{{ m.distanceMeters }}m</span></span>
+              <span class="reco-merchant-benefit success-text">{{ m.benefitLabel }}</span>
+              <span class="reco-merchant-chevron">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </span>
+            </li>
+          </ul>
+        </template>
             <div v-else class="reco-merchant-list">
               <button
                   v-for="merchant in recommendation.nearbyMerchants"
@@ -288,6 +306,14 @@ function goToRecommendedPayment() {
     return;
   }
   router.push({ path: '/pay', query: { userCardId: recommendation.value.userCardId } });
+}
+
+// "가까운 혜택 매장" 항목 클릭 - 매장 상세 페이지로 바로 가지 않고 지도 화면으로 이동해서
+// 그 매장의 상세(바텀시트)를 띄운다. Map.vue의 focusMerchantFromQuery가 이 merchantId
+// 쿼리를 보고 지도를 그 매장 위치로 옮긴 뒤 상세를 연다. (더보기 버튼은 특정 매장에
+// 종속되지 않으므로 merchantId 없이 그냥 지도 화면만 연다.)
+function goToMerchantOnMap(merchantId) {
+  router.push({ path: '/map', query: { merchantId } });
 }
 
 const recentTransactions = computed(() =>

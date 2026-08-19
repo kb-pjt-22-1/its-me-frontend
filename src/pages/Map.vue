@@ -542,10 +542,11 @@ function initMap(kakao, center) {
   focusMerchantFromQuery()
 }
 
-// 홈 화면 "오늘의 추천"에서 매장을 누르면 매장 상세 페이지 대신 이 화면으로 넘어오면서
-// ?merchantId=&lat=&lng=를 함께 받습니다. 내 위치 기준 지도는 그대로 두고(내 위치 마커도
-// 유지), 그 매장 좌표로 지도만 옮겨서 bounds 조회가 그 매장을 포함하게 만든 뒤,
-// bounds 결과에 실제로 그 매장이 들어오면(비동기라 즉시는 아님) 상세(추천 카드 리스트)를 엽니다.
+// 홈 화면 "오늘의 카드 추천"의 가까운 혜택 매장을 누르면 매장 상세 페이지 대신 이
+// 화면으로 넘어오면서 ?merchantId=(선택적으로 &lat=&lng=)를 함께 받습니다. 내
+// 위치 기준 지도는 그대로 두고(내 위치 마커도 유지), 그 매장 좌표로 지도만 옮겨서 bounds
+// 조회가 그 매장을 포함하게 만든 뒤, bounds 결과에 실제로 그 매장이 들어오면(비동기라
+// 즉시는 아님) 상세(추천 카드 리스트)를 엽니다.
 async function focusMerchantFromQuery() {
   const merchantId = route.query.merchantId ? Number(route.query.merchantId) : null
   if (!merchantId || !kakaoInstance || !mapInstance) return
@@ -560,8 +561,16 @@ async function focusMerchantFromQuery() {
   }
 
   mapInstance.setCenter(new kakaoInstance.maps.LatLng(lat, lng))
-  // 더 이상 idle에 자동으로 안 걸리므로, 옮긴 위치 기준으로 직접 검색을 트리거해야 한다.
-  searchNearbyCurrentView()
+  // setCenter 직후에 바로 getBounds()를 읽으면(currentViewBoundsAndCenter가 이걸 씀)
+  // 카카오맵이 내부 투영을 아직 새 중심 기준으로 갱신하지 못해 sw==ne인 크기 0짜리
+  // bounds가 나올 수 있다(그 상태로 검색하면 결과가 항상 0건) - 지도가 실제로 자리잡았다는
+  // 'idle' 이벤트를 한 번 기다린 뒤에 검색을 트리거한다. 일반적인 팬/줌에는 idle을 자동
+  // 재조회 트리거로 안 쓰지만(재검색 버튼으로 대체됨), 여기는 사용자 조작이 아니라
+  // 프로그램이 지도를 옮긴 직후 딱 한 번 필요한 경우라 다르다.
+  kakaoInstance.maps.event.addListener(mapInstance, 'idle', function onIdleOnce() {
+    kakaoInstance.maps.event.removeListener(mapInstance, 'idle', onIdleOnce)
+    searchNearbyCurrentView()
+  })
 
   const stopWatchingBounds = watch(boundsMerchants, (list) => {
     if (list.some((m) => m.id === merchantId)) {
