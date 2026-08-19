@@ -23,30 +23,14 @@
         <h1 class="pin-title">{{ title }}</h1>
         <p class="pin-subtitle">{{ subtitle }}</p>
 
-        <div class="pin-dots" :class="{ shake: pinError }">
-          <span v-for="i in 6" :key="i" class="pin-dot" :class="{ filled: i <= currentInput.length }"></span>
-        </div>
+        <PinDots :length="currentInput.length" :shake="!!pinError" />
 
         <p v-if="pinError" class="pin-error">{{ pinError }}</p>
         <p v-else-if="step === 'confirm'" class="pin-hint muted-text">한 번 더 입력해서 확인해주세요</p>
       </div>
 
-      <div class="keypad">
-        <button
-          v-for="key in keypadKeys"
-          :key="key.label"
-          class="keypad-key"
-          :class="{ 'keypad-key--action': key.type !== 'digit' }"
-          :disabled="key.type === 'blank' || submitting"
-          @click="handleKeypadPress(key)"
-        >
-          <svg v-if="key.type === 'backspace'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
-            <line x1="18" y1="9" x2="12" y2="15"></line>
-            <line x1="12" y1="9" x2="18" y2="15"></line>
-          </svg>
-          <template v-else>{{ key.label }}</template>
-        </button>
+      <div class="keypad-wrap">
+        <PinKeypad :model-value="currentInput" :disabled="submitting" @update:model-value="onPinInput" @complete="advanceStep" />
       </div>
     </template>
   </div>
@@ -57,6 +41,9 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { getMyProfile, registerPin, updatePin } from '@/services/memberService';
 import { useToast } from '@/composables/useToast';
+import { hasWeakPinPattern } from '@/utils/pinValidation';
+import PinDots from '@/components/auth/PinDots.vue';
+import PinKeypad from '@/components/auth/PinKeypad.vue';
 
 const router = useRouter();
 const toast = useToast();
@@ -91,29 +78,6 @@ const subtitle = computed(() => {
   return '두 비밀번호가 같아야 설정이 완료돼요';
 });
 
-const keypadKeys = [
-  { label: '1', type: 'digit' }, { label: '2', type: 'digit' }, { label: '3', type: 'digit' },
-  { label: '4', type: 'digit' }, { label: '5', type: 'digit' }, { label: '6', type: 'digit' },
-  { label: '7', type: 'digit' }, { label: '8', type: 'digit' }, { label: '9', type: 'digit' },
-  { label: '', type: 'blank' }, { label: '0', type: 'digit' }, { label: '', type: 'backspace' },
-];
-
-// 백엔드 PinValidator와 동일한 규칙(3자리 이상 반복·연속 숫자 금지). 서버도 최종적으로
-// 이 규칙을 확인하지만, 여기서 먼저 걸러야 새 PIN을 두 번 입력한 뒤에야(new+confirm) 거절당하는
-// 걸 막을 수 있다 - new 단계가 끝나는 시점에 바로 알려준다.
-function hasWeakPattern(pin) {
-  for (let i = 0; i <= pin.length - 3; i++) {
-    const a = Number(pin[i]);
-    const b = Number(pin[i + 1]);
-    const c = Number(pin[i + 2]);
-    const repeating = a === b && b === c;
-    const ascending = b === a + 1 && c === b + 1;
-    const descending = b === a - 1 && c === b - 1;
-    if (repeating || ascending || descending) return true;
-  }
-  return false;
-}
-
 async function loadProfile() {
   loadingProfile.value = true;
   loadError.value = '';
@@ -134,18 +98,13 @@ function resetToStep(stepName) {
   currentInput.value = '';
 }
 
-const handleKeypadPress = (key) => {
-  if (submitting.value) return;
-
-  if (key.type === 'digit') {
-    if (currentInput.value.length >= 6) return;
-    pinError.value = '';
-    currentInput.value += key.label;
-    if (currentInput.value.length === 6) advanceStep();
-  } else if (key.type === 'backspace') {
-    currentInput.value = currentInput.value.slice(0, -1);
-  }
-};
+// PinKeypad에서 키를 누를 때만(사용자 입력) 호출된다 - advanceStep/submitNewPin이
+// 에러 메시지를 띄워둔 채로 currentInput을 직접 초기화하는 경우는 여기를 안 거치므로
+// 그 메시지를 이 함수가 지우지 않는다.
+function onPinInput(value) {
+  pinError.value = '';
+  currentInput.value = value;
+}
 
 function advanceStep() {
   if (step.value === 'current') {
@@ -155,7 +114,7 @@ function advanceStep() {
   }
 
   if (step.value === 'new') {
-    if (hasWeakPattern(currentInput.value)) {
+    if (hasWeakPinPattern(currentInput.value)) {
       pinError.value = '연속되거나 반복되는 숫자는 사용할 수 없어요';
       currentInput.value = '';
       return;
@@ -223,24 +182,8 @@ async function submitNewPin() {
 }
 .pin-title { margin: 0 0 8px; font-size: 19px; letter-spacing: -.3px; color: var(--charcoal, #24211d); }
 .pin-subtitle { margin: 0 0 34px; font-size: 13px; color: var(--muted, #8f897f); }
-.pin-dots { display: flex; justify-content: center; gap: 14px; }
-.pin-dot { width: 40px; height: 40px; border-radius: 50%; background: var(--inactive, #f0efec); }
-.pin-dot.filled { background: var(--dark, #545045); }
-.pin-dots.shake { animation: pin-shake 0.4s ease; }
-@keyframes pin-shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-8px); }
-  40%, 80% { transform: translateX(8px); }
-}
 .pin-error { margin: 14px 0 0; text-align: center; color: var(--danger, #d94343); font-size: 12px; }
 .pin-hint { margin: 14px 0 0; text-align: center; font-size: 12px; }
 
-.keypad { margin-top: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 20px 18px 0; }
-.keypad-key {
-  height: 62px; border-radius: 14px; border: 1px solid var(--line, #e7e4de);
-  background: var(--surface, #ffffff); font-size: 20px; font-weight: 600;
-  color: var(--charcoal, #24211d); display: grid; place-items: center; cursor: pointer;
-}
-.keypad-key:disabled { visibility: hidden; }
-.keypad-key--action { background: var(--inactive, #f0efec); color: var(--muted, #8f897f); }
+.keypad-wrap { margin-top: auto; padding: 20px 18px 0; }
 </style>

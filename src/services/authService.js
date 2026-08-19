@@ -56,22 +56,36 @@ async function fetchProfileOrFallback(accessToken, userId, loginId) {
 }
 
 /**
- * PortOne 본인인증. 실제 PortOne 키가 없어 백엔드가 impUid를 시드로 CI/DI만 가짜로 만들고,
- * name/phoneNumber/birthDate는 여기서 보낸 값을 그대로 믿는다(PortOneVerifyModal 참고).
- * 성공하면 신원 정보는 서버에만 남고, 그걸 가리키는 1회용 verificationToken만 돌아온다.
+ * 회원가입 1단계 - 휴대폰 인증번호 발송. 운영 환경에서는 devVerificationCode가 항상 null이고
+ * (실제 SMS로 발송됨), 로컬/개발 서버(dev-login 켜진 서버)에서만 실제 6자리 코드가 그대로 온다 -
+ * SMS 연동 전까지는 이 값을 화면에 노출해 테스트한다.
  */
-export async function verifyIdentityRequest({ impUid, name, phoneNumber, birthDate }) {
-  const { data } = await api.post('/auth/portone/verify', { impUid, name, phoneNumber, birthDate })
+export async function requestSignupIdentityCode({ name, birthDate, phoneNumber }) {
+  const { data } = await api.post('/auth/signup/identity', { name, birthDate, phoneNumber })
+  return data.devVerificationCode ?? null
+}
+
+/**
+ * 회원가입 1단계 - 인증번호 검증. 성공하면 1회용 verificationToken을 발급한다(유효시간 10분,
+ * 재사용 불가) - 최종 회원가입 요청에 그대로 실어 보내면 된다.
+ */
+export async function confirmSignupIdentityCode({ phoneNumber, code }) {
+  const { data } = await api.post('/auth/signup/identity/confirm', { phoneNumber, code })
   return data.verificationToken
 }
 
 /**
- * 회원가입. name/phoneNumber/birthDate는 여기로 보내지 않는다 - verifyIdentityRequest가
- * 발급한 토큰 뒤에 서버(Redis)가 들고 있고, signUp이 그 토큰으로 꺼내 쓴다.
+ * 회원가입. name/phoneNumber/birthDate는 여기로 보내지 않는다 - requestSignupIdentityCode/
+ * confirmSignupIdentityCode가 발급한 verificationToken 뒤에 서버(Redis)가 신원 정보를 들고
+ * 있고, signUp이 그 토큰으로 꺼내 쓴다.
+ *
+ * 응답이 로그인 응답과 동일한 모양(accessToken/refreshToken/userId/loginId)이라 loginRequest와
+ * 같은 패턴으로 처리한다 - 가입 즉시 자동 로그인되므로 재로그인 화면을 거치지 않는다.
  */
-export async function signUpRequest({ loginId, password, verificationToken, fcmToken }) {
-  const { data } = await api.post('/auth/signup', { loginId, password, verificationToken, fcmToken })
-  return data
+export async function signUpRequest({ loginId, password, pin, verificationToken, fcmToken }) {
+  const { data } = await api.post('/auth/signup', { loginId, password, pin, verificationToken, fcmToken })
+  const user = await fetchProfileOrFallback(data.accessToken, data.userId, data.loginId)
+  return { accessToken: data.accessToken, refreshToken: data.refreshToken, user }
 }
 
 /**

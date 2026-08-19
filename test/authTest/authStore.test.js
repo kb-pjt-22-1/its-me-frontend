@@ -205,27 +205,36 @@ describe('devLogin', () => {
 })
 
 describe('signUp', () => {
-  it('성공하면 true를 반환하고 세션은 건드리지 않는다', async () => {
-    signUpRequest.mockResolvedValueOnce({ userId: 1 })
+  it('성공하면 세션을 적용하고(로그인과 동일) true를 반환하며, justSignedUp을 켠다', async () => {
+    signUpRequest.mockResolvedValueOnce(SESSION)
     const store = useAuthStore()
 
-    const result = await store.signUp({ loginId: 'newbie', password: 'Test1234!', verificationToken: 'tok' })
+    const result = await store.signUp({
+      loginId: 'newbie', password: 'Test1234!', pin: '481027', verificationToken: 'tok',
+    })
 
     expect(signUpRequest).toHaveBeenCalledWith({
-      loginId: 'newbie', password: 'Test1234!', verificationToken: 'tok', fcmToken: undefined,
+      loginId: 'newbie', password: 'Test1234!', pin: '481027', verificationToken: 'tok', fcmToken: undefined,
     })
     expect(result).toBe(true)
-    expect(store.isAuthenticated).toBe(false)
+    expect(store.isAuthenticated).toBe(true)
+    expect(store.accessToken).toBe(SESSION.accessToken)
+    expect(store.user).toEqual(SESSION.user)
+    expect(store.justSignedUp).toBe(true)
+    expect(localStorage.getItem('accessToken')).toBe(SESSION.accessToken)
   })
 
-  it('실패하면 errorMessage를 채우고 false를 반환한다', async () => {
-    signUpRequest.mockRejectedValueOnce({ response: { data: { message: '이미 가입된 아이디입니다' } } })
+  it('실패하면 errorMessage/errorStatus를 채우고 false를 반환하며, justSignedUp은 켜지지 않는다', async () => {
+    signUpRequest.mockRejectedValueOnce({ response: { status: 409, data: { message: '이미 가입된 아이디입니다' } } })
     const store = useAuthStore()
 
-    const result = await store.signUp({ loginId: 'newbie', password: 'Test1234!', verificationToken: 'tok' })
+    const result = await store.signUp({ loginId: 'newbie', password: 'Test1234!', pin: '481027', verificationToken: 'tok' })
 
     expect(result).toBe(false)
     expect(store.errorMessage).toBe('이미 가입된 아이디입니다')
+    expect(store.errorStatus).toBe(409)
+    expect(store.justSignedUp).toBe(false)
+    expect(store.isAuthenticated).toBe(false)
   })
 })
 

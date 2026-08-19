@@ -221,13 +221,17 @@ describe('devLogin', () => {
 })
 
 describe('signUp', () => {
-  it('성공하면 true를 반환하고(자동 로그인은 안 한다) 상태를 안 건드린다', async () => {
-    authService.signUpRequest.mockResolvedValue({ userId: 5, loginId: 'newuser' })
+  it('성공하면 로그인 응답과 동일하게 세션을 적용하고 true를 반환한다', async () => {
+    authService.signUpRequest.mockResolvedValue({
+      accessToken: 'access-new', refreshToken: 'refresh-new',
+      user: { userId: 5, loginId: 'newuser', name: 'newuser' },
+    })
 
     const store = useAuthStore()
     const result = await store.signUp({
       loginId: 'newuser',
       password: 'Test1234!',
+      pin: '481027',
       verificationToken: 'verify-token-1',
       fcmToken: 'fcm-1',
     })
@@ -235,28 +239,33 @@ describe('signUp', () => {
     expect(authService.signUpRequest).toHaveBeenCalledWith({
       loginId: 'newuser',
       password: 'Test1234!',
+      pin: '481027',
       verificationToken: 'verify-token-1',
       fcmToken: 'fcm-1',
     })
     expect(result).toBe(true)
-    expect(store.isAuthenticated).toBe(false)
+    expect(store.isAuthenticated).toBe(true)
+    expect(store.accessToken).toBe('access-new')
+    expect(store.justSignedUp).toBe(true)
   })
 
-  it('실패하면 서버 메시지를 errorMessage에 담고 false를 반환한다', async () => {
-    authService.signUpRequest.mockRejectedValue({ response: { data: { message: 'login id already in use' } } })
+  it('실패하면 서버 메시지/상태코드를 담고 false를 반환한다', async () => {
+    authService.signUpRequest.mockRejectedValue({ response: { status: 409, data: { message: 'login id already in use' } } })
 
     const store = useAuthStore()
-    const result = await store.signUp({ loginId: 'dup', password: 'Test1234!' })
+    const result = await store.signUp({ loginId: 'dup', password: 'Test1234!', pin: '481027' })
 
     expect(result).toBe(false)
     expect(store.errorMessage).toBe('login id already in use')
+    expect(store.errorStatus).toBe(409)
+    expect(store.isAuthenticated).toBe(false)
   })
 
   it('서버 메시지도 err.message도 없으면 기본 문구로 대체한다', async () => {
     authService.signUpRequest.mockRejectedValue(new Error())
 
     const store = useAuthStore()
-    await store.signUp({ loginId: 'dup', password: 'Test1234!' })
+    await store.signUp({ loginId: 'dup', password: 'Test1234!', pin: '481027' })
 
     expect(store.errorMessage).toBe('회원가입에 실패했습니다.')
   })
