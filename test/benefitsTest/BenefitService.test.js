@@ -150,56 +150,78 @@ describe('fetchAnnualFeeBreakEven', () => {
 })
 
 describe('fetchAiCoaching', () => {
-  it('POST /v1/benefits/coaching을 호출한다', async () => {
-    api.post.mockResolvedValue({ data: { tips: [] } })
+  it('GET /v1/benefits/coaching을 호출한다', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        summary: '카드 사용 전략에 대한 안내입니다.',
+        items: [],
+      },
+    })
 
     await fetchAiCoaching()
 
-    expect(api.post).toHaveBeenCalledWith('/v1/benefits/coaching')
+    expect(api.get).toHaveBeenCalledWith('/v1/benefits/coaching')
   })
 
-  it('배열 응답이면 그대로 매핑한다', async () => {
-    api.post.mockResolvedValue({ data: [{ headline: '카페 혜택 활용', detail: '2,000원 절약' }] })
-
-    const result = await fetchAiCoaching()
-
-    expect(result).toEqual([{ headline: '카페 혜택 활용', detail: '2,000원 절약' }])
-  })
-
-  it('{ tips: [...] } 형태 응답도 처리한다', async () => {
-    api.post.mockResolvedValue({ data: { tips: [{ headline: 'A', detail: 'B' }] } })
-
-    const result = await fetchAiCoaching()
-
-    expect(result).toEqual([{ headline: 'A', detail: 'B' }])
-  })
-
-  it('{ coachingTips: [...] } 형태 응답도 처리한다', async () => {
-    api.post.mockResolvedValue({ data: { coachingTips: [{ message: 'C', description: 'D' }] } })
-
-    const result = await fetchAiCoaching()
-
-    expect(result).toEqual([{ headline: 'C', detail: 'D' }])
-  })
-
-  it('필드명이 message/content, description/expectedSaving인 경우도 fallback으로 처리한다', async () => {
-    api.post.mockResolvedValue({
-      data: [
-        { content: '컨텐츠 필드', expectedSaving: '예상 절약' },
-      ],
+  it('items의 title/message를 headline/detail로 매핑한다', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        summary: '카드 사용 전략에 대한 안내입니다.',
+        items: [
+          {
+            title: '수요일 카페 방문에는',
+            message: 'On the Go 체크카드를 사용하면 690원의 추가 혜택이 예상돼요.',
+            recommendedCardName: 'On the Go 체크카드',
+            expectedSavingAmount: 690,
+            strategyType: 'SWITCH_NOW',
+          },
+        ],
+      },
     })
 
     const result = await fetchAiCoaching()
 
-    expect(result).toEqual([{ headline: '컨텐츠 필드', detail: '예상 절약' }])
+    expect(result).toEqual([
+      {
+        headline: '수요일 카페 방문에는',
+        detail: 'On the Go 체크카드를 사용하면 690원의 추가 혜택이 예상돼요.',
+      },
+    ])
   })
 
-  it('응답이 비어있으면 빈 배열을 반환한다', async () => {
-    api.post.mockResolvedValue({ data: {} })
+  it('items가 없으면 빈 배열을 반환한다', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        summary: '현재 소비 패턴에 적용 가능한 카드 혜택이 없습니다.',
+        items: [],
+      },
+    })
 
     const result = await fetchAiCoaching()
 
     expect(result).toEqual([])
+  })
+
+  it('title/message가 null이면 빈 문자열로 처리한다', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        items: [
+          {
+            title: null,
+            message: null,
+          },
+        ],
+      },
+    })
+
+    const result = await fetchAiCoaching()
+
+    expect(result).toEqual([
+      {
+        headline: '',
+        detail: '',
+      },
+    ])
   })
 })
 
