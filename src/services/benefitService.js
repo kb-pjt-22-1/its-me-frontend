@@ -91,7 +91,7 @@ export async function fetchAnnualFeeBreakEven(year) {
 }
 
 /**
- * AI 혜택 코칭 [POST /api/v1/benefits/coaching]
+ * AI 혜택 코칭 [GET /api/v1/benefits/coaching]
  * 사용자 소비/혜택 데이터를 외부 LLM에 전달해서 코칭 멘트를 받아옴.
  * report/annual-fee-break-even보다 느리고(외부 API 호출) 실패율도 높을 수 있음 -
  * Benefits.vue에서 로딩/에러 상태 꼭 별도로 다뤄야 함.
@@ -101,11 +101,13 @@ export async function fetchAnnualFeeBreakEven(year) {
  * 실제 DTO 나오면 이 정규화 함수만 고치면 됩니다.
  */
 export async function fetchAiCoaching() {
-  const { data } = await api.post('/v1/benefits/coaching')
-  const tips = Array.isArray(data) ? data : (data.tips ?? data.coachingTips ?? [])
+  const { data } = await api.get('/v1/benefits/coaching')
+
+  const tips = data.items ?? []
+
   return tips.map((tip) => ({
-    headline: tip.headline ?? tip.message ?? tip.content ?? '',
-    detail: tip.detail ?? tip.description ?? tip.expectedSaving ?? '',
+    headline: tip.title ?? '',
+    detail: tip.message ?? '',
   }))
 }
 
