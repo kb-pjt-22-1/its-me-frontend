@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import JsBarcode from 'jsbarcode'
@@ -103,7 +103,6 @@ describe('바코드 발급/렌더링', () => {
     await enterPin(wrapper)
 
     expect(createPaymentTokenApi).toHaveBeenCalledWith(1) // selectedMethodId(대표카드 userCardId)
-    expect(wrapper.text()).toContain('ABC123XYZ')
     expect(JsBarcode).toHaveBeenCalledWith(
       expect.anything(),
       'ABC123XYZ',
@@ -208,5 +207,108 @@ describe('페이지 이탈 시 토큰 취소', () => {
     await flushPromises()
 
     expect(result).toBe(true)
+  })
+})
+
+describe('바코드 만료 카운트다운 / 재발급', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('발급 직후 expiresAt까지 남은 시간을 mm:ss로 보여준다', async () => {
+    verifyPin.mockResolvedValue()
+    const issuedAt = new Date()
+    createPaymentTokenApi.mockResolvedValue({
+      paymentTokenId: 'tok-1',
+      tokenValue: 'ABC123XYZ',
+      expiresAt: new Date(issuedAt.getTime() + 3 * 60 * 1000).toISOString(),
+    })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    expect(wrapper.text()).toContain('3:00')
+  })
+
+  it('시간이 흐르면 카운트다운이 줄어들고, 만료되면 만료 문구로 바뀐다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({
+      paymentTokenId: 'tok-1',
+      tokenValue: 'ABC123XYZ',
+      expiresAt: new Date(Date.now() + 5000).toISOString(),
+    })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    expect(wrapper.text()).toContain('0:05')
+
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(wrapper.text()).toContain('0:02')
+
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(wrapper.text()).toContain('바코드가 만료됐어요')
+  })
+
+  it('"다시 발급" 버튼을 누르면 기존 토큰을 취소하고 새 토큰을 발급한다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi
+      .mockResolvedValueOnce({
+        paymentTokenId: 'tok-1',
+        tokenValue: 'ABC123XYZ',
+        expiresAt: new Date(Date.now() + 3000).toISOString(),
+      })
+      .mockResolvedValueOnce({
+        paymentTokenId: 'tok-2',
+        tokenValue: 'NEWTOKEN999',
+        expiresAt: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
+      })
+    cancelPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', status: 'CANCELED' })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+    expect(JsBarcode).toHaveBeenLastCalledWith(expect.anything(), 'ABC123XYZ', expect.anything())
+
+    const reissueButton = wrapper.findAll('button').find((b) => b.text().includes('다시 발급'))
+    await reissueButton.trigger('click')
+    await flushPromises()
+
+    expect(cancelPaymentTokenApi).toHaveBeenCalledWith('tok-1')
+    expect(createPaymentTokenApi).toHaveBeenCalledTimes(2)
+    expect(JsBarcode).toHaveBeenLastCalledWith(expect.anything(), 'NEWTOKEN999', expect.anything())
+    expect(wrapper.text()).toContain('3:00')
+  })
+
+  it('만료된 뒤 재발급해도 정상적으로 새 토큰을 받아온다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi
+      .mockResolvedValueOnce({
+        paymentTokenId: 'tok-1',
+        tokenValue: 'ABC123XYZ',
+        expiresAt: new Date(Date.now() + 1000).toISOString(),
+      })
+      .mockResolvedValueOnce({
+        paymentTokenId: 'tok-2',
+        tokenValue: 'NEWTOKEN999',
+        expiresAt: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
+      })
+    cancelPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', status: 'CANCELED' })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(wrapper.text()).toContain('바코드가 만료됐어요')
+
+    const reissueButton = wrapper.findAll('button').find((b) => b.text().includes('다시 발급'))
+    await reissueButton.trigger('click')
+    await flushPromises()
+
+    expect(JsBarcode).toHaveBeenLastCalledWith(expect.anything(), 'NEWTOKEN999', expect.anything())
+    expect(wrapper.text()).not.toContain('바코드가 만료됐어요')
   })
 })
