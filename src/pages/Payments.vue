@@ -65,7 +65,19 @@
       <div class="barcode-display">
         <p class="card-name">{{ selectedMethod?.cardName }}</p>
         <canvas ref="barcodeCanvasRef" class="barcode-canvas"></canvas>
-        <p class="barcode-number">{{ paymentStore.currentToken?.tokenValue ?? '' }}</p>
+
+        <div class="token-expiry" :class="{ 'token-expiry--expired': isTokenExpired }">
+          <span v-if="!isTokenExpired">바코드 유효시간 {{ remainingLabel }}</span>
+          <span v-else>바코드가 만료됐어요</span>
+          <button
+            type="button"
+            class="reissue-btn"
+            :disabled="isReissuing"
+            @click="reissueToken"
+          >
+            {{ isReissuing ? '재발급 중...' : '다시 발급' }}
+          </button>
+        </div>
       </div>
       <button class="main-action-btn" :disabled="isCompleting" @click="completePayment">
         {{ isCompleting ? '처리 중...' : '결제 완료하기' }}
@@ -125,7 +137,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import JsBarcode from 'jsbarcode';
 import { verifyPin } from '@/services/paymentAuthService';
@@ -166,12 +178,12 @@ watch(
         format: 'CODE128',
         width: 2,
         height: 60,
-        displayValue: false, // 값 자체는 아래 barcode-number 텍스트로 따로 보여줌
+        displayValue: false, // 바코드 아래 값 텍스트는 노출하지 않는다(스캔용 바코드만 표시)
         margin: 0,
       });
     } catch {
       // tokenValue가 바코드로 인코딩 불가능한 문자를 담고 있으면(이론상 없어야 함) 조용히
-      // 무시한다 - barcode-number 텍스트는 그대로 보이니 결제 자체엔 지장 없다.
+      // 무시한다 - 캔버스에 아무것도 안 그려질 뿐 결제 자체엔 지장 없다.
     }
   }
 );
@@ -233,6 +245,60 @@ const keypadKeys = [
   { label: '7', type: 'digit' }, { label: '8', type: 'digit' }, { label: '9', type: 'digit' },
   { label: '', type: 'blank' }, { label: '0', type: 'digit' }, { label: '', type: 'backspace' },
 ];
+
+// ---------------------------------------------------------------------
+// 바코드 만료 카운트다운 / 재발급
+// ---------------------------------------------------------------------
+// expiresAt과 "지금"을 비교해서 남은 초를 계산한다. 1초마다 nowMs만 갱신되는 ref를
+// tick 삼아 만료까지 남은 시간을 다시 계산하는 방식 - setInterval 안에서 직접 DOM 텍스트를
+// 만지지 않고 반응형 상태로만 흘려보내서, 컴포넌트가 언마운트되면 interval도 같이 정리된다.
+const nowMs = ref(Date.now());
+let expiryTimer = null;
+
+onMounted(() => {
+  expiryTimer = setInterval(() => {
+    nowMs.value = Date.now();
+  }, 1000);
+});
+
+onUnmounted(() => {
+  if (expiryTimer) clearInterval(expiryTimer);
+});
+
+const remainingSeconds = computed(() => {
+  const expiresAt = paymentStore.currentToken?.expiresAt;
+  if (!expiresAt) return 0;
+  const diffMs = new Date(expiresAt).getTime() - nowMs.value;
+  return Math.max(0, Math.floor(diffMs / 1000));
+});
+
+const isTokenExpired = computed(
+  () => !!paymentStore.currentToken?.expiresAt && remainingSeconds.value <= 0
+);
+
+const remainingLabel = computed(() => {
+  const m = Math.floor(remainingSeconds.value / 60);
+  const s = remainingSeconds.value % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+});
+
+const isReissuing = ref(false);
+
+// 재발급: 기존 토큰이 아직 서버에 살아있을 수 있으니(만료 전 수동 재발급 포함) 먼저
+// cancel을 시도하고, 실패해도(이미 만료 등) 무시하고 새 토큰 발급으로 넘어간다.
+async function reissueToken() {
+  if (isReissuing.value) return;
+  isReissuing.value = true;
+  try {
+    const staleTokenId = paymentStore.currentToken?.paymentTokenId;
+    if (staleTokenId) {
+      await paymentStore.cancelPaymentToken(staleTokenId).catch(() => {});
+    }
+    await issuePaymentToken();
+  } finally {
+    isReissuing.value = false;
+  }
+}
 
 const handleKeypadPress = (key) => {
   if (key.type === 'digit') {
@@ -325,6 +391,18 @@ onBeforeRouteLeave(() => {
 
 .display-box { padding: 40px 20px; text-align: center; margin-bottom: 24px; }
 .barcode-canvas { max-width: 100%; height: 60px; }
+
+.token-expiry {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-top: 14px; font-size: 12px; color: var(--muted, #8f897f);
+}
+.token-expiry--expired { color: var(--danger, #d94343); font-weight: 700; }
+.reissue-btn {
+  border: 1px solid var(--line, #e7e4de); background: var(--surface, #ffffff);
+  color: var(--charcoal, #24211d); font-size: 11px; font-weight: 700;
+  padding: 5px 10px; border-radius: 20px; cursor: pointer;
+}
+.reissue-btn:disabled { opacity: .6; cursor: not-allowed; }
 .auth-prompt .lock-icon {
   width: 64px; height: 64px; margin: 0 auto 14px;
   border-radius: 50%; background: var(--inactive, #f0efec);
