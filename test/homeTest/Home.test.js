@@ -17,25 +17,18 @@ vi.mock('@/services/benefitService', () => ({
   fetchExpiringBenefits: vi.fn(),
 }))
 
-// 오늘의 추천(onMounted에서 조회)이 실제 네트워크/localStorage를 안 건드리도록 목 처리.
-vi.mock('@/services/merchantsService', async () => {
-  const actual = await vi.importActual('@/services/merchantsService')
-  return {
-    ...actual,
-    fetchTodayRecommendedMerchants: vi.fn().mockResolvedValue([]),
-    fetchMerchantCategories: vi.fn().mockResolvedValue([]),
-  }
-})
-
 import Home from '@/pages/Home.vue'
 import { useCardsStore } from '@/stores/cards'
-import { fetchTodayRecommendedMerchants } from '@/services/merchantsService'
+import { useMerchantsStore } from '@/stores/merchants'
 import { flushPromises } from '@vue/test-utils'
 
 function mountPage(cards) {
   setActivePinia(createPinia())
   const cardsStore = useCardsStore()
+  const merchantsStore = useMerchantsStore()
   cardsStore.cards = cards
+  // Home.vue에 아직 남아 있는 레거시 카테고리 조회가 네트워크를 타지 않게 한다.
+  merchantsStore.fetchCategories = vi.fn().mockResolvedValue()
   const wrapper = mount(Home)
   return { wrapper, cardsStore }
 }
@@ -45,6 +38,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   routerMock.push.mockClear()
   window.console.error = vi.fn()
+  fetchTodayRecommendation.mockResolvedValue(null)
+  fetchExpiringBenefits.mockResolvedValue({ daysRemaining: 0, expiringBenefits: [], nearbyMerchantBenefits: [] })
+  Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { getCurrentPosition: vi.fn() } })
 })
 
 describe('fetchRecommendation', () => {
@@ -113,75 +109,44 @@ describe('fetchExpiring', () => {
 })
 
 describe('오늘의 추천', () => {
-  it('조회 중에는 로딩 문구를, 결과가 없으면 빈 문구를 보여준다', async () => {
-    const { wrapper } = mountPage([])
-    expect(wrapper.text()).toContain('추천 매장을 찾는 중...')
+  const recommendation = {
+    categoryName: '카페',
+    cardName: '청춘대로 톡톡카드',
+    benefitLabel: '카페 10% 할인',
+    nearbyMerchants: [
+      { merchantId: 1, name: '커피빈 무교동', distanceMeters: 135.4, benefitLabel: '최대 10% 할인' },
+      { merchantId: 2, name: '어떤 편의점', distanceMeters: 200, benefitLabel: '최대 5% 할인' },
+    ],
+  }
 
+  it('카드 추천 응답의 nearbyMerchants를 오늘의 카드 추천 내부에 표시한다', async () => {
+    fetchTodayRecommendation.mockResolvedValueOnce(recommendation)
+
+    const { wrapper } = mountPage([])
     await flushPromises()
 
-    expect(wrapper.text()).toContain('주변에 추천할 매장이 없어요.')
+    const recommendationCard = wrapper.find('.reco-card')
+    const merchants = recommendationCard.findAll('.reco-merchant-item')
+    expect(merchants).toHaveLength(2)
+    expect(merchants[0].text()).toContain('커피빈 무교동')
+    expect(merchants[0].text()).toContain('135m')
+    expect(merchants[0].text()).toContain('최대 10% 할인')
+    expect(merchants[1].text()).toContain('어떤 편의점')
+    expect(merchants[1].text()).toContain('200m')
+    expect(merchants[1].text()).toContain('최대 5% 할인')
   })
 
-  it('혜택 매장은 뱃지와 혜택 요약을, 혜택 없는 매장은 이름/거리만 보여준다', async () => {
-    fetchTodayRecommendedMerchants.mockResolvedValueOnce([
-      {
-        id: 1,
-        name: '커피빈 무교동',
-        categoryCode: '5813',
-        distanceMeters: 135,
-        recommended: true,
-        benefitSummary: '다음 달 기대 25원',
-        recommendedCardName: '굿데이 플래티늄카드',
-        typicalPaymentAmount: 8000,
-      },
-      {
-        id: 2,
-        name: '어떤 편의점',
-        categoryCode: '5499',
-        distanceMeters: 200,
-        recommended: false,
-        benefitSummary: null,
-        recommendedCardName: null,
-        typicalPaymentAmount: null,
-      },
-    ])
-
-    const { wrapper } = mountPage([])
-    await flushPromises()
-
-    const cards = wrapper.findAll('.today-recommend-card')
-    expect(cards).toHaveLength(2)
-    expect(cards[0].text()).toContain('커피빈 무교동')
-    expect(cards[0].text()).toContain('혜택 매장')
-    expect(cards[0].text()).toContain('굿데이 플래티늄카드')
-    expect(cards[0].text()).toContain('다음 달 기대 25원')
-    expect(cards[0].find('.today-recommend-typical-amount').text()).toBe('8,000원 기준')
-    expect(cards[1].text()).toContain('어떤 편의점')
-    expect(cards[1].text()).not.toContain('혜택 매장')
-    expect(cards[1].find('.today-recommend-typical-amount').exists()).toBe(false)
-  })
-
-  it('추천 매장을 클릭하면 매장 상세 페이지 대신, 그 매장이 선택된 채로 지도 화면으로 이동한다', async () => {
-    fetchTodayRecommendedMerchants.mockResolvedValueOnce([
-      {
-        id: 42,
-        name: '맥도날드 을지로1가',
-        categoryCode: '5812',
-        lat: 37.567,
-        lng: 126.995,
-        distanceMeters: 137,
-        recommended: true,
-      },
-    ])
-
-    const { wrapper } = mountPage([])
-    await flushPromises()
-
-    await wrapper.find('.today-recommend-card').trigger('click')
-
-    expect(routerMock.push).toHaveBeenCalledWith({
-      path: '/map',
-      query: { merchantId: 42, lat: 37.567, lng: 126.995 },
+  it('가까운 혜택 매장을 클릭하면 매장 상세 화면으로 이동한다', async () => {
+    fetchTodayRecommendation.mockResolvedValueOnce({
+      ...recommendation,
+      nearbyMerchants: [{ merchantId: 42, name: '맥도날드 을지로1가', distanceMeters: 137, benefitLabel: '10% 할인' }],
     })
+
+    const { wrapper } = mountPage([])
+    await flushPromises()
+
+    await wrapper.find('.reco-merchant-item').trigger('click')
+
+    expect(routerMock.push).toHaveBeenCalledWith('/stores/42')
   })
 })

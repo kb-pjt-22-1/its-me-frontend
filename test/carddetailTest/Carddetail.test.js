@@ -98,8 +98,8 @@ describe('카드 번호 표시', () => {
   it('마스킹 문자열을 제외하고 카드번호 뒤 4자리만 표시한다', async () => {
     const { wrapper } = await mountPage()
 
-    expect(wrapper.find('.card-number').text()).toBe('0442')
-    expect(wrapper.find('.card-number').text()).not.toContain('•')
+    expect(wrapper.find('.detail-card-number').text()).toBe('0442')
+    expect(wrapper.find('.detail-card-number').text()).not.toContain('•')
   })
 })
 
