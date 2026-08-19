@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
+let routeHash = ''
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ hash: routeHash }),
+}))
+
 import Benefits from '@/pages/Benefits.vue'
 import { useBenefitsStore } from '@/stores/benefits'
 
@@ -98,6 +103,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-08-15T12:00:00+09:00'))
   window.console.error = vi.fn()
+  routeHash = ''
 })
 
 afterEach(() => {
@@ -386,5 +392,59 @@ describe('이번 달 받을 수 있는 혜택', () => {
       ],
     })
     expect(wrapperNoCount.text()).not.toContain('회 사용')
+  })
+})
+
+// ---------------------------------------------------------------------
+// 홈 화면 "이번 달에 사라지는 혜택" 카드에서 /benefits#available로 진입했을 때 스크롤
+// ---------------------------------------------------------------------
+describe('해시로 진입 시 스크롤', () => {
+  // document.querySelector로 대상을 찾으므로, 실제 document에 붙여야(attachTo) 검증 가능하다.
+  // 다른 테스트에 영향 안 주도록 매번 unmount로 정리한다.
+  function mountAttached() {
+    setActivePinia(createPinia())
+    const benefitsStore = useBenefitsStore()
+
+    benefitsStore.$patch({
+      reportMonthLabel: '8월',
+      totalBenefit: 42500,
+      deltaVsLastMonth: 7200,
+      categoryBreakdown: makeCategoryBreakdown(),
+      breakevenCards: [makeCard()],
+      aiTips: makeAiTips(),
+      benefitLimits: makeBenefitLimits(),
+    })
+
+    vi.spyOn(benefitsStore, 'fetchReport').mockResolvedValue()
+    vi.spyOn(benefitsStore, 'fetchBreakEven').mockResolvedValue()
+    vi.spyOn(benefitsStore, 'fetchAiCoaching').mockResolvedValue()
+    vi.spyOn(benefitsStore, 'fetchLimits').mockResolvedValue()
+
+    return mount(Benefits, { attachTo: document.body })
+  }
+
+  it('#available로 들어오면 해당 섹션으로 스크롤한다', async () => {
+    routeHash = '#available'
+    const scrollIntoViewSpy = vi.fn()
+    // JSDOM은 scrollIntoView를 구현하지 않아 기본적으로 없다.
+    window.Element.prototype.scrollIntoView = scrollIntoViewSpy
+
+    const wrapper = mountAttached()
+    await flushPromises()
+
+    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+    wrapper.unmount()
+  })
+
+  it('해시가 없으면 스크롤하지 않는다', async () => {
+    routeHash = ''
+    const scrollIntoViewSpy = vi.fn()
+    window.Element.prototype.scrollIntoView = scrollIntoViewSpy
+
+    const wrapper = mountAttached()
+    await flushPromises()
+
+    expect(scrollIntoViewSpy).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 })

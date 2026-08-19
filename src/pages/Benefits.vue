@@ -149,7 +149,7 @@
     </section>
 
     <!-- 이번 달 받을 수 있는 혜택 [GET /api/v1/benefits/limits] -->
-    <section class="available-section">
+    <section id="available" class="available-section">
       <div class="section-header">
         <h3 class="section-title">이번 달 받을 수 있는 혜택</h3>
         <button type="button" class="link-btn">전체 카드</button>
@@ -324,8 +324,10 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
+import { useRoute } from 'vue-router';
 import { useBenefitsStore } from '@/stores/benefits';
 
+const route = useRoute();
 const benefitsStore = useBenefitsStore();
 const {
   reportMonthLabel,
@@ -497,6 +499,22 @@ onMounted(() => {
   loadBreakEven();
   loadAiCoaching();
   loadLimits();
+
+  // 홈 화면 "이번 달에 사라지는 혜택" 카드에서 /benefits#available로 들어온 경우,
+  // 데이터 로딩(loadLimits)이 끝나 리스트가 실제로 그려진 뒤에 스크롤해야 위치가 어긋나지
+  // 않는다. nextTick 한 번으로는 비동기 fetch가 끝나기 전이라 부족할 수 있어서, 대상
+  // 섹션이 나타날 때까지 짧게 폴링한다.
+  if (route.hash === '#available') {
+    const scrollToTarget = (attemptsLeft = 20) => {
+      const target = document.querySelector(route.hash);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (attemptsLeft > 0) {
+        setTimeout(() => scrollToTarget(attemptsLeft - 1), 50);
+      }
+    };
+    nextTick(() => scrollToTarget());
+  }
 });
 </script>
 
