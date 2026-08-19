@@ -372,22 +372,26 @@ async function loadTodayRecommendations(lat, lng) {
   }
 }
 
+// "오늘의 카드 추천"과 "오늘의 추천"(매장 리스트) 둘 다 같은 위치 기준으로 근처 혜택을
+// 평가하므로, 좌표(현재 위치 또는 실패 시 서울시청 기본값)를 한 번만 구해서 같이 넘긴다.
+function loadLocationBasedRecommendations(lat, lng) {
+  loadTodayRecommendations(lat, lng);
+  homeStore.fetchRecommendation(lat, lng);
+}
+
 onMounted(() => {
   merchantsStore.fetchCategories();
+  homeStore.fetchExpiring();
 
   const defaultCenter = { lat: 37.5665, lng: 126.978 }; // 서울시청
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-      (position) => loadTodayRecommendations(position.coords.latitude, position.coords.longitude),
-      () => loadTodayRecommendations(defaultCenter.lat, defaultCenter.lng),
+      (position) => loadLocationBasedRecommendations(position.coords.latitude, position.coords.longitude),
+      () => loadLocationBasedRecommendations(defaultCenter.lat, defaultCenter.lng),
     );
   } else {
-    loadTodayRecommendations(defaultCenter.lat, defaultCenter.lng);
+    loadLocationBasedRecommendations(defaultCenter.lat, defaultCenter.lng);
   }
-});
-onMounted(() => {
-  homeStore.fetchRecommendation();
-  homeStore.fetchExpiring();
 });
 </script>
 
