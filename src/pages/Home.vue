@@ -174,7 +174,11 @@
         </div>
 
         <template v-else-if="expiring">
-          <div v-if="expiring.expiringBenefits.length > 0" class="expiring-row">
+          <div
+            v-if="expiring.expiringBenefits.length > 0"
+            class="expiring-row expiring-row--clickable"
+            @click="router.push({ path: '/benefits', hash: '#available' })"
+          >
             <span class="expiring-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--orange-deep, #e6aa00)" stroke-width="2">
                 <circle cx="12" cy="12" r="10"></circle>
@@ -186,6 +190,11 @@
               <p class="muted-text">{{ expiring.expiringBenefits.map((b) => b.label).join(' · ') }}</p>
             </div>
             <span v-if="expiring.daysRemaining != null" class="pill pill--gold">D-{{ expiring.daysRemaining }}</span>
+            <span class="expiring-chevron">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </span>
           </div>
 
           <div
@@ -201,7 +210,14 @@
             </span>
             <div class="expiring-main">
               <strong>최근 결제한 곳 주변에서 받을 수 있는 혜택</strong>
-              <p class="muted-text">{{ expiring.nearbyMerchantBenefits.map((m) => m.label).join(' · ') }}</p>
+              <p class="muted-text">
+                {{
+                  expiring.nearbyMerchantBenefits
+                    .map((m) => [m.merchantName, m.label].filter(Boolean).join(' '))
+                    .filter(Boolean)
+                    .join(' · ')
+                }}
+              </p>
             </div>
             <span class="expiring-chevron">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

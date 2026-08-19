@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <!-- AI 혜택 코치 [POST /api/v1/benefits/coaching] -->
+    <!-- AI 혜택 코치 [GET /api/v1/benefits/coaching] -->
     <section class="surface-card ai-card">
       <span class="pill pill--gold ai-badge">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"></path></svg>
@@ -149,7 +149,7 @@
     </section>
 
     <!-- 이번 달 받을 수 있는 혜택 [GET /api/v1/benefits/limits] -->
-    <section class="available-section">
+    <section id="available" class="available-section">
       <div class="section-header">
         <h3 class="section-title">이번 달 받을 수 있는 혜택</h3>
         <button type="button" class="link-btn">전체 카드</button>
@@ -322,10 +322,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import { useRoute } from 'vue-router';
 import { useBenefitsStore } from '@/stores/benefits';
 
+const route = useRoute();
 const benefitsStore = useBenefitsStore();
 const {
   reportMonthLabel,
@@ -497,6 +499,33 @@ onMounted(() => {
   loadBreakEven();
   loadAiCoaching();
   loadLimits();
+
+  // 홈 화면 "이번 달에 사라지는 혜택" 카드에서 /benefits#available로 들어온 경우 스크롤한다.
+  // #available 섹션 자체는 로딩 상태와 무관하게 항상 렌더링돼 있어서(내부 리스트만
+  // 로딩/에러/데이터로 바뀜), DOM에 엘리먼트가 존재하는지로는 "데이터가 다 들어왔는지"를
+  // 알 수 없다 - 데이터가 오기 전에 스크롤하면 이후 리스트가 그려지며 레이아웃이 늘어나서
+  // 사용자가 기대한 위치보다 위쪽에서 멈추게 된다. 그래서 DOM 존재 여부가 아니라 스토어의
+  // 실제 로딩 상태(limitsLoading)를 기준으로, 로딩이 끝난 뒤 다음 tick(리스트가 그려진 뒤)에
+  // 스크롤한다.
+  if (route.hash === '#available') {
+    const scrollToAvailable = () => {
+      nextTick(() => {
+        document.querySelector('#available')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    };
+
+    if (limitsLoading.value) {
+      const stopWatch = watch(limitsLoading, (loading) => {
+        if (!loading) {
+          stopWatch();
+          scrollToAvailable();
+        }
+      });
+    } else {
+      // 캐시된 데이터가 있어 이미 로딩이 끝난 상태로 진입한 경우
+      scrollToAvailable();
+    }
+  }
 });
 </script>
 

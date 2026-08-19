@@ -150,56 +150,78 @@ describe('fetchAnnualFeeBreakEven', () => {
 })
 
 describe('fetchAiCoaching', () => {
-  it('POST /v1/benefits/coaching을 호출한다', async () => {
-    api.post.mockResolvedValue({ data: { tips: [] } })
+  it('GET /v1/benefits/coaching을 호출한다', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        summary: '카드 사용 전략에 대한 안내입니다.',
+        items: [],
+      },
+    })
 
     await fetchAiCoaching()
 
-    expect(api.post).toHaveBeenCalledWith('/v1/benefits/coaching')
+    expect(api.get).toHaveBeenCalledWith('/v1/benefits/coaching')
   })
 
-  it('배열 응답이면 그대로 매핑한다', async () => {
-    api.post.mockResolvedValue({ data: [{ headline: '카페 혜택 활용', detail: '2,000원 절약' }] })
-
-    const result = await fetchAiCoaching()
-
-    expect(result).toEqual([{ headline: '카페 혜택 활용', detail: '2,000원 절약' }])
-  })
-
-  it('{ tips: [...] } 형태 응답도 처리한다', async () => {
-    api.post.mockResolvedValue({ data: { tips: [{ headline: 'A', detail: 'B' }] } })
-
-    const result = await fetchAiCoaching()
-
-    expect(result).toEqual([{ headline: 'A', detail: 'B' }])
-  })
-
-  it('{ coachingTips: [...] } 형태 응답도 처리한다', async () => {
-    api.post.mockResolvedValue({ data: { coachingTips: [{ message: 'C', description: 'D' }] } })
-
-    const result = await fetchAiCoaching()
-
-    expect(result).toEqual([{ headline: 'C', detail: 'D' }])
-  })
-
-  it('필드명이 message/content, description/expectedSaving인 경우도 fallback으로 처리한다', async () => {
-    api.post.mockResolvedValue({
-      data: [
-        { content: '컨텐츠 필드', expectedSaving: '예상 절약' },
-      ],
+  it('items의 title/message를 headline/detail로 매핑한다', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        summary: '카드 사용 전략에 대한 안내입니다.',
+        items: [
+          {
+            title: '수요일 카페 방문에는',
+            message: 'On the Go 체크카드를 사용하면 690원의 추가 혜택이 예상돼요.',
+            recommendedCardName: 'On the Go 체크카드',
+            expectedSavingAmount: 690,
+            strategyType: 'SWITCH_NOW',
+          },
+        ],
+      },
     })
 
     const result = await fetchAiCoaching()
 
-    expect(result).toEqual([{ headline: '컨텐츠 필드', detail: '예상 절약' }])
+    expect(result).toEqual([
+      {
+        headline: '수요일 카페 방문에는',
+        detail: 'On the Go 체크카드를 사용하면 690원의 추가 혜택이 예상돼요.',
+      },
+    ])
   })
 
-  it('응답이 비어있으면 빈 배열을 반환한다', async () => {
-    api.post.mockResolvedValue({ data: {} })
+  it('items가 없으면 빈 배열을 반환한다', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        summary: '현재 소비 패턴에 적용 가능한 카드 혜택이 없습니다.',
+        items: [],
+      },
+    })
 
     const result = await fetchAiCoaching()
 
     expect(result).toEqual([])
+  })
+
+  it('title/message가 null이면 빈 문자열로 처리한다', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        items: [
+          {
+            title: null,
+            message: null,
+          },
+        ],
+      },
+    })
+
+    const result = await fetchAiCoaching()
+
+    expect(result).toEqual([
+      {
+        headline: '',
+        detail: '',
+      },
+    ])
   })
 })
 
@@ -315,11 +337,19 @@ describe('fetchExpiringBenefits', () => {
     expect(api.get).toHaveBeenCalledWith('/v1/benefits/expiring')
   })
 
-  it('사라지는 혜택/주변 매장 혜택을 정규화한다', async () => {
+  it('실제 응답 필드(data.benefits, serviceName/amount 등)를 정규화한다', async () => {
     api.get.mockResolvedValue({
       data: {
         daysRemaining: 4,
-        expiringBenefits: [{ categoryName: '영화', label: '영화 4,000원 할인' }],
+        benefits: [
+          {
+            cardName: '가온카드',
+            serviceName: '영화',
+            amount: 4000,
+            merchantNote: 'CGV, 메가박스 등',
+            benefitSummary: '영화 관람 시 최대 4,000원까지 할인이 적용되는 혜택입니다.',
+          },
+        ],
         nearbyMerchantBenefits: [{ merchantName: '스타벅스', label: '스타벅스 10%' }],
       },
     })
@@ -328,29 +358,59 @@ describe('fetchExpiringBenefits', () => {
 
     expect(result).toEqual({
       daysRemaining: 4,
-      expiringBenefits: [{ categoryName: '영화', label: '영화 4,000원 할인' }],
+      expiringBenefits: [
+        {
+          categoryName: '영화',
+          label: '영화 4,000원 할인',
+          cardName: '가온카드',
+          merchantNote: 'CGV, 메가박스 등',
+          benefitSummary: '영화 관람 시 최대 4,000원까지 할인이 적용되는 혜택입니다.',
+        },
+      ],
       nearbyMerchantBenefits: [{ merchantName: '스타벅스', label: '스타벅스 10%' }],
     })
   })
 
-  it('label이 없으면 categoryName+discountAmount로 조립한다', async () => {
+  it('amount가 없으면 0원으로 조립한다', async () => {
     api.get.mockResolvedValue({
-      data: { expiringBenefits: [{ categoryName: '카페', discountAmount: 2000 }] },
+      data: { benefits: [{ serviceName: '카페', amount: undefined }] },
     })
 
     const result = await fetchExpiringBenefits()
 
-    expect(result.expiringBenefits[0].label).toBe('카페 2,000원 할인')
+    expect(result.expiringBenefits[0].label).toBe('카페 0원 할인')
   })
 
-  it('nearbyMerchants(구 필드명)도 nearbyMerchantBenefits로 인식한다', async () => {
+  it('nearbyMerchantBenefits는 필드명 그대로 매핑한다', async () => {
     api.get.mockResolvedValue({
-      data: { nearbyMerchants: [{ merchantName: 'GS25', benefitLabel: '5% 적립' }] },
+      data: { nearbyMerchantBenefits: [{ merchantName: 'GS25', label: '5% 적립' }] },
     })
 
     const result = await fetchExpiringBenefits()
 
     expect(result.nearbyMerchantBenefits).toEqual([{ merchantName: 'GS25', label: '5% 적립' }])
+  })
+
+  it('label/benefitLabel이 없고 benefitType+benefitValue만 있으면 그걸로 조합한다 (형태 미확정 대비 방어 로직)', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        nearbyMerchantBenefits: [
+          { merchantName: '스타벅스', benefitType: 'PERCENT', benefitValue: 10 },
+          { merchantName: 'CGV', benefitType: 'AMOUNT', benefitValue: 4000 },
+          { merchantName: '알수없는매장', benefitType: 'UNKNOWN', benefitValue: 1 },
+          { merchantName: '값없음' },
+        ],
+      },
+    })
+
+    const result = await fetchExpiringBenefits()
+
+    expect(result.nearbyMerchantBenefits).toEqual([
+      { merchantName: '스타벅스', label: '10%' },
+      { merchantName: 'CGV', label: '4,000원' },
+      { merchantName: '알수없는매장', label: '' },
+      { merchantName: '값없음', label: '' },
+    ])
   })
 
   it('필드가 없으면 null/빈 배열로 안전하게 정규화한다', async () => {

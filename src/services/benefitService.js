@@ -91,7 +91,7 @@ export async function fetchAnnualFeeBreakEven(year) {
 }
 
 /**
- * AI 혜택 코칭 [POST /api/v1/benefits/coaching]
+ * AI 혜택 코칭 [GET /api/v1/benefits/coaching]
  * 사용자 소비/혜택 데이터를 외부 LLM에 전달해서 코칭 멘트를 받아옴.
  * report/annual-fee-break-even보다 느리고(외부 API 호출) 실패율도 높을 수 있음 -
  * Benefits.vue에서 로딩/에러 상태 꼭 별도로 다뤄야 함.
@@ -101,11 +101,13 @@ export async function fetchAnnualFeeBreakEven(year) {
  * 실제 DTO 나오면 이 정규화 함수만 고치면 됩니다.
  */
 export async function fetchAiCoaching() {
-  const { data } = await api.post('/v1/benefits/coaching')
-  const tips = Array.isArray(data) ? data : (data.tips ?? data.coachingTips ?? [])
+  const { data } = await api.get('/v1/benefits/coaching')
+
+  const tips = data.items ?? []
+
   return tips.map((tip) => ({
-    headline: tip.headline ?? tip.message ?? tip.content ?? '',
-    detail: tip.detail ?? tip.description ?? tip.expectedSaving ?? '',
+    headline: tip.title ?? '',
+    detail: tip.message ?? '',
   }))
 }
 
@@ -223,13 +225,35 @@ export async function fetchExpiringBenefits() {
   const { data } = await api.get('/v1/benefits/expiring')
   return {
     daysRemaining: data.daysRemaining ?? null,
-    expiringBenefits: (data.expiringBenefits ?? []).map((b) => ({
-      categoryName: b.categoryName,
-      label: b.label ?? `${b.categoryName} ${(b.discountAmount ?? 0).toLocaleString()}원 할인`,
+    // 백엔드 실제 응답 필드는 data.benefits (expiringBenefits 아님).
+    // 항목 필드도 cardName/serviceName/amount/merchantNote/benefitSummary로 내려온다.
+    // benefitSummary는 문장형으로 길게 오는 값이라, Home.vue가 그대로 이어붙여 쓰기엔 너무
+    // 길다 - 우선 categoryName 자리에 serviceName을, label엔 amount 기반 짧은 문구를 조합해서
+    // 채운다. 백엔드에 짧은 요약 필드가 별도로 생기면 이 label 조합 로직은 그걸로 교체하면 됨.
+    expiringBenefits: (data.benefits ?? []).map((b) => ({
+      categoryName: b.serviceName,
+      label: `${b.serviceName} ${(b.amount ?? 0).toLocaleString()}원 할인`,
+      cardName: b.cardName,
+      merchantNote: b.merchantNote,
+      benefitSummary: b.benefitSummary,
     })),
-    nearbyMerchantBenefits: (data.nearbyMerchantBenefits ?? data.nearbyMerchants ?? []).map((m) => ({
+    // nearbyMerchantBenefits: 매장별 혜택 표시 문자열(예: "10%", "4,000원")을 백엔드가
+    // 아직 어떤 형태로 내려줄지 정해지지 않았다. 확정되기 전까지는 아래 세 형태를 모두
+    // 방어적으로 처리한다: (1) 이미 조합된 label/benefitLabel 문자열, (2) benefitType
+    // ('PERCENT' | 'AMOUNT') + benefitValue 조합, (3) 셋 다 없으면 빈 문자열.
+    // 형태가 확정되면 formatMerchantBenefitLabel 함수만 그에 맞춰 정리하면 된다.
+    nearbyMerchantBenefits: (data.nearbyMerchantBenefits ?? []).map((m) => ({
       merchantName: m.merchantName,
-      label: m.label ?? m.benefitLabel ?? '',
+      label: formatMerchantBenefitLabel(m),
     })),
   }
+}
+
+function formatMerchantBenefitLabel(m) {
+  if (m.label) return m.label
+  if (m.benefitLabel) return m.benefitLabel
+  if (m.benefitValue == null) return ''
+  if (m.benefitType === 'PERCENT') return `${m.benefitValue}%`
+  if (m.benefitType === 'AMOUNT') return `${m.benefitValue.toLocaleString()}원`
+  return ''
 }
