@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <!-- AI 혜택 코치 [POST /api/v1/benefits/coaching] -->
+    <!-- AI 혜택 코치 [GET /api/v1/benefits/coaching] -->
     <section class="surface-card ai-card">
       <span class="pill pill--gold ai-badge">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"></path></svg>
