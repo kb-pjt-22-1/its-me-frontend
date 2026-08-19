@@ -7,8 +7,6 @@ export const useMerchantsStore = defineStore('merchants', {
     merchants: [],
     categories: [],   // [{ categoryCode, categoryName, categoryIcon }]
     brands: [],       // [{ brandId, brandCode, brandName, brandLogo }]
-    isLoading: false,
-    error: null,
   }),
 
   getters: {
@@ -53,20 +51,12 @@ export const useMerchantsStore = defineStore('merchants', {
       const authStore = useAuthStore()
       if (!authStore.isAuthenticated) return
 
-      this.isLoading = true
-      this.error = null
-      try {
-        const [merchants, categories] = await Promise.all([
-          fetchMerchantList(),
-          this.categories.length === 0 ? fetchMerchantCategories() : Promise.resolve(this.categories),
-        ])
-        this.merchants = merchants
-        this.categories = categories
-      } catch (err) {
-        this.error = err.response?.data?.message ?? '매장 목록을 불러오지 못했습니다.'
-      } finally {
-        this.isLoading = false
-      }
+      const [merchants, categories] = await Promise.all([
+        fetchMerchantList(),
+        this.categories.length === 0 ? fetchMerchantCategories() : Promise.resolve(this.categories),
+      ])
+      this.merchants = merchants
+      this.categories = categories
     },
 
     async fetchMerchantDetail(merchantId) {
