@@ -96,7 +96,7 @@ body, html {
   padding: 0;
   width: 100%;
   height: 100%;
-  background-color: #f7f7f5;
+  background-color: var(--page, #f2f4f6);
 }
 
 #app {

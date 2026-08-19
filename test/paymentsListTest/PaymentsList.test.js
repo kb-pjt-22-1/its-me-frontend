@@ -8,6 +8,7 @@ vi.mock('vue-router', () => ({
 }))
 
 import PaymentsList from '@/pages/PaymentsList.vue'
+import PaymentDetailSheet from '@/components/payment/PaymentDetailSheet.vue'
 import { usePaymentStore } from '@/stores/payment'
 
 const baseItem = {
@@ -29,7 +30,7 @@ function mountPage({ history = [], isLoading = false } = {}) {
   paymentStore.fetchHistory = vi.fn()
 
   const wrapper = mount(PaymentsList, {
-    global: { stubs: { Footer: true } },
+    global: { stubs: { Footer: true, PaymentDetailSheet: true } },
   })
 
   return { wrapper, paymentStore }
@@ -67,16 +68,21 @@ describe('결제 내역 정규화', () => {
     expect(wrapper.text()).toContain('알 수 없는 매장')
   })
 
-  it('categoryCode에 맞는 아이콘을 보여준다', () => {
-    const { wrapper } = mountPage({ history: [{ ...baseItem, categoryCode: '5812' }] })
+  it('카테고리 아이콘 없이 결제금액과 할인금액을 현재 형식으로 보여준다', () => {
+    const { wrapper } = mountPage({ history: [{ ...baseItem }] })
+    const item = wrapper.find('.history-item')
 
-    expect(wrapper.find('.item-icon').text()).toBe('🍽️')
+    expect(item.find('.item-icon').exists()).toBe(false)
+    expect(item.find('.price').text()).toBe('5,000원')
+    expect(item.find('.price').text()).not.toBe('-5,000원')
+    expect(item.find('.benefit').text()).toBe('500원 할인')
+    expect(item.find('.benefit').text()).not.toBe('할인 500원')
   })
 
-  it('categoryCode가 없거나 매칭되지 않으면 기본 아이콘을 보여준다', () => {
-    const { wrapper } = mountPage({ history: [{ ...baseItem, categoryCode: null }] })
+  it('할인금액이 0이면 할인 문구를 표시하지 않는다', () => {
+    const { wrapper } = mountPage({ history: [{ ...baseItem, discountAmount: 0 }] })
 
-    expect(wrapper.find('.item-icon').text()).toBe('🏷️')
+    expect(wrapper.find('.history-item .benefit').exists()).toBe(false)
   })
 
   it('paymentTime이 없으면 paidAt을 대신 쓴다', () => {
@@ -122,12 +128,18 @@ describe('결제 내역 정규화', () => {
 })
 
 describe('상호작용', () => {
-  it('내역을 클릭하면 결제 상세 화면으로 이동한다', async () => {
+  it('내역을 클릭하면 선택한 결제 ID로 상세 시트를 열고 라우팅하지 않는다', async () => {
     const { wrapper } = mountPage({ history: [{ ...baseItem, paymentId: 42 }] })
+    const detailSheet = wrapper.getComponent(PaymentDetailSheet)
+
+    expect(detailSheet.props('open')).toBe(false)
+    expect(detailSheet.props('paymentId')).toBe(null)
 
     await wrapper.find('.history-item').trigger('click')
 
-    expect(pushMock).toHaveBeenCalledWith('/payments/42')
+    expect(detailSheet.props('open')).toBe(true)
+    expect(detailSheet.props('paymentId')).toBe(42)
+    expect(pushMock).not.toHaveBeenCalled()
   })
 
   it('다음 달 화살표를 누르면 다음 달 데이터를 다시 조회한다', async () => {

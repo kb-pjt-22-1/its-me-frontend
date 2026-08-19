@@ -114,7 +114,7 @@
   opacity: 0;
 }
 .page-content { padding: 0 18px 24px; }
-.surface-card { background: var(--surface); border-radius: 20px; box-shadow: 0 8px 25px rgba(55, 48, 39, .06); }
+.surface-card { background: var(--surface, #ffffff); border: 1px solid #f2f2f2; border-radius: 20px; box-shadow: 0 6px 20px rgba(36, 33, 29, 0.09); }
 
 @media (min-width: 700px) {
   .mobile-shell { margin: 24px auto; min-height: calc(100vh - 48px); border-radius: 18px; overflow: hidden; }

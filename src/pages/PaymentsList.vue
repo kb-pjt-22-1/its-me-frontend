@@ -46,26 +46,26 @@
               v-for="item in group.items"
               :key="item.paymentId"
               class="history-item"
-              @click="goToDetail(item.paymentId)"
+              @click="openPaymentDetail(item.paymentId)"
             >
-              <div class="item-icon">{{ item.categoryIcon }}</div>
               <div class="item-info">
                 <p class="name">{{ item.merchantName }}</p>
                 <p class="desc muted-text">{{ item.time }} · {{ item.cardName }}</p>
               </div>
               <div class="item-price">
-                <p class="price">-{{ item.finalAmount.toLocaleString() }}원</p>
-                <p class="benefit">할인 {{ item.discountAmount.toLocaleString() }}원</p>
+                <p class="price">{{ item.finalAmount.toLocaleString() }}원</p>
+                <p v-if="item.discountAmount > 0" class="benefit">{{ item.discountAmount.toLocaleString() }}원 할인</p>
               </div>
-              <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="9 6 15 12 9 18"></polyline>
-              </svg>
             </button>
           </div>
         </div>
       </template>
     </div>
-
+    <PaymentDetailSheet
+        :open="isDetailSheetOpen"
+        :payment-id="selectedPaymentId"
+        @close="closePaymentDetail"
+    />
     <Footer />
   </div>
 </template>
@@ -76,7 +76,20 @@ import { useRouter } from 'vue-router';
 import Button from '@/components/common/Button.vue';
 import Footer from '@/layouts/menu/Footer.vue';
 import { usePaymentStore } from '@/stores/payment';
-import { getCategoryIcon } from '@/utils/categoryIcons';
+import PaymentDetailSheet from '@/components/payment/PaymentDetailSheet.vue';
+
+const selectedPaymentId = ref(null);
+const isDetailSheetOpen = ref(false);
+
+function openPaymentDetail(paymentId) {
+  selectedPaymentId.value = paymentId;
+  isDetailSheetOpen.value = true;
+}
+
+function closePaymentDetail() {
+  isDetailSheetOpen.value = false;
+  selectedPaymentId.value = null;
+}
 
 const router = useRouter();
 const paymentStore = usePaymentStore();
@@ -110,8 +123,6 @@ const normalizedHistory = computed(() =>
     return {
       paymentId: item.paymentId ?? item.id,
       merchantName: item.merchantName ?? item.merchant?.name ?? '알 수 없는 매장',
-      categoryCode: item.categoryCode ?? null,
-      categoryIcon: getCategoryIcon(item.categoryCode),
       cardName: item.cardName ?? item.card?.cardName ?? '',
       finalAmount: item.finalAmount ?? item.amount ?? 0,
       discountAmount: item.discountAmount ?? 0,
@@ -143,8 +154,6 @@ const groupedHistory = computed(() => {
 const totalPayment = computed(() => normalizedHistory.value.reduce((sum, item) => sum + item.finalAmount, 0));
 const totalBenefit = computed(() => normalizedHistory.value.reduce((sum, item) => sum + item.discountAmount, 0));
 
-const goToDetail = (paymentId) => router.push(`/payments/${paymentId}`);
-
 onMounted(() => {
   fetchHistoryForCurrentMonth();
 });
@@ -161,7 +170,7 @@ onMounted(() => {
   position: absolute;
   inset: 0;
   box-sizing: border-box;
-  background: var(--page, #f7f7f5);
+  background: #ffffff;
   display: flex;
   flex-direction: column;
 }
@@ -184,63 +193,39 @@ onMounted(() => {
   min-height: 0; /* flex 자식이 내용 크기만큼 늘어나지 않고 실제로 줄어들어 스크롤되게 함 */
   overflow-y: auto;
   box-sizing: border-box;
-  padding: 0 18px 84px;
+  padding: 16px 18px 84px;
 }
 /* 전역 .page-header는 뒤로가기 버튼-제목-우측 여백을 양끝 정렬(space-between)하는데,
    이 페이지는 제목을 가운데가 아니라 뒤로가기 버튼 바로 옆에 붙인다. 배경은 흰색으로
    해서 아래 date-nav(아이보리 배경)와 구분되게 하고, .fixed-top의 좌우 패딩을
    음수 마진으로 상쇄해 화면 끝까지 흰색이 번지게(bleed) 한 뒤 자체 패딩으로 다시 채운다. */
-.page-header {
-  height: 60px;
-  justify-content: flex-start;
-  gap: 10px;
-  background: var(--surface, #ffffff);
-  margin: 0 -18px 14px;
-  padding: 0 18px;
-  box-sizing: border-box;
-  border-bottom: 1px solid var(--line, #e7e4de);
-}
-.page-header h2 { font-size: 17px; } /* 전역 기본값(16px)보다 1px 크게 */
-
-.date-nav { display: flex; justify-content: center; align-items: center; gap: 20px; padding: 10px 0 20px; }
-.date-nav h3 { margin: 0; font-size: 15px; color: var(--charcoal, #24211d); }
-.date-arrow { border: none; background: none; cursor: pointer; color: var(--muted, #8f897f); font-size: 14px; padding: 4px 8px; }
+.page-header { height: 60px; justify-content: flex-start; gap: 10px; margin: 0 -18px; padding: 0 18px; box-sizing: border-box; background: var(--surface, #ffffff); }
+.page-header h2 { font-size: 17px; }
+.date-nav { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 0 -18px; padding: 14px 18px; background: #ffffff; }
+.date-nav h3 { margin: 0; color: var(--charcoal, #24211d); font-size: 15px; }
+.date-arrow { padding: 2px 8px; border: none; background: none; color: var(--muted, #8a8a8a); font-size: 14px; cursor: pointer; }
 
 .loading-text, .empty-text { text-align: center; padding: 60px 0; font-size: 0.9rem; }
 
-.summary-card { padding: 22px; margin-bottom: 26px; }
+.summary-card { padding: 22px; margin-bottom: 16px; }
 .summary-text p, .summary-benefit p { margin: 0 0 8px; font-size: 12px; color: rgba(255, 255, 255, .75); }
 .summary-text h2 { margin: 0; font-size: 20px; color: #ffffff; }
 .summary-benefit { text-align: right; }
 .summary-benefit h2 { margin: 0; font-size: 20px; color: var(--orange, #ffbc00); }
 
-.history-group h4 { color: var(--muted, #8f897f); font-size: 0.85rem; font-weight: 700; margin: 0 0 8px; padding-left: 2px; }
-.history-group + .history-group { margin-top: 20px; }
+.history-group { padding: 22px 2px 24px; border-bottom: 1px solid var(--line, #ececec); }
+.history-group h4 { margin: 0 0 16px; padding: 0; color: var(--charcoal, #24211d); font-size: 14px; font-weight: 500; }
+.history-group + .history-group { margin-top: 0; }
 
-/* 피그마처럼 날짜별 항목들을 라운드 처리된 흰색 카드 하나로 감싼다 - 항목 사이만
-   구분선을 두고, 카드 자체에 배경/그림자를 준다. */
-.history-card {
-  background: var(--surface, #ffffff);
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 2px 10px rgba(46, 42, 36, .06);
-}
+.history-card { overflow: visible; border-radius: 0; background: transparent; box-shadow: none; }
 
-.history-item {
-  width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px;
-  border-bottom: 1px solid var(--line, #e7e4de); background: none; border-left: none;
-  border-right: none; border-top: none; cursor: pointer; text-align: left;
-}
+.history-item { width: 100%; display: flex; align-items: flex-start; gap: 12px; padding: 0; border: none; background: transparent; cursor: pointer; text-align: left; }
+.history-item + .history-item { margin-top: 26px; }
 .history-item:last-child { border-bottom: none; }
-.item-icon {
-  width: 42px; height: 42px; border-radius: 12px; background: var(--page, #f7f7f5);
-  display: grid; place-items: center; font-size: 1.2rem; flex: 0 0 auto;
-}
 .item-info { flex: 1; min-width: 0; }
-.name { font-weight: 700; margin: 0 0 4px; color: var(--charcoal, #24211d); font-size: 0.95rem; }
-.desc { font-size: 0.8rem; margin: 0; }
-.item-price { text-align: right; flex: 0 0 auto; }
-.price { font-weight: 700; color: var(--charcoal, #24211d); margin: 0 0 4px; font-size: 0.9rem; white-space: nowrap; }
-.benefit { font-size: 0.78rem; color: var(--orange, #ffbc00); margin: 0; white-space: nowrap; }
-.chevron { color: var(--muted, #8f897f); flex: 0 0 auto; }
+.name { margin: 0 0 4px; color: var(--charcoal, #24211d); font-size: 0.95rem; font-weight: 700; }
+.desc { margin: 0; font-size: 0.8rem; }
+.item-price { flex: 0 0 auto; text-align: right; }
+.price { margin: 0 0 4px; color: var(--charcoal, #24211d); font-size: 0.9rem; font-weight: 700; white-space: nowrap; }
+.benefit { margin: 0; color: var(--green, #00a878); font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
 </style>

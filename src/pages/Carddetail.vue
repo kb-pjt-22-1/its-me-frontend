@@ -10,22 +10,24 @@
           <polyline points="15 18 9 12 15 6"></polyline>
         </svg>
       </button>
-      <h2>{{ card.cardName }}</h2>
+      <h2 class="detail-header-title">
+        <span>{{ card.cardName }}</span>
+        <span v-if="cardLast4" class="detail-card-number">{{ cardLast4 }}</span>
+      </h2>
       <div class="right-placeholder"></div>
     </header>
 
     <!-- 카드 실물 이미지 대신 CSS로 그린 카드. panLast4 외에는 노출하지 않습니다 (보안) -->
-    <div class="card-visual" :style="{ background: card.color || 'linear-gradient(135deg, #35322b, #211f1a)' }">
-      <div class="card-top">
-        <span class="card-issuer">KB국민</span>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="2">
-          <path d="M8.5 8.5a5 5 0 0 1 7 0"></path>
-          <path d="M5.5 5.5a9 9 0 0 1 13 0"></path>
-          <circle cx="12" cy="14" r="1.6" fill="rgba(255,255,255,.85)" stroke="none"></circle>
-        </svg>
+    <div class="card-image-wrap">
+      <img
+          v-if="getCardImage(card)"
+          :src="getCardImage(card)"
+          :alt="`${card.cardName} 이미지`"
+          class="card-detail-image"
+      />
+      <div v-else class="card-image-fallback">
+        {{ card.cardName }}
       </div>
-      <p class="card-name">{{ card.cardName }}</p>
-      <p class="card-number">{{ displayLast4 }}</p>
     </div>
 
     <!-- 카드 기본 정보 -->
@@ -124,6 +126,7 @@ import { useCardsStore } from '@/stores/cards';
 import { getCurrentTier, formatBenefit } from '@/services/cardService';
 import { useToast } from '@/composables/useToast';
 import { useConfirmDialog } from '@/composables/useConfirmDialog';
+import { getCardImage } from '@/utils/cardImages';
 
 const route = useRoute();
 const router = useRouter();
@@ -147,6 +150,10 @@ const performanceTiers = computed(() =>
         .sort((a, b) =>
             (a.minimumSpending ?? 0) - (b.minimumSpending ?? 0)
         )
+);
+
+const cardLast4 = computed(() =>
+    String(card.value?.panLast4 ?? '').replace(/\D/g, '').slice(-4)
 );
 
 // 지금 적용 중인 할인 구간은 전월 실적 기준이다(performanceTiers[].minimumSpending이
@@ -249,15 +256,9 @@ const handleDeleteCard = async () => {
 .page-header { margin-bottom: 18px; }
 .loading-text { padding-top: 60px; text-align: center; }
 
-.card-visual {
-  border-radius: 18px; padding: 22px 20px; color: #ffffff; min-height: 170px;
-  display: flex; flex-direction: column; justify-content: space-between;
-  box-shadow: 0 14px 26px rgba(0, 0, 0, .18); margin-bottom: 18px;
-}
-.card-top { display: flex; justify-content: space-between; align-items: flex-start; }
-.card-issuer { font-size: 12px; opacity: .8; }
-.card-name { margin: 18px 0 0; font-size: 17px; font-weight: 700; }
-.card-number { margin: 0; font-size: 14px; letter-spacing: 1px; opacity: .9; }
+.card-image-wrap { width: min(100%, 360px); aspect-ratio: 1.586 / 1; margin: 0 auto 18px; display: flex; justify-content: center; align-items: center; }
+.card-detail-image { width: 100%; height: 100%; display: block; object-fit: contain; filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .14)); }
+.card-image-fallback { width: 100%; height: 170px; border-radius: 18px; display: grid; place-items: center; background: var(--dark, #545045); color: #ffffff; font-size: 17px; font-weight: 700; }
 
 .surface-card { padding: 20px; margin-bottom: 14px; }
 
@@ -366,4 +367,8 @@ const handleDeleteCard = async () => {
   font-weight: 700; font-size: 13px; cursor: pointer; margin-top: 10px;
 }
 .not-found { padding-top: 60px; text-align: center; }
+
+.detail-header-title { display: flex; align-items: baseline; justify-content: center; gap: 7px; min-width: 0; }
+.detail-header-title > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-card-number { flex: 0 0 auto; color: var(--muted, #8f897f); font-size: 11px; font-weight: 500; white-space: nowrap; }
 </style>
