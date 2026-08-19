@@ -322,7 +322,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute } from 'vue-router';
 import { useBenefitsStore } from '@/stores/benefits';
@@ -500,20 +500,31 @@ onMounted(() => {
   loadAiCoaching();
   loadLimits();
 
-  // 홈 화면 "이번 달에 사라지는 혜택" 카드에서 /benefits#available로 들어온 경우,
-  // 데이터 로딩(loadLimits)이 끝나 리스트가 실제로 그려진 뒤에 스크롤해야 위치가 어긋나지
-  // 않는다. nextTick 한 번으로는 비동기 fetch가 끝나기 전이라 부족할 수 있어서, 대상
-  // 섹션이 나타날 때까지 짧게 폴링한다.
+  // 홈 화면 "이번 달에 사라지는 혜택" 카드에서 /benefits#available로 들어온 경우 스크롤한다.
+  // #available 섹션 자체는 로딩 상태와 무관하게 항상 렌더링돼 있어서(내부 리스트만
+  // 로딩/에러/데이터로 바뀜), DOM에 엘리먼트가 존재하는지로는 "데이터가 다 들어왔는지"를
+  // 알 수 없다 - 데이터가 오기 전에 스크롤하면 이후 리스트가 그려지며 레이아웃이 늘어나서
+  // 사용자가 기대한 위치보다 위쪽에서 멈추게 된다. 그래서 DOM 존재 여부가 아니라 스토어의
+  // 실제 로딩 상태(limitsLoading)를 기준으로, 로딩이 끝난 뒤 다음 tick(리스트가 그려진 뒤)에
+  // 스크롤한다.
   if (route.hash === '#available') {
-    const scrollToTarget = (attemptsLeft = 20) => {
-      const target = document.querySelector(route.hash);
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else if (attemptsLeft > 0) {
-        setTimeout(() => scrollToTarget(attemptsLeft - 1), 50);
-      }
+    const scrollToAvailable = () => {
+      nextTick(() => {
+        document.querySelector('#available')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     };
-    nextTick(() => scrollToTarget());
+
+    if (limitsLoading.value) {
+      const stopWatch = watch(limitsLoading, (loading) => {
+        if (!loading) {
+          stopWatch();
+          scrollToAvailable();
+        }
+      });
+    } else {
+      // 캐시된 데이터가 있어 이미 로딩이 끝난 상태로 진입한 경우
+      scrollToAvailable();
+    }
   }
 });
 </script>

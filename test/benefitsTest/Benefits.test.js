@@ -423,10 +423,57 @@ describe('해시로 진입 시 스크롤', () => {
     return mount(Benefits, { attachTo: document.body })
   }
 
-  it('#available로 들어오면 해당 섹션으로 스크롤한다', async () => {
+  it('#available로 들어오면 데이터 로딩이 끝난 뒤 해당 섹션으로 스크롤한다', async () => {
     routeHash = '#available'
     const scrollIntoViewSpy = vi.fn()
     // JSDOM은 scrollIntoView를 구현하지 않아 기본적으로 없다.
+    window.Element.prototype.scrollIntoView = scrollIntoViewSpy
+
+    // fetchLimits를 통째로 mockResolvedValue()로 바꾸면 실제 액션 안의
+    // this.limitsLoading = true/false 전환 자체가 안 돌아서, "로딩 중엔 스크롤 안 하고
+    // 끝난 뒤에 스크롤한다"는 걸 검증할 수 없다. 로딩 상태를 직접 제어할 수 있도록
+    // pending 프로미스로 흉내낸다.
+    let resolveLimits
+    setActivePinia(createPinia())
+    const benefitsStore = useBenefitsStore()
+    benefitsStore.$patch({
+      reportMonthLabel: '8월',
+      totalBenefit: 42500,
+      deltaVsLastMonth: 7200,
+      categoryBreakdown: makeCategoryBreakdown(),
+      breakevenCards: [makeCard()],
+      aiTips: makeAiTips(),
+    })
+    vi.spyOn(benefitsStore, 'fetchReport').mockResolvedValue()
+    vi.spyOn(benefitsStore, 'fetchBreakEven').mockResolvedValue()
+    vi.spyOn(benefitsStore, 'fetchAiCoaching').mockResolvedValue()
+    vi.spyOn(benefitsStore, 'fetchLimits').mockImplementation(() => {
+      benefitsStore.limitsLoading = true
+      return new Promise((resolve) => {
+        resolveLimits = () => {
+          benefitsStore.benefitLimits = makeBenefitLimits()
+          benefitsStore.limitsLoading = false
+          resolve()
+        }
+      })
+    })
+
+    const wrapper = mount(Benefits, { attachTo: document.body })
+    await flushPromises()
+
+    // 로딩 중엔 아직 스크롤하면 안 된다 (핵심 회귀 포인트)
+    expect(scrollIntoViewSpy).not.toHaveBeenCalled()
+
+    resolveLimits()
+    await flushPromises()
+
+    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+    wrapper.unmount()
+  })
+
+  it('이미 로딩이 끝난 상태(캐시)로 들어오면 바로 스크롤한다', async () => {
+    routeHash = '#available'
+    const scrollIntoViewSpy = vi.fn()
     window.Element.prototype.scrollIntoView = scrollIntoViewSpy
 
     const wrapper = mountAttached()
