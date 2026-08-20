@@ -535,28 +535,11 @@ function initMap(kakao, center) {
   // 추천 강조(테두리+후광)와 같은 시각 언어를 클러스터에도 얹는 것뿐입니다.
   kakao.maps.event.addListener(clusterer, 'clustered', onClustered)
 
-  // 최초 진입 시 1회만 자동으로 현재 위치 기준 검색합니다.
+  // 최초 진입 시 1회만 자동으로 현재 위치 기준 검색합니다 - 이후 팬/줌으로는 더 이상
+  // 자동 재조회하지 않고, 재검색 버튼이나 카테고리 칩을 눌러야 다시 조회합니다.
   searchNearbyCurrentView()
 
-  // 이후 팬/줌(idle)이 있을 때마다도 화면 범위가 바뀐 만큼 자동으로 다시 조회합니다.
-  // 팬/줌 도중 idle이 짧은 간격으로 여러 번 뜰 수 있어(관성 스크롤 등) 150ms 디바운스로
-  // 마지막 하나만 실제 조회로 이어지게 합니다.
-  kakao.maps.event.addListener(map, 'idle', scheduleLoadBoundsMerchants)
-
   focusMerchantFromQuery()
-}
-
-let boundsDebounceTimer = null
-function scheduleLoadBoundsMerchants() {
-  if (boundsDebounceTimer) clearTimeout(boundsDebounceTimer)
-  boundsDebounceTimer = setTimeout(() => {
-    boundsDebounceTimer = null
-    if (selectedCategory.value) {
-      searchCategoryInView(selectedCategory.value)
-    } else {
-      searchNearbyCurrentView()
-    }
-  }, 150)
 }
 
 // 홈 화면 "오늘의 카드 추천"의 가까운 혜택 매장을 누르면 매장 상세 페이지 대신 이
@@ -686,15 +669,6 @@ async function searchNearbyCurrentView() {
   if (!kakaoInstance || !mapInstance) return
   const { bounds, center } = currentViewBoundsAndCenter()
   if (isDegenerateBounds(bounds)) return
-  // 레벨 6 이상(많이 축소된 상태)에서는 조회 자체를 하지 않는다 - 화면 범위가 너무 넓어져
-  // 매장 수가 과도하게 많아지고, 어차피 화면상 핀 하나하나를 구분하기도 힘든 축소 수준이다.
-  // 기존에 그려져 있던 핀도 실제 화면과 안 맞으니 같이 지운다.
-  if (mapInstance.getLevel() >= 6) {
-    boundsMerchants.value = []
-    clusterer?.clear()
-    markers = []
-    return
-  }
   await withMerchantsLoading(() => fetchRecommendedNearbyMerchants(bounds, center))
 }
 
@@ -905,7 +879,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   mapResizeObserver?.disconnect()
-  if (boundsDebounceTimer) clearTimeout(boundsDebounceTimer)
 })
 </script>
 

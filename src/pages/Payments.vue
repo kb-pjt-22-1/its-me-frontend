@@ -416,6 +416,11 @@ onBeforeRouteLeave(() => {
   }
   return true;
 });
+
+// completePayment의 isTokenExpired 방어 분기는 UI상 버튼이 disabled라 클릭으로는
+// 절대 도달할 수 없다(만료되면 버튼도 같이 잠김). 테스트에서 그 방어 로직 자체를
+// 직접 검증할 수 있게 최소한으로 노출한다.
+defineExpose({ completePayment });
 </script>
 
 <style scoped>

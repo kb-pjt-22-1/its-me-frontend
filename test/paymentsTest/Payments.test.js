@@ -235,6 +235,29 @@ describe('결제 완료', () => {
     vi.useRealTimers()
   })
 
+  it('만료된 상태에서 completePayment 자체를 직접 호출해도(방어 로직 단위 검증) 결제 없이 만료 토스트만 띄운다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({
+      paymentTokenId: 'tok-1',
+      tokenValue: 'ABC123XYZ',
+      expiresAt: new Date(Date.now() + 1000).toISOString(),
+    })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(wrapper.text()).toContain('바코드가 만료됐어요')
+
+    // UI(disabled 버튼)로는 도달 못 하는 completePayment 내부 방어 분기 자체를 직접 호출해서 검증한다.
+    await wrapper.vm.completePayment()
+
+    expect(toastMock.error).toHaveBeenCalledWith('바코드가 만료됐어요. 다시 발급해주세요.')
+    expect(completePaymentTokenApi).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
   it('결제 토큰 정보가 없는 상태에서 시도하면 에러 토스트를 띄우고 인증 상태를 해제한다', async () => {
     verifyPin.mockResolvedValue()
     createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
