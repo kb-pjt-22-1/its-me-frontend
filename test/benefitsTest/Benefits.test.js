@@ -3,8 +3,10 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 let routeHash = ''
+const routerPushMock = vi.fn()
 vi.mock('vue-router', () => ({
   useRoute: () => ({ hash: routeHash }),
+  useRouter: () => ({ push: routerPushMock }),
 }))
 
 import Benefits from '@/pages/Benefits.vue'
@@ -392,6 +394,17 @@ describe('이번 달 받을 수 있는 혜택', () => {
       ],
     })
     expect(wrapperNoCount.text()).not.toContain('회 사용')
+  })
+
+  it('"이 혜택 사용하기"를 누르면 그 카테고리 코드를 쿼리로 담아 지도 화면으로 이동한다', async () => {
+    const { wrapper } = mountPage({
+      benefitLimits: [makeBenefitLimitItem({ key: '1-CAFE-혜택', categoryCode: 'CAFE' })],
+    })
+
+    const useButton = wrapper.findAll('button').find((b) => b.text().includes('이 혜택 사용하기'))
+    await useButton.trigger('click')
+
+    expect(routerPushMock).toHaveBeenCalledWith({ path: '/map', query: { categoryCode: 'CAFE' } })
   })
 })
 
