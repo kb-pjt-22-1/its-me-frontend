@@ -1,8 +1,8 @@
 import api from '@/api'
 
 /** 결제 바코드/QR 생성 [POST /api/v1/payment-tokens] */
-export async function createPaymentToken(userCardId) {
-  const { data } = await api.post('/v1/payment-tokens', { userCardId })
+export async function createPaymentToken(userCardId, merchantId = null) {
+  const { data } = await api.post('/v1/payment-tokens', { userCardId, merchantId })
   return data
 }
 

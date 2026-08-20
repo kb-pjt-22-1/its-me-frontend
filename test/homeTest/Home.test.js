@@ -20,17 +20,25 @@ vi.mock('@/services/benefitService', () => ({
 import Home from '@/pages/Home.vue'
 import { useCardsStore } from '@/stores/cards'
 import { useMerchantsStore } from '@/stores/merchants'
+import { useBookmarksStore } from '@/stores/bookmarks'
+import { usePaymentStore } from '@/stores/payment'
 import { flushPromises } from '@vue/test-utils'
 
 function mountPage(cards) {
   setActivePinia(createPinia())
   const cardsStore = useCardsStore()
   const merchantsStore = useMerchantsStore()
+  const bookmarksStore = useBookmarksStore()
+  const paymentStore = usePaymentStore()
   cardsStore.cards = cards
   // Home.vue에 아직 남아 있는 레거시 카테고리 조회가 네트워크를 타지 않게 한다.
   merchantsStore.fetchCategories = vi.fn().mockResolvedValue()
+  // 인증 안 된 상태라 bookmarksStore.fetchBookmarks()는 원래 조기 종료되지만,
+  // 명시적으로 mock해서 네트워크 호출 자체를 안 타게 고정한다.
+  bookmarksStore.fetchBookmarks = vi.fn().mockResolvedValue()
+  merchantsStore.fetchMerchantDetail = vi.fn().mockResolvedValue(null)
   const wrapper = mount(Home)
-  return { wrapper, cardsStore }
+  return { wrapper, cardsStore, bookmarksStore, paymentStore }
 }
 
 beforeEach(() => {
@@ -151,5 +159,128 @@ describe('오늘의 추천', () => {
     await wrapper.find('.reco-merchant-item').trigger('click')
 
     expect(routerMock.push).toHaveBeenCalledWith({ path: '/map', query: { merchantId: 42 } })
+  })
+})
+
+describe('추천 카드로 결제', () => {
+  it('recommendation에 userCardId가 있으면 그 카드를 쿼리로 넘겨 결제 화면으로 이동한다', async () => {
+    fetchTodayRecommendation.mockResolvedValueOnce({
+      categoryName: '카페',
+      cardName: '청춘대로 톡톡카드',
+      userCardId: 5,
+      nearbyMerchants: [],
+    })
+
+    const { wrapper } = mountPage([])
+    await flushPromises()
+
+    const ctaButton = wrapper.findAll('button').find((b) => b.text().includes('추천 카드로 결제'))
+    await ctaButton.trigger('click')
+
+    expect(routerMock.push).toHaveBeenCalledWith({ path: '/pay', query: { userCardId: 5 } })
+  })
+
+  it('recommendation에 userCardId가 없으면 그냥 결제 화면으로 이동한다', async () => {
+    fetchTodayRecommendation.mockResolvedValueOnce({
+      categoryName: '카페',
+      cardName: '청춘대로 톡톡카드',
+      userCardId: null,
+      nearbyMerchants: [],
+    })
+
+    const { wrapper } = mountPage([])
+    await flushPromises()
+
+    const ctaButton = wrapper.findAll('button').find((b) => b.text().includes('추천 카드로 결제'))
+    await ctaButton.trigger('click')
+
+    expect(routerMock.push).toHaveBeenCalledWith('/pay')
+  })
+
+  it('가까운 혜택 매장 "더보기"를 누르면 지도 화면으로 이동한다', async () => {
+    fetchTodayRecommendation.mockResolvedValueOnce({
+      categoryName: '카페',
+      cardName: '청춘대로 톡톡카드',
+      nearbyMerchants: [],
+    })
+
+    const { wrapper } = mountPage([])
+    await flushPromises()
+
+    const moreButton = wrapper.findAll('button').find((b) => b.text().includes('더보기 〉'))
+    await moreButton.trigger('click')
+
+    expect(routerMock.push).toHaveBeenCalledWith('/map')
+  })
+})
+
+describe('간편 결제 버튼', () => {
+  it('최근 저장한 매장이 있으면 그 매장으로 결제 화면으로 이동한다', async () => {
+    const { wrapper, bookmarksStore } = mountPage([])
+    bookmarksStore.bookmarks = [{ bookmarkId: 1, merchantId: 7, createdAt: '2026-08-01T00:00:00' }]
+    await flushPromises()
+
+    const payButton = wrapper.findAll('button').find((b) => b.text().includes('간편 결제'))
+    await payButton.trigger('click')
+
+    expect(routerMock.push).toHaveBeenCalledWith({ path: '/pay', query: { merchantId: 7 } })
+  })
+
+  it('저장한 매장이 없으면 그냥 결제 화면으로 이동한다', async () => {
+    const { wrapper, bookmarksStore } = mountPage([])
+    bookmarksStore.bookmarks = []
+    await flushPromises()
+
+    const payButton = wrapper.findAll('button').find((b) => b.text().includes('간편 결제'))
+    await payButton.trigger('click')
+
+    expect(routerMock.push).toHaveBeenCalledWith('/pay')
+  })
+})
+
+describe('놓치기 쉬운 혜택', () => {
+  it('이번 달 사라지는 혜택 카드를 누르면 혜택 페이지의 이번 달 받을 수 있는 혜택 섹션으로 이동한다', async () => {
+    fetchExpiringBenefits.mockResolvedValue({
+      daysRemaining: 4,
+      expiringBenefits: [{ categoryName: '카페', label: '카페 2,000원 할인' }],
+      nearbyMerchantBenefits: [],
+    })
+
+    const { wrapper } = mountPage([])
+    await flushPromises()
+
+    const expiringRow = wrapper.find('.expiring-row--clickable')
+    await expiringRow.trigger('click')
+
+    expect(routerMock.push).toHaveBeenCalledWith({ path: '/benefits', hash: '#available' })
+  })
+})
+
+describe('최근 결제 내역', () => {
+  it('결제 일시를 yyyy.MM.dd HH:mm 형식으로 보여준다', async () => {
+    const { wrapper, paymentStore } = mountPage([])
+    paymentStore.history = [
+      {
+        paymentId: 1,
+        merchantName: '스타벅스 강남점',
+        finalAmount: 4500,
+        discountAmount: 500,
+        paymentTime: '2026-08-05T13:30:00',
+        cardName: '청춘대로 톡톡카드',
+      },
+    ]
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('2026.08.05 13:30')
+  })
+
+  it('전체보기를 누르면 결제 내역 목록 화면으로 이동한다', async () => {
+    const { wrapper } = mountPage([])
+    await flushPromises()
+
+    const moreButton = wrapper.findAll('button').find((b) => b.text().includes('전체보기'))
+    await moreButton.trigger('click')
+
+    expect(routerMock.push).toHaveBeenCalledWith('/payments')
   })
 })

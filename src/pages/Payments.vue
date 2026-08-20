@@ -342,7 +342,10 @@ const checkPin = async () => {
 async function issuePaymentToken() {
   isIssuingToken.value = true;
   try {
-    await paymentStore.createPaymentToken(selectedMethodId.value);
+    await paymentStore.createPaymentToken(
+      selectedMethodId.value,
+      route.query.merchantId ? Number(route.query.merchantId) : undefined
+    );
   } catch {
     toast.error('바코드를 발급하지 못했어요. 다시 시도해주세요.');
     isAuthenticated.value = false; // 토큰 없이는 결제 화면을 보여줘봤자 의미가 없어서 인증 전 화면으로 되돌림
@@ -378,6 +381,16 @@ onMounted(async () => {
   cardsStore.ensureBenefitsLoaded(
     cardsStore.cards.filter((c) => c.status === 'ACTIVE').map((c) => c.userCardId)
   );
+
+  // merchantsStore.merchants는 전체 매장(2만 건+)을 명시적으로 fetchMerchants() 해야만
+  // 채워지는데, 이 페이지는 그걸 호출한 적이 없어서 route.query.merchantId가 있어도
+  // getByIdWithCategory가 항상 null을 반환하고 있었다(북마크 매장 → 간편결제 연결 시
+  // 카드별 혜택이 하나도 안 뜨던 원인). 홈/매장상세에서 특정 매장 하나만 들고 넘어오는
+  // 흐름이라, 전체 목록 대신 fetchMerchantDetail로 그 매장 하나만 가볍게 받아온다.
+  if (route.query.merchantId) {
+    if (merchantsStore.categories.length === 0) await merchantsStore.fetchCategories();
+    await merchantsStore.fetchMerchantDetail(route.query.merchantId);
+  }
 });
 
 // 발급된 토큰(바코드)을 아직 결제 완료도 취소도 안 한 채로 페이지를 벗어나면, 서버에
