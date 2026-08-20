@@ -27,8 +27,8 @@ vi.mock('@/services/paymentAuthService', () => ({
 }))
 
 vi.mock('@/services/cardService', () => ({
-  findBenefitForCategory: () => null,
-  formatBenefit: () => '',
+  findBenefitForCategory: vi.fn(() => null),
+  formatBenefit: vi.fn(() => ''),
 }))
 
 const cardsStoreMock = {
@@ -65,6 +65,7 @@ vi.mock('@/services/paymentService', () => ({
 
 import Payments from '@/pages/Payments.vue'
 import { verifyPin } from '@/services/paymentAuthService'
+import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
 import {
   createPaymentToken as createPaymentTokenApi,
   completePaymentToken as completePaymentTokenApi,
@@ -98,6 +99,9 @@ beforeEach(() => {
   capturedLeaveGuard = null
   routeMock.query = {}
   merchantsStoreMock.categories = []
+  merchantsStoreMock.getByIdWithCategory = () => null
+  findBenefitForCategory.mockReturnValue(null)
+  formatBenefit.mockReturnValue('')
 })
 
 describe('바코드 발급/렌더링', () => {
@@ -118,6 +122,21 @@ describe('바코드 발급/렌더링', () => {
       'ABC123XYZ',
       expect.objectContaining({ format: 'CODE128', displayValue: false })
     )
+  })
+
+  it('JsBarcode가 인코딩 실패로 예외를 던져도 화면은 그대로 정상 동작한다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
+    JsBarcode.mockImplementationOnce(() => {
+      throw new Error('invalid barcode value')
+    })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    // 캔버스에 그리는 것만 실패할 뿐, 결제 토큰 자체는 정상 발급된 상태라 화면은 그대로 떠 있어야 한다.
+    expect(wrapper.find('.barcode-tap-area').exists()).toBe(true)
+    expect(wrapper.find('.barcode-tap-area').attributes('disabled')).toBeUndefined()
   })
 
   it('매장 상세에서 넘어온 경우(쿼리에 merchantId 있음) 토큰 발급 시 merchantId도 같이 넘긴다', async () => {
@@ -215,6 +234,30 @@ describe('결제 완료', () => {
     expect(completePaymentTokenApi).not.toHaveBeenCalled()
     vi.useRealTimers()
   })
+
+  it('결제 토큰 정보가 없는 상태에서 시도하면 에러 토스트를 띄우고 인증 상태를 해제한다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
+
+    const { wrapper, paymentStore } = mountPage()
+    await enterPin(wrapper)
+
+    // 정상 흐름에선 발생하지 않지만(발급 성공 시 항상 currentToken이 채워짐), 방어 로직
+    // 검증을 위해 currentToken을 비운 상태를 강제로 만든다. 만료가 아니라(currentToken이
+    // 아예 없어 isTokenExpired는 false) 버튼은 비활성화되지 않으므로 클릭이 정상적으로 먹는다.
+    paymentStore.currentToken = null
+    await wrapper.vm.$nextTick()
+
+    const barcodeArea = wrapper.find('.barcode-tap-area')
+    expect(barcodeArea.attributes('disabled')).toBeUndefined()
+
+    await barcodeArea.trigger('click')
+    await flushPromises()
+
+    expect(toastMock.error).toHaveBeenCalledWith('결제 토큰 정보가 없어요. 다시 인증해주세요.')
+    expect(completePaymentTokenApi).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('간편 비밀번호 인증 후 바코드가 표시됩니다')
+  })
 })
 
 describe('페이지 이탈 시 토큰 취소', () => {
@@ -289,6 +332,164 @@ describe('매장 정보 조회 (route.query.merchantId)', () => {
     await flushPromises()
 
     expect(merchantsStoreMock.fetchCategories).not.toHaveBeenCalled()
+  })
+})
+
+describe('결제 수단 선택 및 혜택 표시', () => {
+  it('매장 정보가 있으면 카드별 혜택을 계산해서 혜택이 높은 카드를 먼저 보여준다', () => {
+    routeMock.query = { merchantId: '7' }
+    merchantsStoreMock.getByIdWithCategory = () => ({ id: 7, name: '스타벅스', categoryCode: '5813' })
+    cardsStoreMock.cards = [
+      { userCardId: 1, cardName: 'A카드', panLast4: '1111', status: 'ACTIVE', color: '#111111', isPrimary: true, benefitsInfo: 'A', previousMonthAmount: 0 },
+      { userCardId: 2, cardName: 'B카드', panLast4: '2222', status: 'ACTIVE', color: '#222222', isPrimary: false, benefitsInfo: 'B', previousMonthAmount: 0 },
+    ]
+    findBenefitForCategory.mockImplementation((benefitsInfo) => {
+      if (benefitsInfo === 'A') return { discountRate: 5 }
+      if (benefitsInfo === 'B') return { discountRate: 10 }
+      return null
+    })
+    formatBenefit.mockImplementation((benefit) => `${benefit.discountRate}% 할인`)
+
+    const { wrapper } = mountPage()
+
+    const methodItems = wrapper.findAll('.method-item')
+    expect(methodItems[0].text()).toContain('B카드')
+    expect(methodItems[0].text()).toContain('10% 할인')
+    expect(methodItems[1].text()).toContain('A카드')
+    expect(methodItems[1].text()).toContain('5% 할인')
+
+    cardsStoreMock.cards = [
+      { userCardId: 1, cardName: '청춘대로 톡톡카드', panLast4: '1234', status: 'ACTIVE', color: '#1f3a5f', isPrimary: true, benefitsInfo: null, currentAmount: 0 },
+    ]
+  })
+
+  it('매장 정보는 있지만 적용 가능한 혜택이 없는 카드는 "혜택 없음"으로 보여준다', () => {
+    routeMock.query = { merchantId: '7' }
+    merchantsStoreMock.getByIdWithCategory = () => ({ id: 7, name: '스타벅스', categoryCode: '5813' })
+    findBenefitForCategory.mockReturnValue(null)
+
+    const { wrapper } = mountPage()
+
+    expect(wrapper.text()).toContain('혜택 없음')
+  })
+
+  it('카드색이 없는 카드는 기본 색상으로 대체된다', () => {
+    cardsStoreMock.cards = [
+      { userCardId: 1, cardName: '색상없는카드', panLast4: '9999', status: 'ACTIVE', color: null, isPrimary: true, benefitsInfo: null, currentAmount: 0 },
+    ]
+
+    const { wrapper } = mountPage()
+
+    expect(wrapper.find('.method-icon').attributes('style')).toContain('background: rgb(36, 33, 29)')
+
+    cardsStoreMock.cards = [
+      { userCardId: 1, cardName: '청춘대로 톡톡카드', panLast4: '1234', status: 'ACTIVE', color: '#1f3a5f', isPrimary: true, benefitsInfo: null, currentAmount: 0 },
+    ]
+  })
+
+  it('결제 수단을 클릭하면 선택이 바뀐다', async () => {
+    cardsStoreMock.cards = [
+      { userCardId: 1, cardName: 'A카드', panLast4: '1111', status: 'ACTIVE', color: '#111111', isPrimary: true, benefitsInfo: null, currentAmount: 0 },
+      { userCardId: 2, cardName: 'B카드', panLast4: '2222', status: 'ACTIVE', color: '#222222', isPrimary: false, benefitsInfo: null, currentAmount: 0 },
+    ]
+
+    const { wrapper } = mountPage()
+    const methodItems = wrapper.findAll('.method-item')
+    expect(methodItems[0].classes()).toContain('selected')
+
+    await methodItems[1].trigger('click')
+
+    expect(wrapper.findAll('.method-item')[1].classes()).toContain('selected')
+    expect(wrapper.findAll('.method-item')[0].classes()).not.toContain('selected')
+
+    cardsStoreMock.cards = [
+      { userCardId: 1, cardName: '청춘대로 톡톡카드', panLast4: '1234', status: 'ACTIVE', color: '#1f3a5f', isPrimary: true, benefitsInfo: null, currentAmount: 0 },
+    ]
+  })
+
+  it('카드 목록을 아직 못 받아왔으면 로딩 문구를 보여준다', () => {
+    cardsStoreMock.isLoading = true
+    cardsStoreMock.cards = []
+
+    const { wrapper } = mountPage()
+
+    expect(wrapper.text()).toContain('불러오는 중...')
+
+    cardsStoreMock.isLoading = false
+    cardsStoreMock.cards = [
+      { userCardId: 1, cardName: '청춘대로 톡톡카드', panLast4: '1234', status: 'ACTIVE', color: '#1f3a5f', isPrimary: true, benefitsInfo: null, currentAmount: 0 },
+    ]
+  })
+
+  it('쿼리에 userCardId가 있으면 그 카드를 기본 선택한다', () => {
+    routeMock.query = { userCardId: '2' }
+    cardsStoreMock.cards = [
+      { userCardId: 1, cardName: 'A카드', panLast4: '1111', status: 'ACTIVE', color: '#111111', isPrimary: true, benefitsInfo: null, currentAmount: 0 },
+      { userCardId: 2, cardName: 'B카드', panLast4: '2222', status: 'ACTIVE', color: '#222222', isPrimary: false, benefitsInfo: null, currentAmount: 0 },
+    ]
+
+    const { wrapper } = mountPage()
+
+    const methodItems = wrapper.findAll('.method-item')
+    expect(methodItems[1].classes()).toContain('selected')
+    expect(methodItems[1].text()).toContain('B카드')
+
+    cardsStoreMock.cards = [
+      { userCardId: 1, cardName: '청춘대로 톡톡카드', panLast4: '1234', status: 'ACTIVE', color: '#1f3a5f', isPrimary: true, benefitsInfo: null, currentAmount: 0 },
+    ]
+  })
+})
+
+describe('PIN 입력 화면', () => {
+  it('뒤로가기를 누르면 결제 화면으로 돌아간다', async () => {
+    const { wrapper } = mountPage()
+
+    const startButton = wrapper.findAll('button').find((b) => b.text().includes('간편 비밀번호 인증 후 결제하기'))
+    await startButton.trigger('click')
+    expect(wrapper.find('.pin-page').exists()).toBe(true)
+
+    await wrapper.find('.back-btn').trigger('click')
+
+    expect(wrapper.find('.pin-page').exists()).toBe(false)
+    expect(wrapper.text()).toContain('간편 비밀번호 인증 후 바코드가 표시됩니다')
+  })
+
+  it('백스페이스를 누르면 마지막 자리를 지운다', async () => {
+    verifyPin.mockResolvedValue()
+    const { wrapper } = mountPage()
+
+    const startButton = wrapper.findAll('button').find((b) => b.text().includes('간편 비밀번호 인증 후 결제하기'))
+    await startButton.trigger('click')
+
+    const digitButtons = wrapper.findAll('.keypad-key').filter((b) => /^[0-9]$/.test(b.text()))
+    for (let i = 0; i < 3; i++) {
+      await digitButtons[i].trigger('click')
+    }
+    expect(wrapper.findAll('.pin-dot.filled')).toHaveLength(3)
+
+    const backspaceButton = wrapper.findAll('.keypad-key')[11]
+    await backspaceButton.trigger('click')
+
+    expect(wrapper.findAll('.pin-dot.filled')).toHaveLength(2)
+    expect(verifyPin).not.toHaveBeenCalled() // 아직 6자리를 다 안 채웠으니 검증 자체가 안 일어남
+  })
+
+  it('6자리를 다 채운 뒤에는 숫자를 더 눌러도 무시한다', async () => {
+    verifyPin.mockImplementation(() => new Promise(() => {})) // 검증이 안 끝나는 상태로 붙잡아둠
+    const { wrapper } = mountPage()
+
+    const startButton = wrapper.findAll('button').find((b) => b.text().includes('간편 비밀번호 인증 후 결제하기'))
+    await startButton.trigger('click')
+
+    const digitButtons = wrapper.findAll('.keypad-key').filter((b) => /^[0-9]$/.test(b.text()))
+    for (let i = 0; i < 6; i++) {
+      await digitButtons[i].trigger('click')
+    }
+    expect(wrapper.findAll('.pin-dot.filled')).toHaveLength(6)
+
+    await digitButtons[0].trigger('click') // 7번째 입력 시도 - 무시돼야 함
+
+    expect(wrapper.findAll('.pin-dot.filled')).toHaveLength(6)
   })
 })
 
@@ -392,5 +593,48 @@ describe('바코드 만료 카운트다운 / 재발급', () => {
 
     expect(JsBarcode).toHaveBeenLastCalledWith(expect.anything(), 'NEWTOKEN999', expect.anything())
     expect(wrapper.text()).not.toContain('바코드가 만료됐어요')
+  })
+
+  it('재발급 처리 중에 다시 눌러도 중복으로 재발급되지 않는다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({
+      paymentTokenId: 'tok-1',
+      tokenValue: 'ABC123XYZ',
+      expiresAt: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
+    })
+    // cancelPaymentToken을 아직 안 끝나는 프로미스로 묶어서, "재발급 처리 중" 상태를 붙잡아둔다.
+    let resolveCancel
+    cancelPaymentTokenApi.mockReturnValue(new Promise((resolve) => { resolveCancel = resolve }))
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    const reissueButton = wrapper.findAll('button').find((b) => b.text().includes('다시 발급'))
+    await reissueButton.trigger('click') // 첫 클릭 - isReissuing이 true로 바뀌고 아직 안 끝남
+    await reissueButton.trigger('click') // 두 번째 클릭 - isReissuing 가드에 막혀서 무시돼야 함
+    await flushPromises()
+
+    expect(cancelPaymentTokenApi).toHaveBeenCalledTimes(1)
+
+    resolveCancel({ paymentTokenId: 'tok-1', status: 'CANCELED' })
+    await flushPromises()
+  })
+
+  it('컴포넌트가 언마운트되면 카운트다운 타이머를 정리한다', async () => {
+    const clearIntervalSpy = vi.spyOn(global, 'clearInterval')
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({
+      paymentTokenId: 'tok-1',
+      tokenValue: 'ABC123XYZ',
+      expiresAt: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
+    })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    wrapper.unmount()
+
+    expect(clearIntervalSpy).toHaveBeenCalled()
+    clearIntervalSpy.mockRestore()
   })
 })
