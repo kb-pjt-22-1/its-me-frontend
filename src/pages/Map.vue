@@ -837,10 +837,22 @@ function onChipClick(cat) {
 }
 
 onMounted(async () => {
-  merchantsStore.fetchCategories()
+  const categoriesPromise = merchantsStore.fetchCategories()
   merchantsStore.fetchBrands()
   // 매장 상세(추천 카드)에 쓸 보유 카드 - Storedetail.vue와 동일하게, 이미 있으면 다시 안 받습니다.
   if (cardsStore.cards.length === 0) cardsStore.fetchCards()
+
+  // 혜택 페이지 "이 혜택 사용하기"에서 ?categoryCode=로 넘어온 경우, 그 카테고리 칩을
+  // 미리 선택해둔다. merchants computed가 이미 selectedCategory로 클라이언트 필터링을
+  // 하고 있어서, 화면 안 매장이 로드되는 대로(idle 이벤트) 자동으로 그 카테고리만 걸러져
+  // 보인다 - 매장 목록을 위해 별도 API를 새로 호출할 필요가 없다. 위에서 이미 시작한
+  // fetchCategories() 호출의 Promise를 그대로 기다려서, 중복 요청 없이 카테고리 사전이
+  // 채워질 때까지만 기다린다.
+  if (route.query.categoryCode) {
+    await categoriesPromise
+    const category = merchantsStore.getCategoryByCode(route.query.categoryCode)
+    if (category) selectedCategory.value = category.categoryName
+  }
 
   let kakao
   try {

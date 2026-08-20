@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <!-- AI 혜택 코치 [GET /api/v1/benefits/coaching] -->
+    <!-- AI 혜택 코치 [POST /api/v1/benefits/coaching] -->
     <section class="surface-card ai-card">
       <span class="pill pill--gold ai-badge">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"></path></svg>
@@ -176,7 +176,7 @@
               <div class="usage-main">
                 <div class="usage-top-row">
                   <strong>{{ item.category }}</strong>
-                  <button type="button" class="usage-link">이 혜택 사용하기 &gt;</button>
+                  <button type="button" class="usage-link" @click="goToMapForCategory(item.categoryCode)">이 혜택 사용하기 &gt;</button>
                 </div>
                 <p class="usage-sub muted-text">{{ item.cardName }} · {{ item.serviceName }}</p>
                 <p class="usage-desc muted-text">{{ item.used.toLocaleString() }}원 사용 / {{ limitLabel(item) }}</p>
@@ -324,10 +324,11 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useBenefitsStore } from '@/stores/benefits';
 
 const route = useRoute();
+const router = useRouter();
 const benefitsStore = useBenefitsStore();
 const {
   reportMonthLabel,
@@ -371,6 +372,13 @@ function loadAiCoaching() {
 
 function loadLimits() {
   benefitsStore.fetchLimits();
+}
+
+// "이 혜택 사용하기" 클릭 시 - 카테고리별로 실제 이용 가능한 매장을 보러 지도 화면으로 이동.
+// categoryCode를 쿼리로 넘기면 Map.vue가 merchantsStore에서 그 코드에 맞는 카테고리명을
+// 찾아 칩을 자동으로 선택한 상태로 진입한다(칩을 직접 누른 것과 동일한 흐름).
+function goToMapForCategory(categoryCode) {
+  router.push({ path: '/map', query: { categoryCode } });
 }
 
 const showFullBreakdown = ref(false);
@@ -537,7 +545,7 @@ onMounted(() => {
 .danger-text { color: var(--danger, #d94343); }
 
 .page {
-  padding: 8px 18px 40px;
+  padding: 18px 18px 40px;
 }
 
 /* AI 혜택 코치 */
