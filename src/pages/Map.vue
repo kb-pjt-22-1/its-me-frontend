@@ -503,7 +503,14 @@ function initMap(kakao, center) {
   })
   // 옵션에 map을 넘기면 생성과 동시에 지도에 올라간다 - 이후 재사용할 일은 없지만,
   // 변수에 담아두는 것만으로 "만들고 버리는" 인스턴스가 아님이 명확해진다.
-  const centerMarker = new kakao.maps.Marker({ map, position: new kakao.maps.LatLng(center.lat, center.lng) })
+  // 카카오 기본 마커(검은 물방울)를 그대로 쓰면 매장 핀과 구분이 안 가서, 점+링 아이콘으로
+  // 따로 그린다 - buildCurrentLocationMarkerImage 참고.
+  const centerMarker = new kakao.maps.Marker({
+    map,
+    position: new kakao.maps.LatLng(center.lat, center.lng),
+    image: buildCurrentLocationMarkerImage(kakao),
+    zIndex: 1,
+  })
   kakaoInstance = kakao
   mapInstance = map
   observeMapContainerResize()
@@ -699,31 +706,58 @@ function onResearchClick() {
   }
 }
 
-// 핀 모양(물방울 + 아이콘)을 SVG로 그려서 MarkerImage로 씁니다. MarkerClusterer가
+// 핀 모양(원형 배지 + 아이콘)을 SVG로 그려서 MarkerImage로 씁니다. MarkerClusterer가
 // CustomOverlay를 못 받고 Marker만 받아서(SDK 제약) DOM 대신 이 방식을 씁니다.
 // displayImage(브랜드 로고 우선, 없으면 카테고리 아이콘)를 SVG <image>로 그대로 참조합니다.
 // recommended=true인 매장만 테두리 색과 은은한 후광으로 강조합니다 -
 // 나머지 매장도 똑같이 핀은 그려지고, 강조만 빠집니다(필터링이 아니라 하이라이트).
-const PIN_WIDTH = 32
-const PIN_HEIGHT = 40
+// 원래 물방울 핀은 테두리가 옅은 회갈색(#8f897f)이라 카카오맵의 복잡한 배경 위에서 묻혀
+// 보이던 문제가 있어서, 클러스터 배지와 같은 원형으로 바꾸고 진한 charcoal 테두리 +
+// 그림자로 대비를 올렸습니다 - 뾰족한 꼬리가 없는 대신 아이콘이 더 크게 보입니다.
+const PIN_SIZE = 36
 // iconDataUri는 base64로 인코딩된 data URI만 받습니다(외부/절대 URL이 아님) - 브라우저가
 // <img src="data:image/svg+xml,...">로 쓰이는 SVG 안에서는 <image href="외부 URL">가
 // 가리키는 이미지를 보안상 아예 안 불러오기 때문에(같은 오리진이어도), 미리 fetch해서
 // base64로 SVG 안에 통째로 박아 넣어야 실제로 보입니다. createMerchantMarker 참고.
 function buildMerchantMarkerImage(kakao, merchant, iconDataUri) {
   const recommended = !!merchant.recommended
-  const borderColor = recommended ? '#ffbc00' : '#8f897f'
-  const glow = recommended ? '<circle cx="16" cy="15" r="15" fill="#ffbc00" fill-opacity="0.22"/>' : ''
-  const iconTag = iconDataUri ? `<image href="${iconDataUri}" x="9" y="8" width="14" height="14"/>` : ''
+  const borderColor = recommended ? '#ffbc00' : '#24211d'
+  const glow = recommended ? '<circle cx="18" cy="18" r="17" fill="#ffbc00" fill-opacity="0.22"/>' : ''
+  // 브랜드 로고/카테고리 아이콘 원본이 정사각형이 아니거나 배경이 꽉 찬 사진이어도, 핀
+  // 밖으로 삐져나오지 않도록 원형 clipPath로 잘라서 넣습니다(정사각형 통짜 이미지가 원형
+  // 배지 위에 그대로 얹히는 문제 방지) - preserveAspectRatio="slice"로 비율은 유지한 채
+  // 원 안을 꽉 채우도록 크롭합니다.
+  const iconTag = iconDataUri
+    ? `<image href="${iconDataUri}" x="8" y="8" width="20" height="20" ` +
+      'preserveAspectRatio="xMidYMid slice" clip-path="url(#pinIconClip)"/>'
+    : ''
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_WIDTH}" height="${PIN_HEIGHT}" viewBox="0 0 32 40">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_SIZE}" height="${PIN_SIZE}" viewBox="0 0 36 36">` +
+    '<defs><filter id="pinShadow" x="-50%" y="-50%" width="200%" height="200%">' +
+    '<feDropShadow dx="0" dy="1.5" stdDeviation="1.3" flood-color="#000000" flood-opacity="0.35"/>' +
+    '</filter><clipPath id="pinIconClip"><circle cx="18" cy="18" r="10"/></clipPath></defs>' +
     glow +
-    `<path d="M16 39C16 39 4 23.6 4 15A12 12 0 1 1 28 15C28 23.6 16 39 16 39Z" fill="#ffffff" stroke="${borderColor}" stroke-width="2.5"/>` +
+    `<circle filter="url(#pinShadow)" cx="18" cy="18" r="14" fill="#ffffff" stroke="${borderColor}" stroke-width="3"/>` +
     iconTag +
     '</svg>'
   const src = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
-  return new kakao.maps.MarkerImage(src, new kakao.maps.Size(PIN_WIDTH, PIN_HEIGHT), {
-    offset: new kakao.maps.Point(PIN_WIDTH / 2, PIN_HEIGHT),
+  return new kakao.maps.MarkerImage(src, new kakao.maps.Size(PIN_SIZE, PIN_SIZE), {
+    offset: new kakao.maps.Point(PIN_SIZE / 2, PIN_SIZE / 2),
+  })
+}
+
+// 현재 위치 표시용 점+링 아이콘. 카카오 기본 마커(검은 물방울)를 대신해서 매장 핀과
+// 헷갈리지 않도록 별도로 그립니다 - 클러스터 배지와 같은 dark 톤으로 통일했습니다.
+function buildCurrentLocationMarkerImage(kakao) {
+  const size = 22
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 22 22">` +
+    '<circle cx="11" cy="11" r="10" fill="#545045" fill-opacity="0.18"/>' +
+    '<circle cx="11" cy="11" r="6.5" fill="#545045" stroke="#ffffff" stroke-width="2.5"/>' +
+    '</svg>'
+  const src = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+  return new kakao.maps.MarkerImage(src, new kakao.maps.Size(size, size), {
+    offset: new kakao.maps.Point(size / 2, size / 2),
   })
 }
 

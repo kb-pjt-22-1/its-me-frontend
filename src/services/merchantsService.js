@@ -107,7 +107,7 @@ export async function fetchMerchantBrands() {
 }
 
 // merchants 테이블 실제 컬럼: merchant_id, brand_id, category_code, merchant_code,
-//   merchant_name, address, latitude, longitude, phone
+//   merchant_name, address, latitude, longitude
 function normalizeMerchant(dto) {
   return {
     id: dto.merchantId,
@@ -118,7 +118,6 @@ function normalizeMerchant(dto) {
     address: dto.address,
     lat: dto.latitude,
     lng: dto.longitude,
-    phone: dto.phone,
   }
 }
 
