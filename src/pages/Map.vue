@@ -602,27 +602,26 @@ function onClusterClick(cluster) {
 }
 
 // 매 클러스터링 결과마다(줌/이동으로 다시 뭉칠 때도) 클러스터별로 혜택 매장 포함 여부를
-// 확인해서 배지 스타일을 다시 그립니다. getClusterMarker()가 돌려주는 오버레이는
-// styles 옵션으로 그려진 기본 배지와 같은 CustomOverlay라 setContent로 덮어쓸 수 있습니다.
+// 확인해서 배지에 테두리를 입힙니다.
+//
+// clusterMarker.setContent(새_HTML_문자열)로 통째로 갈아 끼우면 안 됩니다 - 실제 카카오
+// clusterer.js 소스를 까보면, Cluster가 생성될 때 만든 div 하나(this._content)에만
+// click 리스너를 addEventListener로 직접 걸어두고(clusterclick 이벤트를 쏘는 용도),
+// 그 뒤로는 항상 같은 div를 재사용합니다(setContent(this._content)). setContent에
+// 새 문자열/엘리먼트를 넘기면 그 리스너가 붙은 div 자체가 통째로 다른 노드로 바뀌면서
+// 리스너가 함께 사라져 배지를 눌러도 반응이 없어집니다. 그래서 새 엘리먼트를 만들지
+// 않고, getContent()로 리스너가 이미 붙어있는 그 div를 그대로 받아와 스타일만
+// 덧입힙니다 - 숫자 텍스트와 기본 배경(styles 옵션)은 클러스터러가 이미 그려둔 그대로
+// 둡니다.
 function onClustered(clusters) {
   clusters.forEach((cluster) => {
     const clusterMarkers = cluster.getMarkers()
     const hasRecommended = clusterMarkers.some((marker) => marker.merchantRef?.recommended)
-    const clusterMarker = cluster.getClusterMarker()
-    if (!clusterMarker) return
-    clusterMarker.setContent(buildClusterBadgeContent(clusterMarkers.length, hasRecommended))
+    const content = cluster.getClusterMarker()?.getContent()
+    if (!(content instanceof HTMLElement)) return
+    content.style.boxSizing = 'border-box'
+    content.style.border = hasRecommended ? '2px solid #ffbc00' : '2px solid transparent'
   })
-}
-
-function buildClusterBadgeContent(count, hasRecommended) {
-  // border-box라 테두리 두께만큼 line-height를 줄여야 숫자가 수직 중앙에 남는다.
-  const border = hasRecommended ? '2px solid #ffbc00' : '2px solid transparent'
-  return (
-    '<div style="cursor: pointer; width: 36px; height: 36px; box-sizing: border-box; ' +
-    `border: ${border}; background: rgba(84, 80, 69, 0.9); border-radius: 18px; ` +
-    'color: #ffffff; text-align: center; line-height: 32px; font-weight: bold; font-size: 13px;">' +
-    `${count}</div>`
-  )
 }
 
 // 매장 전체를 미리 안 받고, 명시적으로 검색을 트리거했을 때만(초기 진입 1회 / 재검색 버튼 /
@@ -642,11 +641,16 @@ async function withMerchantsLoading(run) {
     if (requestId !== boundsRequestId) return
     boundsMerchants.value = result
     clusterFilterMerchantIds.value = null // 화면이 갱신됐으니 이전 클러스터 선택은 해제
+    // 재검색 버튼으로 새로 받아온 목록엔 지금 상세로 보고 있던 매장이 없을 수도 있고,
+    // 있어도 목록부터 다시 보여주는 게 자연스럽다 - 카테고리 칩 클릭(selectCategory)과
+    // 같은 규칙: 새 검색이 반영되면 열려있던 매장 상세는 닫고 목록으로 돌아간다.
+    selectedMerchantId.value = null
   } catch (err) {
     if (requestId !== boundsRequestId) return
     console.warn('매장 조회 실패', err)
     boundsMerchants.value = []
     clusterFilterMerchantIds.value = null
+    selectedMerchantId.value = null
   } finally {
     if (requestId === boundsRequestId) merchantsLoading.value = false
   }
@@ -773,8 +777,10 @@ function createMerchantMarker(kakao, merchant) {
   marker.merchantRef = merchant
   kakao.maps.event.addListener(marker, 'click', () => selectMerchant(merchant.id))
 
-  if (merchant.displayImage) {
-    toDataUri(merchant.displayImage).then((dataUri) => {
+  // 핀은 브랜드 사진 대신 카테고리 아이콘으로 통일한다 - 브랜드 로고는 목록/상세에서만
+  // (displayImage로) 보여주고, 지도 위에서는 매장 종류를 한눈에 구분하는 용도가 우선이다.
+  if (merchant.categoryIcon) {
+    toDataUri(merchant.categoryIcon).then((dataUri) => {
       if (!dataUri) return
       marker.setImage(buildMerchantMarkerImage(kakao, merchant, dataUri))
     })

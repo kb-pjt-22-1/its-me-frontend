@@ -250,7 +250,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     const cafePin = getClusterer().markers.find((m) => m.title === '동네 카페')
     const martPin = getClusterer().markers.find((m) => m.title === '동네 마트')
     expect(decodedPinSvg(cafePin)).toContain('stroke="#ffbc00"')
-    expect(decodedPinSvg(martPin)).toContain('stroke="#8f897f"')
+    expect(decodedPinSvg(martPin)).toContain('stroke="#24211d"')
   })
 
   it('recommended=true이고 typicalPaymentAmount가 있으면 목록에 "OOO원 기준" 문구를 보여준다', async () => {
@@ -348,7 +348,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     })
   })
 
-  it('brandId의 brandLogo가 로컬 브랜드 이미지와 매칭되면 카테고리 아이콘 대신 브랜드 로고를 쓰고, 매칭되는 파일이 없으면 카테고리 아이콘으로 폴백한다', async () => {
+  it('지도 핀은 brandId 유무와 무관하게 항상 카테고리 아이콘을 쓰고, 하단 목록은 브랜드 로고를 우선한다', async () => {
     const { kakao, getClusterer } = createKakaoMock()
     window.kakao = kakao
     fetchMerchantBrands.mockResolvedValue([
@@ -356,21 +356,27 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
       { brandId: 2, brandCode: 'NO_LOCAL_LOGO', brandName: '로고 파일 없는 브랜드', brandLogo: '/Brands/no-such-file.png' },
     ])
     fetchRecommendedNearbyMerchants.mockResolvedValue([
-      { ...CAFE_MERCHANT, brandId: 1 }, // src/images/Brands/starbucks.png와 매칭
-      { ...MART_MERCHANT, brandId: 2 }, // brandLogo는 있지만 실제 파일이 없어 카테고리 아이콘으로 폴백
+      { ...CAFE_MERCHANT, brandId: 1 }, // src/images/Brands/starbucks.png와 매칭되는 브랜드
+      { ...MART_MERCHANT, brandId: 2 }, // brandLogo는 있지만 실제 파일이 없음
     ])
 
     const wrapper = mountMapPage()
     await flushPromises()
 
+    // 핀: 브랜드가 있어도 사진 대신 카테고리 아이콘으로 통일 (지도 위에서는 매장 종류
+    // 구분이 우선이라 브랜드 사진을 안 쓴다).
     const starbucksPin = getClusterer().markers.find((m) => m.title === '동네 카페')
-    expect(decodedPinSvg(starbucksPin)).toMatch(/<image href="[^"]*starbucks[^"]*\.png"/)
+    expect(decodedPinSvg(starbucksPin)).toContain('<image href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/2615.svg"')
 
     const noLogoPin = getClusterer().markers.find((m) => m.title === '동네 마트')
     expect(decodedPinSvg(noLogoPin)).toContain('<image href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f6d2.svg"')
 
+    // 하단 목록: 기존대로 브랜드 로고 우선, 없으면 카테고리 아이콘으로 폴백.
     const cafeItem = wrapper.findAll('.sheet-item').find((item) => item.find('strong').text() === '동네 카페')
     expect(cafeItem.find('.sheet-item-icon img').attributes('src')).toContain('starbucks')
+
+    const martItem = wrapper.findAll('.sheet-item').find((item) => item.find('strong').text() === '동네 마트')
+    expect(martItem.find('.sheet-item-icon img').attributes('src')).toContain('twemoji')
   })
 
   it('마운트 시 전체 매장이 아니라 카테고리 목록만 가볍게 불러온다', async () => {
@@ -470,6 +476,53 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
   })
 
+  // 회귀 테스트: onClustered가 예전엔 clusterMarker.setContent(새 HTML 문자열)로 배지를
+  // 통째로 새로 그렸는데, 실제 카카오 clusterer.js 소스를 확인해보니 MarkerClusterer가
+  // 클릭 리스너를 (setContent로 갈아 끼운 새 엘리먼트가 아니라) 자기가 생성 시점에 만든
+  // 고정된 content div 하나에만 addEventListener로 걸어두고 계속 재사용한다 - 그 div를
+  // 다른 엘리먼트로 갈아 치우면 리스너가 같이 사라져 배지를 눌러도 반응이 없어졌다.
+  // 지금은 setContent를 아예 안 부르고 getContent()로 그 div를 그대로 받아와 스타일만
+  // 덧입히므로, onClustered가 (1) setContent를 호출하지 않고 (2) 기존 div에 테두리
+  // 스타일만 적용하는지 검증한다.
+  it('클러스터가 (재)계산되면 추천 매장 포함 여부에 따라 기존 배지 엘리먼트에 테두리만 덧입히고, 엘리먼트를 새로 만들지 않는다', async () => {
+    const { kakao, getClusterer, trigger } = createKakaoMock()
+    window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      { ...CAFE_MERCHANT, recommended: true },
+      MART_MERCHANT,
+    ])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const clusterer = getClusterer()
+    const cafePin = clusterer.markers.find((m) => m.title === '동네 카페')
+    const martPin = clusterer.markers.find((m) => m.title === '동네 마트')
+
+    const recommendedContent = document.createElement('div')
+    const setContentSpy = vi.fn()
+    const recommendedClusterMarker = { getContent: () => recommendedContent, setContent: setContentSpy }
+    const recommendedCluster = { getMarkers: () => [cafePin], getClusterMarker: () => recommendedClusterMarker }
+
+    const plainContent = document.createElement('div')
+    const plainClusterMarker = { getContent: () => plainContent, setContent: setContentSpy }
+    const plainCluster = { getMarkers: () => [martPin], getClusterMarker: () => plainClusterMarker }
+
+    trigger(clusterer, 'clustered', [recommendedCluster, plainCluster])
+
+    expect(setContentSpy).not.toHaveBeenCalled()
+    // jsdom이 style.border 조회 시 색상을 rgb()로 정규화해서 돌려주므로 borderColor로 비교한다.
+    expect(recommendedContent.style.borderColor).toBe('rgb(255, 188, 0)')
+    expect(plainContent.style.borderColor).toBe('transparent')
+
+    // 리스너는 MarkerClusterer가 이 div에 이미 걸어둔 것 그대로다 - onClustered가
+    // 엘리먼트를 안 바꿨으니 그 리스너도 안 끊겼을 거라는 뜻이다. 실제 클릭 동작 자체는
+    // 'clusterclick'을 직접 트리거하는 다른 테스트들이 검증한다.
+    trigger(clusterer, 'clusterclick', { getMarkers: () => [cafePin] })
+    await flushPromises()
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
+  })
+
   it('매장 상세를 보다가(목록으로 돌아가지 않고) 클러스터를 클릭하면, 이전 매장 상세 대신 클러스터 목록이 뜬다', async () => {
     const { kakao, getClusterer, trigger } = createKakaoMock()
     window.kakao = kakao
@@ -518,6 +571,26 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
 
     expect(wrapper.find('.cluster-filter-banner').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
+  })
+
+  it('매장 상세를 보다가 재검색 버튼을 누르면, 상세가 닫히고 하단 시트가 목록으로 돌아온다', async () => {
+    const { kakao } = createKakaoMock()
+    window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const cafeItem = wrapper.findAll('.sheet-item').find((item) => item.find('strong').text() === '동네 카페')
+    await cafeItem.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.store-name').text()).toBe('동네 카페')
+
+    await wrapper.find('.research-btn').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
   })
 })
 
