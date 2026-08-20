@@ -111,7 +111,7 @@
             <strong>{{ row.card.cardName }}</strong>
             <span v-if="row.card.isPrimary" class="method-badge">대표</span>
           </span>
-          <span class="method-number">•••• {{ row.card.panLast4 }}</span>
+          <span class="method-number"> {{ row.card.panLast4 }}</span>
         </span>
 
         <span class="method-right">
@@ -426,14 +426,14 @@ onBeforeRouteLeave(() => {
 .auth-prompt h3 { margin: 0 0 6px; font-size: 16px; }
 .auth-prompt p { margin: 0; color: var(--muted, #8f897f); font-size: 12px; }
 
-.pin-page { min-height: 100vh; padding-bottom: 20px; box-sizing: border-box; display: flex; flex-direction: column; }
+.pin-page {height: 100%;min-height: 0;box-sizing: border-box;display: flex;flex-direction: column;overflow: hidden;}
 .pin-header { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 18px; }
 .pin-header h2 { margin: 0; font-size: 16px; color: var(--charcoal, #24211d); }
 .pin-header .back-btn {
   width: 30px; height: 30px; display: grid; place-items: center;
   border: none; background: none; color: var(--charcoal, #24211d); cursor: pointer; padding: 0;
 }
-.pin-body { padding: 20px 18px 10px; }
+.pin-body { flex: 0 0 auto; padding: 0 18px 6px; }
 .pin-title { margin: 0 0 8px; font-size: 19px; letter-spacing: -.3px; color: var(--charcoal, #24211d); }
 .pin-subtitle { margin: 0 0 22px; font-size: 13px; color: var(--muted, #8f897f); }
 .pin-card-row {
@@ -453,11 +453,19 @@ onBeforeRouteLeave(() => {
 }
 .pin-error { margin: 14px 0 0; text-align: center; color: var(--danger, #d94343); font-size: 12px; }
 
-.keypad { margin-top: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 20px 18px 0; }
+.keypad {flex: 0 0 auto;margin-top: auto;display: grid;grid-template-columns: repeat(3, 1fr);gap: 10px; padding: 12px 18px 20px;}
+
 .keypad-key {
-  height: 62px; border-radius: 14px; border: 1px solid var(--line, #e7e4de);
-  background: var(--surface, #ffffff); font-size: 20px; font-weight: 600;
-  color: var(--charcoal, #24211d); display: grid; place-items: center; cursor: pointer;
+  height: 58px;
+  border-radius: 14px;
+  border: 1px solid var(--line, #e7e4de);
+  background: var(--surface, #ffffff);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--charcoal, #24211d);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
 }
 .keypad-key:disabled { visibility: hidden; }
 .keypad-key--action { background: var(--inactive, #f0efec); color: var(--muted, #8f897f); }

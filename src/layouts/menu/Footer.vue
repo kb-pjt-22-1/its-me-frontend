@@ -55,9 +55,8 @@
   width: 100%;
   max-width: 440px;  /* main.css의 .page-container, Header와 동일 */
   background-color: var(--surface, #ffffff);
-  border: 1px solid rgba(36, 33, 29, 0.06);
-  border-bottom: none;
-  border-radius: 18px 18px 0 0;
+  border: none;
+  border-radius: 0;
   display: flex;
   align-items: flex-end;
   padding-top: 4px;
