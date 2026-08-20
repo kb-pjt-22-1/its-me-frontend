@@ -227,11 +227,11 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
 
     // 새 페이지로 이동하지 않고, 같은 바텀시트 안에서 목록 대신 상세가 뜬다.
     expect(routerMock.push).not.toHaveBeenCalled()
-    expect(wrapper.find('.store-name').text()).toBe('동네 카페')
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
     expect(wrapper.find('.sort-toggle').exists()).toBe(false)
 
     await wrapper.find('.detail-back-btn').trigger('click')
-    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
     expect(wrapper.find('.sort-toggle').exists()).toBe(true)
   })
 
@@ -538,14 +538,14 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
     // 카페 핀을 클릭해 상세를 연다 - "목록으로"를 누르지 않고 그대로 둔다.
     trigger(cafePin, 'click')
     await flushPromises()
-    expect(wrapper.find('.store-name').text()).toBe('동네 카페')
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
 
     // 이 상태에서 마트가 속한 클러스터를 클릭하면, 남아있던 카페 상세가 아니라
     // 클러스터(마트)의 목록이 떠야 한다.
     trigger(clusterer, 'clusterclick', { getMarkers: () => [martPin] })
     await flushPromises()
 
-    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
   })
 
@@ -584,12 +584,12 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
     const cafeItem = wrapper.findAll('.sheet-item').find((item) => item.find('strong').text() === '동네 카페')
     await cafeItem.trigger('click')
     await flushPromises()
-    expect(wrapper.find('.store-name').text()).toBe('동네 카페')
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
 
     await wrapper.find('.research-btn').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
   })
 })
@@ -661,13 +661,13 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
 
     await wrapper.find('.sheet-item').trigger('click') // 첫 매장(이름순 정렬상 '동네 마트') 상세로 진입
     await flushPromises()
-    expect(wrapper.find('.store-name').exists()).toBe(true)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(true)
 
     const cafeChip = wrapper.findAll('.chip').find((btn) => btn.text() === '카페')
     await cafeChip.trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
   })
 
@@ -680,12 +680,12 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
 
     await wrapper.find('.sheet-item').trigger('click')
     await flushPromises()
-    expect(wrapper.find('.store-name').exists()).toBe(true)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(true)
 
     await wrapper.find('input').setValue('카페')
     await flushPromises()
 
-    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
   })
 })
@@ -843,7 +843,7 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     await flushPromises()
 
     expect(routerMock.push).not.toHaveBeenCalled()
-    expect(wrapper.find('.store-name').text()).toBe('동네 카페')
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
   })
 
   it('목록을 스크롤한 채로 매장을 클릭해도, 상세는 맨 위부터 보인다', async () => {

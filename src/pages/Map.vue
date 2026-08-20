@@ -76,8 +76,20 @@
         <span class="sheet-handle"></span>
         <div class="sheet-peek-row">
           <div class="sheet-summary">
-            <p class="sheet-meta muted-text">{{ selectedMerchant ? '매장 상세' : `현재 위치 기준 · ${nearbyMerchants.length}곳` }}</p>
-            <p class="sheet-title">{{ selectedMerchant ? selectedMerchant.name : '주변 제휴 매장' }}</p>
+            <button v-if="selectedMerchant" class="detail-back-btn" aria-label="목록으로" @click.stop="closeMerchantDetail">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            <p v-else class="sheet-meta muted-text">현재 위치 기준 · {{ nearbyMerchants.length }}곳</p>
+
+            <div v-if="selectedMerchant" class="sheet-title-row">
+              <p class="sheet-title sheet-title--detail">{{ selectedMerchant.name }}</p>
+              <span class="pill pill--gold">{{ selectedMerchant.categoryName }}</span>
+            </div>
+            <p v-else class="sheet-title">주변 제휴 매장</p>
+
+            <p v-if="selectedMerchant && selectedMerchant.address" class="store-address muted-text">{{ selectedMerchant.address }}</p>
           </div>
           <div v-if="!selectedMerchant" class="sort-toggle" @click.stop>
             <button
@@ -101,22 +113,7 @@
       <div class="sheet-body" ref="sheetBody">
         <!-- 매장 상세: 새 페이지로 이동하지 않고 이 바텀시트 자리에서 그대로 보여줍니다 -->
         <template v-if="selectedMerchant">
-          <button class="detail-back-btn" @click="closeMerchantDetail">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-            목록으로
-          </button>
-
-          <div class="store-banner">
-            <span class="banner-icon"><img :src="selectedMerchant.displayImage" alt="" /></span>
-          </div>
-
           <div class="store-info">
-            <span class="pill pill--gold">{{ selectedMerchant.categoryName }}</span>
-            <h1 class="store-name">{{ selectedMerchant.name }}</h1>
-            <p v-if="selectedMerchant.address" class="store-address muted-text">{{ selectedMerchant.address }}</p>
-
             <div v-if="bestCardForSelected" class="benefit-strip">
               제휴 혜택: 이 매장에서 <strong>{{ bestCardForSelected.cardName }}</strong>로 결제하면
               <strong>{{ formatBenefit(bestMatchForSelected) }}</strong>
@@ -1053,6 +1050,10 @@ onUnmounted(() => {
 .sheet-meta { margin: 0; font-size: 11px; }
 .sheet-title { margin: 2px 0 0; font-size: 15px; font-weight: 800; color: var(--charcoal, #24211d); }
 
+.sheet-title-row { display: flex; align-items: center; gap: 8px; margin: 2px 0 0; }
+.sheet-title-row .sheet-title { margin: 0; }
+.sheet-title--detail { font-size: 20px; }
+
 .sheet-body {
   padding: 0 18px 18px;
   overflow-y: auto;
@@ -1148,34 +1149,22 @@ onUnmounted(() => {
 .page-btn:disabled { opacity: .4; cursor: not-allowed; }
 .page-indicator { font-size: 12px; }
 
-/* 매장 상세 - 바텀시트 안에서 목록 대신 뜨는 영역 (Storedetail.vue와 같은 구성) */
+/* 매장 상세 - 바텀시트 안에서 목록 대신 뜨는 영역 (Storedetail.vue와 같은 구성).
+   detail-back-btn은 sheet-meta 자리(펼침 손잡이 바로 아래)에 들어가므로 그 자리에 맞춘다 -
+   매장 상세일 때 "매장 상세"라는 무의미한 라벨 대신 뒤로가기 역할을 그 자리에서 바로 한다. */
 .detail-back-btn {
   display: flex;
   align-items: center;
-  gap: 4px;
   border: none;
   background: none;
-  padding: 0 0 14px;
-  font-size: 13px;
-  font-weight: 700;
+  padding: 0;
+  margin: 0;
   color: var(--muted, #8f897f);
   cursor: pointer;
 }
 
-.store-banner {
-  height: 140px; border-radius: 18px; background: linear-gradient(135deg, #8a6a4a, #4a382a);
-  display: grid; place-items: center; margin-bottom: 16px;
-}
-.banner-icon {
-  width: 56px; height: 56px; border-radius: 50%; background: rgba(255, 255, 255, .25);
-  display: grid; place-items: center;
-}
-.banner-icon img { width: 28px; height: 28px; }
-
 .store-info { margin-bottom: 20px; }
-.store-info .pill { margin-bottom: 8px; }
-.store-name { margin: 0 0 6px; font-size: 18px; color: var(--charcoal, #24211d); }
-.store-address { margin: 0 0 14px; font-size: 13px; }
+.store-address { margin: 4px 0 0; font-size: 13px; }
 
 .benefit-strip {
   background: #fff6dd; border-radius: 12px; padding: 12px 14px; font-size: 12.5px;
