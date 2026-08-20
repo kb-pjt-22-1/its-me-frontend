@@ -373,8 +373,6 @@ const formatPaymentTime = (value) => {
   return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
-
 onMounted(() => {
   homeStore.fetchExpiring();
   bookmarksStore.fetchBookmarks().then(loadLatestBookmarkMerchantName);
