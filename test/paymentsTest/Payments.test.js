@@ -108,7 +108,11 @@ describe('바코드 발급/렌더링', () => {
     const { wrapper } = mountPage()
     await enterPin(wrapper)
 
-    expect(createPaymentTokenApi).toHaveBeenCalledWith(1, undefined) // selectedMethodId(대표카드 userCardId), merchantId 없음
+    // merchantId 없을 때 undefined가 아니라 null이 넘어가는 이유: store의 createPaymentToken이
+    // merchantId 기본값을 null로 둬서(JSON.stringify가 undefined 필드는 통째로 지워버리는 것과
+    // 달리, null은 요청 바디에 "merchantId": null로 명시적으로 남는다 - 백엔드 선택값 의도를
+    // 더 명확히 드러냄), Payments.vue가 undefined를 넘겨도 기본 매개변수로 치환된다.
+    expect(createPaymentTokenApi).toHaveBeenCalledWith(1, null) // selectedMethodId(대표카드 userCardId), merchantId 없음
     expect(JsBarcode).toHaveBeenCalledWith(
       expect.anything(),
       'ABC123XYZ',
