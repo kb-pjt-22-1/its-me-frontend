@@ -129,18 +129,21 @@
 
       <!-- 간편결제 / 이번 달 혜택 (작게 줄여서 유지) -->
       <div class="bottom-container">
-        <Button variant="box" class="bottom-box bottom-box--compact" @click="router.push('/pay')">
+        <Button variant="box" class="bottom-box bottom-box--compact" @click="goToPay">
           <h3>간편 결제</h3>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.6" class="barcode-icon">
-            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
-            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
-            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
-            <line x1="14" y1="14" x2="14" y2="17"></line>
-            <line x1="17" y1="14" x2="17" y2="14.01"></line>
-            <line x1="20" y1="14" x2="20" y2="17"></line>
-            <line x1="14" y1="20" x2="17" y2="20"></line>
-            <line x1="20" y1="20" x2="20" y2="20.01"></line>
-          </svg>
+          <div class="quick-pay-row">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.6" class="barcode-icon">
+              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+              <line x1="14" y1="14" x2="14" y2="17"></line>
+              <line x1="17" y1="14" x2="17" y2="14.01"></line>
+              <line x1="20" y1="14" x2="20" y2="17"></line>
+              <line x1="14" y1="20" x2="17" y2="20"></line>
+              <line x1="20" y1="20" x2="20" y2="20.01"></line>
+            </svg>
+            <span v-if="latestBookmarkMerchantName" class="quick-pay-merchant">{{ latestBookmarkMerchantName }}</span>
+          </div>
           <span class="pay-link-text">지금 결제 →</span>
         </Button>
         <Button tag="div" variant="box-outline" class="bottom-box bottom-box--compact">
@@ -261,17 +264,21 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import Button from '@/components/common/Button.vue';
 import { useAuthStore } from '@/stores/auth';
 import { usePaymentStore } from '@/stores/payment';
+import { useBookmarksStore } from '@/stores/bookmarks';
+import { useMerchantsStore } from '@/stores/merchants';
 import { useHomeStore } from '@/stores/home';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const paymentStore = usePaymentStore();
+const bookmarksStore = useBookmarksStore();
+const merchantsStore = useMerchantsStore();
 const homeStore = useHomeStore();
 
 const { recommendation, recommendationLoading, recommendationError, expiring, expiringLoading, expiringError } =
@@ -288,6 +295,41 @@ function goToRecommendedPayment() {
     return;
   }
   router.push({ path: '/pay', query: { userCardId: recommendation.value.userCardId } });
+}
+
+// 홈 화면 "간편 결제" 버튼 - 기본은 그냥 결제 화면(/pay)으로 보내지만, 최근 저장한(북마크한)
+// 매장이 하나라도 있으면 그 매장 결제로 바로 연결한다. bookmarksStore.bookmarks는 백엔드가
+// created_at DESC로 이미 정렬해서 내려주므로, 배열 맨 앞이 항상 가장 최근 북마크다.
+// (참고: 완료 시점 결제 "금액"은 merchantId를 넘겨도 서버가 데모용으로 무작위 생성한다 -
+// 매장만 정확히 그 매장으로 찍히고 금액은 랜덤이다.)
+function goToPay() {
+  const latestBookmark = bookmarksStore.bookmarks[0];
+  if (!latestBookmark) {
+    router.push('/pay');
+    return;
+  }
+  router.push({ path: '/pay', query: { merchantId: latestBookmark.merchantId } });
+}
+
+// 버튼에 매장명을 같이 보여주기 위한 것 - 북마크 응답(BookmarkResponseDto)엔 merchantId만
+// 있고 매장명이 없어서, 최근 북마크가 바뀔 때마다 그 매장 하나만 가볍게 조회한다.
+// merchantsStore.merchants 전체 목록은 이 페이지에서 안 불러오므로(2만 건+라 무거움)
+// fetchMerchantDetail로 단건만 받는다 - 이미 캐시돼 있으면(다른 화면에서 받아온 적 있으면)
+// 네트워크도 안 탄다.
+const latestBookmarkMerchantName = ref('');
+async function loadLatestBookmarkMerchantName() {
+  const latestBookmark = bookmarksStore.bookmarks[0];
+  if (!latestBookmark) {
+    latestBookmarkMerchantName.value = '';
+    return;
+  }
+  try {
+    const merchant = await merchantsStore.fetchMerchantDetail(latestBookmark.merchantId);
+    latestBookmarkMerchantName.value = merchant?.name ?? '';
+  } catch {
+    // 실패해도 버튼 동작 자체엔 지장 없으니(goToPay는 merchantId만 있으면 됨) 이름만 조용히 비워둔다.
+    latestBookmarkMerchantName.value = '';
+  }
 }
 
 // "가까운 혜택 매장" 항목 클릭 - 매장 상세 페이지로 바로 가지 않고 지도 화면으로 이동해서
@@ -335,6 +377,7 @@ const goToCardDetail = (userCardId) => router.push(`/cards/${userCardId}`);
 
 onMounted(() => {
   homeStore.fetchExpiring();
+  bookmarksStore.fetchBookmarks().then(loadLatestBookmarkMerchantName);
 
   const defaultCenter = { lat: 37.5665, lng: 126.978 }; // 서울시청
   if (navigator.geolocation) {
@@ -424,8 +467,13 @@ onMounted(() => {
 }
 .bottom-box h3 { margin: 0 0 6px; font-size: 13px; }
 .pay-link-text { color: var(--orange, #ffbc00); font-weight: 700; font-size: 12px; margin-top: 6px; display: block; }
+.quick-pay-row { display: flex; align-items: center; gap: 6px; }
+.quick-pay-merchant {
+  color: #ffffff; font-size: 11px; font-weight: 700; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
 .gift-icon { margin: 2px 0; }
-.barcode-icon { margin: 2px 0; }
+.barcode-icon { margin: 2px 0; flex: 0 0 auto; }
 .benefit-amount { margin: 4px 0 0; font-size: 16px; font-weight: 700; }
 
 /* 놓치기 쉬운 혜택 - 오늘의 카드 추천이랑 같은 패턴 */

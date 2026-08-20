@@ -45,7 +45,12 @@ const cardsStoreMock = {
 }
 vi.mock('@/stores/cards', () => ({ useCardsStore: () => cardsStoreMock }))
 
-const merchantsStoreMock = { getByIdWithCategory: () => null }
+const merchantsStoreMock = {
+  categories: [],
+  getByIdWithCategory: () => null,
+  fetchCategories: vi.fn().mockResolvedValue(),
+  fetchMerchantDetail: vi.fn().mockResolvedValue(null),
+}
 vi.mock('@/stores/merchants', () => ({ useMerchantsStore: () => merchantsStoreMock }))
 
 vi.mock('@/services/paymentService', () => ({
@@ -92,6 +97,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   capturedLeaveGuard = null
   routeMock.query = {}
+  merchantsStoreMock.categories = []
 })
 
 describe('바코드 발급/렌더링', () => {
@@ -102,12 +108,23 @@ describe('바코드 발급/렌더링', () => {
     const { wrapper } = mountPage()
     await enterPin(wrapper)
 
-    expect(createPaymentTokenApi).toHaveBeenCalledWith(1) // selectedMethodId(대표카드 userCardId)
+    expect(createPaymentTokenApi).toHaveBeenCalledWith(1, undefined) // selectedMethodId(대표카드 userCardId), merchantId 없음
     expect(JsBarcode).toHaveBeenCalledWith(
       expect.anything(),
       'ABC123XYZ',
       expect.objectContaining({ format: 'CODE128', displayValue: false })
     )
+  })
+
+  it('매장 상세에서 넘어온 경우(쿼리에 merchantId 있음) 토큰 발급 시 merchantId도 같이 넘긴다', async () => {
+    routeMock.query = { merchantId: '7' }
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    expect(createPaymentTokenApi).toHaveBeenCalledWith(1, 7)
   })
 
   it('토큰 발급에 실패하면 에러 토스트를 띄우고 인증 전 화면으로 되돌린다', async () => {
@@ -207,6 +224,40 @@ describe('페이지 이탈 시 토큰 취소', () => {
     await flushPromises()
 
     expect(result).toBe(true)
+  })
+})
+
+describe('매장 정보 조회 (route.query.merchantId)', () => {
+  it('merchantId가 쿼리에 있으면 카테고리와 매장 상세를 받아온다', async () => {
+    routeMock.query = { merchantId: '7' }
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
+
+    mountPage()
+    await flushPromises()
+
+    expect(merchantsStoreMock.fetchCategories).toHaveBeenCalledTimes(1)
+    expect(merchantsStoreMock.fetchMerchantDetail).toHaveBeenCalledWith('7')
+  })
+
+  it('merchantId가 쿼리에 없으면 매장 상세를 조회하지 않는다', async () => {
+    verifyPin.mockResolvedValue()
+
+    mountPage()
+    await flushPromises()
+
+    expect(merchantsStoreMock.fetchMerchantDetail).not.toHaveBeenCalled()
+  })
+
+  it('이미 카테고리를 받아온 상태면 다시 불러오지 않는다', async () => {
+    routeMock.query = { merchantId: '7' }
+    merchantsStoreMock.categories = [{ categoryCode: '5812', categoryName: '음식점' }]
+    verifyPin.mockResolvedValue()
+
+    mountPage()
+    await flushPromises()
+
+    expect(merchantsStoreMock.fetchCategories).not.toHaveBeenCalled()
   })
 })
 

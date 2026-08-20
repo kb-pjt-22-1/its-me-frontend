@@ -36,8 +36,8 @@ export const usePaymentStore = defineStore('payment', {
       return verifyPinRequest(pin)
     },
 
-    async createPaymentToken(userCardId) {
-      this.currentToken = await createPaymentToken(userCardId)
+    async createPaymentToken(userCardId, merchantId = null) {
+      this.currentToken = await createPaymentToken(userCardId, merchantId)
       return this.currentToken
     },
 
