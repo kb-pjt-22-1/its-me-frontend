@@ -98,7 +98,7 @@
         </div>
       </div>
 
-      <div class="sheet-body">
+      <div class="sheet-body" ref="sheetBody">
         <!-- 매장 상세: 새 페이지로 이동하지 않고 이 바텀시트 자리에서 그대로 보여줍니다 -->
         <template v-if="selectedMerchant">
           <button class="detail-back-btn" @click="closeMerchantDetail">
@@ -352,6 +352,14 @@ const selectedMerchantId = ref(null)
 const selectedMerchant = computed(
   () => boundsMerchantsWithCategory.value.find((m) => m.id === selectedMerchantId.value) ?? null,
 )
+
+// 목록과 상세가 같은 sheet-body 안에서 v-if/v-else로 내용만 바뀌는 구조라, 목록을 스크롤한
+// 채로 매장을 클릭하면 상세도 그 스크롤 위치에서부터 보였다(맨 위 배너/이름이 화면 밖에
+// 있는 상태로 시작) - 상세↔목록을 오갈 때마다 스크롤을 맨 위로 되돌린다.
+const sheetBody = ref(null)
+watch(selectedMerchantId, () => {
+  if (sheetBody.value) sheetBody.value.scrollTop = 0
+})
 
 function selectMerchant(merchantId) {
   selectedMerchantId.value = merchantId

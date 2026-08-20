@@ -845,6 +845,22 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     expect(routerMock.push).not.toHaveBeenCalled()
     expect(wrapper.find('.store-name').text()).toBe('동네 카페')
   })
+
+  it('목록을 스크롤한 채로 매장을 클릭해도, 상세는 맨 위부터 보인다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const sheetBodyEl = wrapper.find('.sheet-body').element
+    sheetBodyEl.scrollTop = 200
+
+    await wrapper.find('.sheet-item').trigger('click')
+    await flushPromises()
+
+    expect(sheetBodyEl.scrollTop).toBe(0)
+  })
 })
 
 describe('북마크 토글 실패 처리', () => {
