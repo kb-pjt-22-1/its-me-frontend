@@ -70,7 +70,16 @@
     <div v-else class="display-box surface-card">
       <div class="barcode-display">
         <p class="card-name">{{ selectedMethod?.cardName }}</p>
-        <canvas ref="barcodeCanvasRef" class="barcode-canvas"></canvas>
+
+        <button
+          type="button"
+          class="barcode-tap-area"
+          :disabled="isTokenExpired || isCompleting"
+          :aria-label="isCompleting ? '결제 처리 중' : '바코드를 눌러 결제 완료'"
+          @click="completePayment"
+        >
+          <canvas ref="barcodeCanvasRef" class="barcode-canvas"></canvas>
+        </button>
 
         <div class="token-expiry" :class="{ 'token-expiry--expired': isTokenExpired }">
           <span v-if="!isTokenExpired">바코드 유효시간 {{ remainingLabel }}</span>
@@ -85,9 +94,6 @@
           </button>
         </div>
       </div>
-      <button class="main-action-btn" :disabled="isCompleting" @click="completePayment">
-        {{ isCompleting ? '처리 중...' : '결제 완료하기' }}
-      </button>
     </div>
 
     <div class="payment-methods">
@@ -355,6 +361,13 @@ async function issuePaymentToken() {
 }
 
 const completePayment = async () => {
+  // 바코드 이미지를 직접 눌러야 결제가 발생하는 구조로 바뀌면서, 만료된 바코드를
+  // 눌러도 결제가 진행되지 않게 막는다(버튼 disabled로도 막지만, 방어적으로 한 번 더 체크).
+  if (isTokenExpired.value) {
+    toast.error('바코드가 만료됐어요. 다시 발급해주세요.');
+    return;
+  }
+
   const paymentTokenId = paymentStore.currentToken?.paymentTokenId;
   if (!paymentTokenId) {
     toast.error('결제 토큰 정보가 없어요. 다시 인증해주세요.');
@@ -409,7 +422,13 @@ onBeforeRouteLeave(() => {
 .layout-container { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: 8px 18px 0; box-sizing: border-box; background: var(--page, #f2f4f6); }
 
 .display-box { flex: 0 0 auto; padding: 32px 20px; text-align: center; margin-bottom: 16px; }
-.barcode-canvas { max-width: 100%; height: 60px; }
+.barcode-canvas { max-width: 100%; height: 60px; pointer-events: none; }
+
+.barcode-tap-area {
+  display: flex; flex-direction: column; align-items: center;
+  width: 100%; border: none; background: none; padding: 0; cursor: pointer;
+}
+.barcode-tap-area:disabled { cursor: not-allowed; }
 
 .token-expiry {
   display: flex; align-items: center; justify-content: center; gap: 10px;

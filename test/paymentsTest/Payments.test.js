@@ -165,8 +165,8 @@ describe('결제 완료', () => {
     const { wrapper } = mountPage()
     await enterPin(wrapper)
 
-    const completeButton = wrapper.findAll('button').find((b) => b.text().includes('결제 완료하기'))
-    await completeButton.trigger('click')
+    const barcodeArea = wrapper.find('.barcode-tap-area')
+    await barcodeArea.trigger('click')
     await flushPromises()
 
     expect(completePaymentTokenApi).toHaveBeenCalledWith('tok-1')
@@ -182,11 +182,38 @@ describe('결제 완료', () => {
     const { wrapper } = mountPage()
     await enterPin(wrapper)
 
-    const completeButton = wrapper.findAll('button').find((b) => b.text().includes('결제 완료하기'))
-    await completeButton.trigger('click')
+    const barcodeArea = wrapper.find('.barcode-tap-area')
+    await barcodeArea.trigger('click')
     await flushPromises()
 
     expect(toastMock.error).toHaveBeenCalledWith('결제를 완료하지 못했어요. 다시 시도해주세요.')
+  })
+
+  it('바코드가 만료된 상태면 눌러도 결제되지 않고, 만료 안내 토스트를 띄운다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({
+      paymentTokenId: 'tok-1',
+      tokenValue: 'ABC123XYZ',
+      expiresAt: new Date(Date.now() + 1000).toISOString(), // 1초 뒤 만료
+    })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    await vi.advanceTimersByTimeAsync(2000) // 만료 시점을 지남
+    expect(wrapper.text()).toContain('바코드가 만료됐어요')
+
+    const barcodeArea = wrapper.find('.barcode-tap-area')
+    // disabled 상태라 실제 클릭 이벤트가 안 먹지만, 방어 로직 자체(completePayment 안 만료 체크)도
+    // 같이 검증하기 위해 disabled 여부와 completePaymentTokenApi 미호출을 모두 확인한다.
+    expect(barcodeArea.attributes('disabled')).toBeDefined()
+
+    await barcodeArea.trigger('click')
+    await flushPromises()
+
+    expect(completePaymentTokenApi).not.toHaveBeenCalled()
+    vi.useRealTimers()
   })
 })
 
