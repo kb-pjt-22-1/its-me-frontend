@@ -117,6 +117,9 @@ function createKakaoMock({ level = 3 } = {}) {
     setImage(image) {
       this.image = image
     }
+    setPosition(position) {
+      this.position = position
+    }
   }
   class MarkerClusterer {
     constructor(options) {
@@ -764,6 +767,8 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
       configurable: true,
       value: {
         getCurrentPosition: (success) => success({ coords: { latitude: 37.5665, longitude: 126.978 } }),
+        watchPosition: () => 1,
+        clearWatch: () => {},
       },
     })
 
@@ -787,6 +792,8 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
       configurable: true,
       value: {
         getCurrentPosition: (success) => success({ coords: { latitude: 37.1234, longitude: 127.5678 } }),
+        watchPosition: () => 1,
+        clearWatch: () => {},
       },
     })
 
@@ -803,6 +810,44 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
       const center = mapInstance.panTo.mock.calls[0][0]
       expect(center.lat).toBe(37.1234)
       expect(center.lng).toBe(127.5678)
+    } finally {
+      Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
+    }
+  })
+
+  it('GPS 위치가 바뀌면(watchPosition) 지도는 그대로 두고 내 위치 마커만 그 자리로 옮긴다', async () => {
+    let reportPosition = null
+    const originalGeolocation = navigator.geolocation
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success) => success({ coords: { latitude: 37.5665, longitude: 126.978 } }),
+        watchPosition: (success) => {
+          reportPosition = success
+          return 1
+        },
+        clearWatch: () => {},
+      },
+    })
+
+    try {
+      const { kakao, mapInstance, markerInstances } = createKakaoMock()
+      window.kakao = kakao
+      fetchRecommendedNearbyMerchants.mockResolvedValue([])
+
+      mountMapPage()
+      await flushPromises()
+
+      // initMap이 매장 핀보다 먼저 만드는 마커라 markerInstances[0]이 내 위치 마커다.
+      const centerMarker = markerInstances[0]
+      expect(centerMarker.position).toEqual({ lat: 37.5665, lng: 126.978 })
+
+      reportPosition({ coords: { latitude: 37.9999, longitude: 127.1111 } })
+      await flushPromises()
+
+      expect(centerMarker.position).toEqual({ lat: 37.9999, lng: 127.1111 })
+      // 마커만 움직이고, 사용자가 보고 있던 지도 중심은 그대로 둔다.
+      expect(mapInstance.panTo).not.toHaveBeenCalled()
     } finally {
       Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
     }
