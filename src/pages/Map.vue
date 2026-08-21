@@ -717,7 +717,7 @@ function onResearchClick() {
 
 // 핀 모양(원형 배지 + 아이콘)을 SVG로 그려서 MarkerImage로 씁니다. MarkerClusterer가
 // CustomOverlay를 못 받고 Marker만 받아서(SDK 제약) DOM 대신 이 방식을 씁니다.
-// displayImage(브랜드 로고 우선, 없으면 카테고리 아이콘)를 SVG <image>로 그대로 참조합니다.
+// 카테고리 아이콘(브랜드 로고는 목록/상세 전용, 핀엔 안 씀)을 SVG <image>로 그대로 참조합니다.
 // recommended=true인 매장만 테두리 색과 은은한 후광으로 강조합니다 -
 // 나머지 매장도 똑같이 핀은 그려지고, 강조만 빠집니다(필터링이 아니라 하이라이트).
 // 원래 물방울 핀은 테두리가 옅은 회갈색(#8f897f)이라 카카오맵의 복잡한 배경 위에서 묻혀
@@ -737,14 +737,14 @@ function buildMerchantMarkerImage(kakao, merchant, iconDataUri) {
   // 배지 위에 그대로 얹히는 문제 방지) - preserveAspectRatio="slice"로 비율은 유지한 채
   // 원 안을 꽉 채우도록 크롭합니다.
   const iconTag = iconDataUri
-    ? `<image href="${iconDataUri}" x="8" y="8" width="20" height="20" ` +
+    ? `<image href="${iconDataUri}" x="6" y="6" width="24" height="24" ` +
       'preserveAspectRatio="xMidYMid slice" clip-path="url(#pinIconClip)"/>'
     : ''
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_SIZE}" height="${PIN_SIZE}" viewBox="0 0 36 36">` +
     '<defs><filter id="pinShadow" x="-50%" y="-50%" width="200%" height="200%">' +
     '<feDropShadow dx="0" dy="1.5" stdDeviation="1.3" flood-color="#000000" flood-opacity="0.35"/>' +
-    '</filter><clipPath id="pinIconClip"><circle cx="18" cy="18" r="10"/></clipPath></defs>' +
+    '</filter><clipPath id="pinIconClip"><circle cx="18" cy="18" r="12"/></clipPath></defs>' +
     glow +
     `<circle filter="url(#pinShadow)" cx="18" cy="18" r="14" fill="#ffffff" stroke="${borderColor}" stroke-width="3"/>` +
     iconTag +
