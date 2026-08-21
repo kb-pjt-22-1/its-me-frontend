@@ -1,4 +1,5 @@
 import api from '@/api'
+import { getCategoryPinIcon } from '@/utils/categoryPinIcons'
 
 /**
  * 매장 목록 조회 [GET /api/v1/merchants?categoryCode=]
@@ -94,10 +95,14 @@ export function sortCategories(categories, rankFn = defaultCategoryRank) {
  * 응답: [{ categoryCode, categoryName, categoryIcon }]
  * ⚠ merchants 응답엔 categoryCode만 있고 이름/아이콘이 없어서, 화면에 표시하려면
  *   이 목록을 같이 받아서 categoryCode 기준으로 매칭해야 합니다.
+ * ⚠ 백엔드가 내려주는 categoryIcon은 실제로 존재하지 않는 더미 CDN URL이라(categoryIcons.js
+ *   참고) 항상 로컬 아이콘(categoryPinIcons.js)으로 덮어씁니다 - 핀/목록/상세가 전부 이
+ *   categoryIcon 값 하나만 보므로, 여기서 한 번만 바꾸면 세 군데 다 반영됩니다.
  */
 export async function fetchMerchantCategories() {
   const { data } = await api.get('/v1/merchant-categories')
-  return sortCategories(data)
+  const withLocalIcons = data.map((c) => ({ ...c, categoryIcon: getCategoryPinIcon(c.categoryCode) }))
+  return sortCategories(withLocalIcons)
 }
 
 /** 매장 브랜드 목록 [GET /api/v1/merchant-brands] (매장 등록 폼에서 씀) */
@@ -107,7 +112,7 @@ export async function fetchMerchantBrands() {
 }
 
 // merchants 테이블 실제 컬럼: merchant_id, brand_id, category_code, merchant_code,
-//   merchant_name, address, latitude, longitude, phone
+//   merchant_name, address, latitude, longitude
 function normalizeMerchant(dto) {
   return {
     id: dto.merchantId,
@@ -118,19 +123,22 @@ function normalizeMerchant(dto) {
     address: dto.address,
     lat: dto.latitude,
     lng: dto.longitude,
-    phone: dto.phone,
   }
 }
 
 // fetchRecommendedNearbyMerchants/fetchTodayRecommendedMerchants 둘 다
 // NearbyMerchantRecommendationResponseDto[]를 받는 같은 응답 모양이라 매핑을 공유한다.
+// benefitSummary/recommendedCardName은 DTO 최상위가 아니라 recommendedCards[0](total 기준
+// 1순위 카드)에 들어있다 - 예전엔 최상위 필드를 그대로 읽어서 항상 undefined였고, 그래서
+// 목록에 "OOO원 기준"만 뜨고 정작 얼마 할인되는지 문구는 한 번도 안 보이고 있었다.
 function normalizeRecommendedMerchant(dto) {
+  const topCard = dto.recommendedCards?.[0]
   return {
     ...normalizeMerchant(dto),
     distanceMeters: dto.distanceMeters,
     recommended: dto.benefitAvailable,
-    benefitSummary: dto.benefitSummary,
-    recommendedCardName: dto.recommendedCardName,
+    benefitSummary: topCard?.benefitSummary ?? null,
+    recommendedCardName: topCard?.cardName ?? null,
     typicalPaymentAmount: dto.typicalPaymentAmount ?? null,
   }
 }

@@ -39,6 +39,7 @@ export async function fetchMerchantCardRecommendations(merchantId) {
   return (data.cards ?? []).map((c) => ({
     userCardId: c.userCardId,
     cardName: c.cardName,
+    cardImageUrl: c.cardImageUrl ?? null,
     benefitDescription: c.benefitDescription ?? '',
     benefitApplicable: c.benefitApplicable,
     performanceMet: c.performanceMet,

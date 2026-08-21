@@ -19,6 +19,8 @@ vi.mock('@/services/merchantsService', async () => {
     fetchRecommendedNearbyMerchants: vi.fn(),
     fetchMerchantCategories: vi.fn(),
     fetchMerchantBrands: vi.fn(),
+    fetchMerchantList: vi.fn(),
+    fetchMerchantDetail: vi.fn(),
   }
 })
 
@@ -33,20 +35,24 @@ vi.mock('@/utils/imageDataUri', () => ({
   toDataUri: vi.fn((url) => Promise.resolve(url ?? null)),
 }))
 
-// findBenefitForCategory/formatBenefit(매칭 로직)은 실제 구현을 그대로 쓰고, fetchCardBenefits만
-// 목으로 대체 - benefitsInfo가 없는 카드를 ensureBenefitsLoaded가 실제로 채워주는지 검증하려면
-// 매칭 로직 자체는 진짜여야 한다.
-vi.mock('@/services/cardService', async () => {
-  const actual = await vi.importActual('@/services/cardService')
-  return { ...actual, fetchCardBenefits: vi.fn() }
-})
+// 매장 상세(바텀시트)의 "이 매장 추천 카드"는 Storedetail.vue와 같은 백엔드 엔드포인트를
+// 쓴다 - 프론트에서 카드 혜택을 자체 매칭하지 않으므로 이 서비스만 목으로 대체하면 된다.
+vi.mock('@/services/recommendationService', () => ({
+  fetchMerchantCardRecommendations: vi.fn(),
+}))
 
 import MapPage from '@/pages/Map.vue'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
-import { useCardsStore } from '@/stores/cards'
-import { fetchRecommendedNearbyMerchants, fetchMerchantCategories, fetchMerchantBrands } from '@/services/merchantsService'
-import { fetchCardBenefits } from '@/services/cardService'
+import { useMapViewStore } from '@/stores/mapView'
+import {
+  fetchRecommendedNearbyMerchants,
+  fetchMerchantCategories,
+  fetchMerchantBrands,
+  fetchMerchantList,
+  fetchMerchantDetail,
+} from '@/services/merchantsService'
+import { fetchMerchantCardRecommendations } from '@/services/recommendationService'
 
 // 카카오맵 SDK 대신 Marker/MarkerClusterer 생성과 이벤트 등록을 가로채서 검증하기 위한 최소 mock.
 // Map.vue의 loadKakaoMapScript()는 window.kakao.maps가 이미 있으면 그대로 resolve하므로
@@ -64,6 +70,11 @@ function createKakaoMock({ level = 3 } = {}) {
     if (!listenerMap.has(target)) listenerMap.set(target, {})
     const events = listenerMap.get(target)
     ;(events[eventName] ??= []).push(handler)
+  }
+  function removeListener(target, eventName, handler) {
+    const events = listenerMap.get(target)
+    if (!events?.[eventName]) return
+    events[eventName] = events[eventName].filter((h) => h !== handler)
   }
   function trigger(target, eventName, ...args) {
     const events = listenerMap.get(target)
@@ -130,6 +141,7 @@ function createKakaoMock({ level = 3 } = {}) {
     getBounds: vi.fn(() => bounds),
     getCenter: vi.fn(() => ({ getLat: () => 37.5, getLng: () => 127.1 })),
     panTo: vi.fn(),
+    setCenter: vi.fn(),
   }
   class KakaoMap {
     constructor() {
@@ -147,7 +159,7 @@ function createKakaoMock({ level = 3 } = {}) {
         Size,
         Point,
         LatLng,
-        event: { addListener },
+        event: { addListener, removeListener },
       },
     },
     markerInstances,
@@ -196,7 +208,9 @@ beforeEach(() => {
   fetchRecommendedNearbyMerchants.mockReset().mockResolvedValue([])
   fetchMerchantCategories.mockReset().mockResolvedValue(CATEGORIES)
   fetchMerchantBrands.mockReset().mockResolvedValue([])
-  fetchCardBenefits.mockReset()
+  fetchMerchantCardRecommendations.mockReset().mockResolvedValue([])
+  fetchMerchantList.mockReset().mockResolvedValue([])
+  fetchMerchantDetail.mockReset().mockResolvedValue(null)
 })
 
 afterEach(() => {
@@ -227,11 +241,11 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
 
     // 새 페이지로 이동하지 않고, 같은 바텀시트 안에서 목록 대신 상세가 뜬다.
     expect(routerMock.push).not.toHaveBeenCalled()
-    expect(wrapper.find('.store-name').text()).toBe('동네 카페')
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
     expect(wrapper.find('.sort-toggle').exists()).toBe(false)
 
     await wrapper.find('.detail-back-btn').trigger('click')
-    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
     expect(wrapper.find('.sort-toggle').exists()).toBe(true)
   })
 
@@ -249,8 +263,29 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(getClusterer().markers).toHaveLength(2) // 추천 여부와 무관하게 둘 다 핀으로 뜬다
     const cafePin = getClusterer().markers.find((m) => m.title === '동네 카페')
     const martPin = getClusterer().markers.find((m) => m.title === '동네 마트')
-    expect(decodedPinSvg(cafePin)).toContain('stroke="#ffbc00"')
-    expect(decodedPinSvg(martPin)).toContain('stroke="#8f897f"')
+    expect(decodedPinSvg(cafePin)).toContain('stroke="#00a878"')
+    expect(decodedPinSvg(martPin)).toContain('stroke="#24211d"')
+  })
+
+  it('혜택 매장이 10곳을 넘으면 응답 순서 앞의 10곳만 초록 핀, 나머지는 노란 핀으로 그린다', async () => {
+    const { kakao, getClusterer } = createKakaoMock()
+    window.kakao = kakao
+    const recommendedMerchants = MANY_MERCHANTS.map((m) => ({ ...m, recommended: true }))
+    fetchRecommendedNearbyMerchants.mockResolvedValue(recommendedMerchants)
+
+    mountMapPage()
+    await flushPromises()
+
+    const markers = getClusterer().markers
+    expect(markers).toHaveLength(12)
+    const pinsInOrder = recommendedMerchants.map((m) => markers.find((marker) => marker.title === m.name))
+
+    pinsInOrder.slice(0, 10).forEach((pin) => {
+      expect(decodedPinSvg(pin)).toContain('stroke="#00a878"')
+    })
+    pinsInOrder.slice(10).forEach((pin) => {
+      expect(decodedPinSvg(pin)).toContain('stroke="#ffbc00"')
+    })
   })
 
   it('recommended=true이고 typicalPaymentAmount가 있으면 목록에 "OOO원 기준" 문구를 보여준다', async () => {
@@ -279,36 +314,25 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(cafeItem.find('.sheet-item-typical-amount').exists()).toBe(false)
   })
 
-  // fetchCards()는 카드 실적만 받아오고 benefitsInfo는 안 채운다 - 매장 상세를 열 때
-  // ensureBenefitsLoaded로 그때그때 채워야 findBenefitForCategory가 제대로 매칭한다.
-  // (마이핏카드(할인형)에 적용 가능한 혜택이 없다고 잘못 뜨던 버그의 재현/회귀 테스트)
-  describe('매장 상세 - 보유 카드 혜택 매칭', () => {
-    it('benefitsInfo가 없는 카드도 매장을 선택하면 자동으로 불러와서 혜택을 매칭한다', async () => {
+  // 매장 상세(바텀시트)의 "이 매장 추천 카드"는 지도 핀의 benefitAvailable과 같은 백엔드
+  // 엔진(RecommendationServiceImpl)을 쓰는 /v1/recommendations/merchants/{id}/cards를 그대로
+  // 부른다 - 예전에는 프론트에서 카드의 "현재 실적 구간"에만 맞는 혜택을 자체적으로 찾아서,
+  // 핀은 "혜택 매장"인데 상세를 열면 "혜택 없음"이 뜨는 불일치가 있었다(회귀 테스트).
+  describe('매장 상세 - 이 매장 추천 카드', () => {
+    it('매장을 선택하면 그 매장 id로 카드 비교를 불러와서 렌더링한다', async () => {
       window.kakao = createKakaoMock().kakao
       fetchRecommendedNearbyMerchants.mockResolvedValue([{ ...CAFE_MERCHANT }])
-
-      const cardsStore = useCardsStore()
-      cardsStore.cards = [
-        // 실제 마이핏카드(할인형) 응답 재현: 전월 실적 30만원(충족), 이번 달은 아직 24만원(진행 중,
-        // 1구간 문턱 미달) - 혜택은 "전월" 실적 기준으로 적용돼야 하므로 여전히 1구간이 맞아야 한다.
+      fetchMerchantCardRecommendations.mockResolvedValue([
         {
           userCardId: 1,
           cardName: '마이핏카드(할인형)',
-          status: 'ACTIVE',
-          currentAmount: 240000,
-          previousMonthAmount: 300000,
-        }, // benefitsInfo 없음 - fetchCards()만 탄 상태 재현
-      ]
-      fetchCardBenefits.mockResolvedValue({
-        performanceTiers: [
-          { tierName: '0구간', minimumSpending: 0, benefits: [] },
-          {
-            tierName: '1구간',
-            minimumSpending: 300000,
-            benefits: [{ categoryCodes: ['5813'], discountRate: 5, description: '외식 및 커피 이용금액 5% 청구할인' }],
-          },
-        ],
-      })
+          benefitDescription: '외식 및 커피 이용금액 5% 청구할인',
+          benefitApplicable: true,
+          performanceMet: true,
+          reason: '',
+          recommended: true,
+        },
+      ])
 
       const wrapper = mountMapPage()
       await flushPromises()
@@ -316,27 +340,31 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
       await wrapper.find('.sheet-item').trigger('click')
       await flushPromises()
 
-      expect(fetchCardBenefits).toHaveBeenCalledWith(1)
+      expect(fetchMerchantCardRecommendations).toHaveBeenCalledWith(CAFE_MERCHANT.id)
       const recoCard = wrapper.find('.reco-card')
       expect(recoCard.text()).toContain('마이핏카드(할인형)')
-      expect(recoCard.text()).toContain('5% 할인')
+      expect(recoCard.text()).toContain('혜택 적용 중')
       expect(recoCard.find('.reco-rate--none').exists()).toBe(false)
     })
 
-    it('benefitsInfo가 이미 있는 카드는 다시 불러오지 않는다', async () => {
+    // total(다음 달 기대값 포함)이 아니라 now(지금 당장 확정 혜택) 기준으로 매칭돼야 하므로,
+    // "실적 조건은 채웠지만 지금 당장은 혜택이 없는" 카드는 혜택 없음으로 보여야 한다.
+    it('benefitApplicable이어도 performanceMet=false면 "실적 조건 필요"를 보여준다', async () => {
       window.kakao = createKakaoMock().kakao
       fetchRecommendedNearbyMerchants.mockResolvedValue([{ ...CAFE_MERCHANT }])
-
-      const cardsStore = useCardsStore()
-      cardsStore.cards = [
+      fetchMerchantCardRecommendations.mockResolvedValue([
         {
-          userCardId: 1,
-          cardName: '이미 로드된 카드',
-          status: 'ACTIVE',
-          currentAmount: 0,
-          benefitsInfo: { performanceTiers: [{ tierName: '0구간', minimumSpending: 0, benefits: [] }] },
+          userCardId: 2,
+          cardName: '실적 미달 카드',
+          // benefitApplicable=true면 실제 백엔드는 다음 구간 혜택으로 benefitDescription을
+          // 채워준다(비어있지 않음) - reason은 benefitApplicable=false일 때만 온다.
+          benefitDescription: '카페 10% 할인',
+          benefitApplicable: true,
+          performanceMet: false,
+          reason: '',
+          recommended: false,
         },
-      ]
+      ])
 
       const wrapper = mountMapPage()
       await flushPromises()
@@ -344,11 +372,38 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
       await wrapper.find('.sheet-item').trigger('click')
       await flushPromises()
 
-      expect(fetchCardBenefits).not.toHaveBeenCalled()
+      const recoCard = wrapper.find('.reco-card')
+      expect(recoCard.text()).toContain('실적 조건 필요')
+      expect(recoCard.text()).toContain('카페 10% 할인')
+    })
+
+    it('추천 카드가 없으면(모두 혜택 없음) "적용되는 혜택이 없어요" 문구를 보여준다', async () => {
+      window.kakao = createKakaoMock().kakao
+      fetchRecommendedNearbyMerchants.mockResolvedValue([{ ...CAFE_MERCHANT }])
+      fetchMerchantCardRecommendations.mockResolvedValue([
+        {
+          userCardId: 3,
+          cardName: '혜택 없는 카드',
+          benefitDescription: '',
+          benefitApplicable: false,
+          performanceMet: false,
+          reason: '이 카테고리에 적용되는 혜택이 없어요',
+          recommended: false,
+        },
+      ])
+
+      const wrapper = mountMapPage()
+      await flushPromises()
+
+      await wrapper.find('.sheet-item').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('.benefit-strip--muted').text()).toContain('적용되는 혜택이 없어요')
+      expect(wrapper.find('.reco-rate--none').exists()).toBe(true)
     })
   })
 
-  it('brandId의 brandLogo가 로컬 브랜드 이미지와 매칭되면 카테고리 아이콘 대신 브랜드 로고를 쓰고, 매칭되는 파일이 없으면 카테고리 아이콘으로 폴백한다', async () => {
+  it('지도 핀은 brandId 유무와 무관하게 항상 카테고리 아이콘을 쓰고, 하단 목록은 브랜드 로고를 우선한다', async () => {
     const { kakao, getClusterer } = createKakaoMock()
     window.kakao = kakao
     fetchMerchantBrands.mockResolvedValue([
@@ -356,21 +411,27 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
       { brandId: 2, brandCode: 'NO_LOCAL_LOGO', brandName: '로고 파일 없는 브랜드', brandLogo: '/Brands/no-such-file.png' },
     ])
     fetchRecommendedNearbyMerchants.mockResolvedValue([
-      { ...CAFE_MERCHANT, brandId: 1 }, // src/images/Brands/starbucks.png와 매칭
-      { ...MART_MERCHANT, brandId: 2 }, // brandLogo는 있지만 실제 파일이 없어 카테고리 아이콘으로 폴백
+      { ...CAFE_MERCHANT, brandId: 1 }, // src/images/Brands/starbucks.png와 매칭되는 브랜드
+      { ...MART_MERCHANT, brandId: 2 }, // brandLogo는 있지만 실제 파일이 없음
     ])
 
     const wrapper = mountMapPage()
     await flushPromises()
 
+    // 핀: 브랜드가 있어도 사진 대신 카테고리 아이콘으로 통일 (지도 위에서는 매장 종류
+    // 구분이 우선이라 브랜드 사진을 안 쓴다).
     const starbucksPin = getClusterer().markers.find((m) => m.title === '동네 카페')
-    expect(decodedPinSvg(starbucksPin)).toMatch(/<image href="[^"]*starbucks[^"]*\.png"/)
+    expect(decodedPinSvg(starbucksPin)).toContain('<image href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/2615.svg"')
 
     const noLogoPin = getClusterer().markers.find((m) => m.title === '동네 마트')
     expect(decodedPinSvg(noLogoPin)).toContain('<image href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f6d2.svg"')
 
+    // 하단 목록: 기존대로 브랜드 로고 우선, 없으면 카테고리 아이콘으로 폴백.
     const cafeItem = wrapper.findAll('.sheet-item').find((item) => item.find('strong').text() === '동네 카페')
     expect(cafeItem.find('.sheet-item-icon img').attributes('src')).toContain('starbucks')
+
+    const martItem = wrapper.findAll('.sheet-item').find((item) => item.find('strong').text() === '동네 마트')
+    expect(martItem.find('.sheet-item-icon img').attributes('src')).toContain('twemoji')
   })
 
   it('마운트 시 전체 매장이 아니라 카테고리 목록만 가볍게 불러온다', async () => {
@@ -470,6 +531,53 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
   })
 
+  // 회귀 테스트: onClustered가 예전엔 clusterMarker.setContent(새 HTML 문자열)로 배지를
+  // 통째로 새로 그렸는데, 실제 카카오 clusterer.js 소스를 확인해보니 MarkerClusterer가
+  // 클릭 리스너를 (setContent로 갈아 끼운 새 엘리먼트가 아니라) 자기가 생성 시점에 만든
+  // 고정된 content div 하나에만 addEventListener로 걸어두고 계속 재사용한다 - 그 div를
+  // 다른 엘리먼트로 갈아 치우면 리스너가 같이 사라져 배지를 눌러도 반응이 없어졌다.
+  // 지금은 setContent를 아예 안 부르고 getContent()로 그 div를 그대로 받아와 스타일만
+  // 덧입히므로, onClustered가 (1) setContent를 호출하지 않고 (2) 기존 div에 테두리
+  // 스타일만 적용하는지 검증한다.
+  it('클러스터가 (재)계산되면 추천 매장 포함 여부에 따라 기존 배지 엘리먼트에 테두리만 덧입히고, 엘리먼트를 새로 만들지 않는다', async () => {
+    const { kakao, getClusterer, trigger } = createKakaoMock()
+    window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      { ...CAFE_MERCHANT, recommended: true },
+      MART_MERCHANT,
+    ])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const clusterer = getClusterer()
+    const cafePin = clusterer.markers.find((m) => m.title === '동네 카페')
+    const martPin = clusterer.markers.find((m) => m.title === '동네 마트')
+
+    const recommendedContent = document.createElement('div')
+    const setContentSpy = vi.fn()
+    const recommendedClusterMarker = { getContent: () => recommendedContent, setContent: setContentSpy }
+    const recommendedCluster = { getMarkers: () => [cafePin], getClusterMarker: () => recommendedClusterMarker }
+
+    const plainContent = document.createElement('div')
+    const plainClusterMarker = { getContent: () => plainContent, setContent: setContentSpy }
+    const plainCluster = { getMarkers: () => [martPin], getClusterMarker: () => plainClusterMarker }
+
+    trigger(clusterer, 'clustered', [recommendedCluster, plainCluster])
+
+    expect(setContentSpy).not.toHaveBeenCalled()
+    // jsdom이 style.border 조회 시 색상을 rgb()로 정규화해서 돌려주므로 borderColor로 비교한다.
+    expect(recommendedContent.style.borderColor).toBe('rgb(0, 168, 120)')
+    expect(plainContent.style.borderColor).toBe('transparent')
+
+    // 리스너는 MarkerClusterer가 이 div에 이미 걸어둔 것 그대로다 - onClustered가
+    // 엘리먼트를 안 바꿨으니 그 리스너도 안 끊겼을 거라는 뜻이다. 실제 클릭 동작 자체는
+    // 'clusterclick'을 직접 트리거하는 다른 테스트들이 검증한다.
+    trigger(clusterer, 'clusterclick', { getMarkers: () => [cafePin] })
+    await flushPromises()
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
+  })
+
   it('매장 상세를 보다가(목록으로 돌아가지 않고) 클러스터를 클릭하면, 이전 매장 상세 대신 클러스터 목록이 뜬다', async () => {
     const { kakao, getClusterer, trigger } = createKakaoMock()
     window.kakao = kakao
@@ -485,14 +593,14 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
     // 카페 핀을 클릭해 상세를 연다 - "목록으로"를 누르지 않고 그대로 둔다.
     trigger(cafePin, 'click')
     await flushPromises()
-    expect(wrapper.find('.store-name').text()).toBe('동네 카페')
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
 
     // 이 상태에서 마트가 속한 클러스터를 클릭하면, 남아있던 카페 상세가 아니라
     // 클러스터(마트)의 목록이 떠야 한다.
     trigger(clusterer, 'clusterclick', { getMarkers: () => [martPin] })
     await flushPromises()
 
-    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
   })
 
@@ -518,6 +626,26 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
 
     expect(wrapper.find('.cluster-filter-banner').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
+  })
+
+  it('매장 상세를 보다가 재검색 버튼을 누르면, 상세가 닫히고 하단 시트가 목록으로 돌아온다', async () => {
+    const { kakao } = createKakaoMock()
+    window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const cafeItem = wrapper.findAll('.sheet-item').find((item) => item.find('strong').text() === '동네 카페')
+    await cafeItem.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
+
+    await wrapper.find('.research-btn').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
   })
 })
 
@@ -588,13 +716,13 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
 
     await wrapper.find('.sheet-item').trigger('click') // 첫 매장(이름순 정렬상 '동네 마트') 상세로 진입
     await flushPromises()
-    expect(wrapper.find('.store-name').exists()).toBe(true)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(true)
 
     const cafeChip = wrapper.findAll('.chip').find((btn) => btn.text() === '카페')
     await cafeChip.trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
   })
 
@@ -607,12 +735,12 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
 
     await wrapper.find('.sheet-item').trigger('click')
     await flushPromises()
-    expect(wrapper.find('.store-name').exists()).toBe(true)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(true)
 
     await wrapper.find('input').setValue('카페')
     await flushPromises()
 
-    expect(wrapper.find('.store-name').exists()).toBe(false)
+    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
   })
 })
@@ -627,7 +755,7 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
 
     const items = wrapper.findAll('.sheet-item-info strong').map((el) => el.text())
     expect(items).toEqual(['동네 마트', '동네 카페']) // 이름순(가나다)
-    expect(wrapper.findAll('.sheet-item-info p')[0].text()).toContain('거리 정보 없음')
+    expect(wrapper.findAll('.sheet-item-meta')[0].text()).toContain('거리 정보 없음')
   })
 
   it('내 위치에서 1km 넘게 떨어진 매장도 목록에서 사라지지 않는다 (지도 핀과 같은 매장을 보여줌)', async () => {
@@ -770,7 +898,23 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     await flushPromises()
 
     expect(routerMock.push).not.toHaveBeenCalled()
-    expect(wrapper.find('.store-name').text()).toBe('동네 카페')
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
+  })
+
+  it('목록을 스크롤한 채로 매장을 클릭해도, 상세는 맨 위부터 보인다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const sheetBodyEl = wrapper.find('.sheet-body').element
+    sheetBodyEl.scrollTop = 200
+
+    await wrapper.find('.sheet-item').trigger('click')
+    await flushPromises()
+
+    expect(sheetBodyEl.scrollTop).toBe(0)
   })
 })
 
@@ -975,6 +1119,144 @@ describe('카카오맵 컨테이너 리사이즈 대응 (ResizeObserver -> relay
       await flushPromises()
     } finally {
       window.ResizeObserver = originalResizeObserver
+    }
+  })
+})
+
+describe('다른 화면에서 넘어온 쿼리로 지도 상태를 복원한다', () => {
+  it('혜택 페이지에서 ?categoryCode=로 들어오면 해당 카테고리 칩이 미리 선택된 채로 필터링된다', async () => {
+    const { kakao } = createKakaoMock()
+    window.kakao = kakao
+    routeMock.query = { categoryCode: '5411' }
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const martChip = wrapper.findAll('.chip').find((btn) => btn.text() === '마트')
+    expect(martChip.classes()).toContain('active')
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
+  })
+
+  it('홈 화면 추천에서 ?merchantId=&lat=&lng=로 들어오면 그 좌표로 지도를 옮기고, 검색 결과가 도착하면 해당 매장 상세를 연다', async () => {
+    const { kakao, trigger, mapInstance } = createKakaoMock()
+    window.kakao = kakao
+    routeMock.query = { merchantId: String(CAFE_MERCHANT.id), lat: '37.5', lng: '127.1' }
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    expect(mapInstance.setCenter).toHaveBeenCalled()
+    expect(fetchMerchantDetail).not.toHaveBeenCalled() // lat/lng이 이미 왔으니 상세 조회로 좌표를 다시 구할 필요가 없다
+    // 최초 검색 결과가 도착하면 그 매장 상세가 자동으로 열린다.
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
+
+    // setCenter로 지도를 옮긴 뒤 실제로 idle해지면, 옮긴 위치 기준으로 한 번 더 재검색한다.
+    fetchRecommendedNearbyMerchants.mockClear()
+    trigger(mapInstance, 'idle')
+    await flushPromises()
+    expect(fetchRecommendedNearbyMerchants).toHaveBeenCalledTimes(1)
+  })
+
+  it('?merchantId=만 있고 좌표가 없으면 매장 상세를 조회해 그 좌표로 지도를 옮긴다', async () => {
+    const { kakao, mapInstance } = createKakaoMock()
+    window.kakao = kakao
+    routeMock.query = { merchantId: String(CAFE_MERCHANT.id) }
+    fetchMerchantDetail.mockResolvedValue({ ...CAFE_MERCHANT, lat: 37.55, lng: 127.15 })
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
+
+    mountMapPage()
+    await flushPromises()
+
+    expect(fetchMerchantDetail).toHaveBeenCalledWith(CAFE_MERCHANT.id)
+    expect(mapInstance.setCenter).toHaveBeenCalled()
+  })
+
+  it('일반 진입(쿼리 없음)이어도 이전에 보던 매장 상세가 mapViewStore에 남아있으면, 검색 결과가 도착하는 대로 다시 그 상세를 연다', async () => {
+    const { kakao } = createKakaoMock()
+    window.kakao = kakao
+    useMapViewStore().selectedMerchantId = CAFE_MERCHANT.id
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
+  })
+})
+
+describe('지도 이동 시 마지막 위치 저장 및 재검색 버튼(카테고리 선택 중)', () => {
+  it('팬/줌이 끝나면(idle) 마지막 중심 좌표와 줌 레벨을 mapViewStore에 저장한다', async () => {
+    const { kakao, trigger, mapInstance } = createKakaoMock({ level: 5 })
+    window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([])
+
+    mountMapPage()
+    await flushPromises()
+
+    trigger(mapInstance, 'idle')
+
+    const mapViewStore = useMapViewStore()
+    expect(mapViewStore.center).toEqual({ lat: 37.5, lng: 127.1 })
+    expect(mapViewStore.level).toBe(5)
+  })
+
+  it('카테고리를 고른 채로 재검색을 누르면 화면 범위가 아니라 그 카테고리 전체를 다시 검색한다', async () => {
+    const { kakao } = createKakaoMock()
+    window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([MART_MERCHANT])
+    fetchMerchantList.mockResolvedValue([MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const martChip = wrapper.findAll('.chip').find((btn) => btn.text() === '마트')
+    await martChip.trigger('click')
+    await flushPromises()
+    fetchRecommendedNearbyMerchants.mockClear()
+
+    await wrapper.find('.research-btn').trigger('click')
+    await flushPromises()
+
+    expect(fetchMerchantList).toHaveBeenCalledWith('5411')
+    expect(fetchRecommendedNearbyMerchants).not.toHaveBeenCalled()
+  })
+
+  it('카카오맵 스크립트 로드가 실패하면 에러 문구를 보여준다', async () => {
+    // window.kakao 없이(afterEach에서 delete됨) 이미 로드 중이던 스크립트 태그가 있던
+    // 상황을 흉내낸다 - 그 스크립트가 에러 이벤트를 내면 loadKakaoMapScript()가 reject된다.
+    const existingScript = document.createElement('script')
+    existingScript.dataset.kakaoMap = 'true'
+    document.head.appendChild(existingScript)
+
+    try {
+      const wrapper = mountMapPage()
+      await flushPromises()
+
+      existingScript.dispatchEvent(new Event('error'))
+      await flushPromises()
+
+      expect(wrapper.find('.map-error').text()).toContain('카카오맵 스크립트 로드 실패')
+    } finally {
+      existingScript.remove()
+    }
+  })
+
+  it('매장 조회가 실패하면 목록을 비우고 콘솔에 경고를 남긴다', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const { kakao } = createKakaoMock()
+      window.kakao = kakao
+      fetchRecommendedNearbyMerchants.mockRejectedValue(new Error('network error'))
+
+      const wrapper = mountMapPage()
+      await flushPromises()
+
+      expect(warnSpy).toHaveBeenCalledWith('매장 조회 실패', expect.any(Error))
+      expect(wrapper.findAll('.sheet-item-info strong')).toHaveLength(0)
+    } finally {
+      warnSpy.mockRestore()
     }
   })
 })

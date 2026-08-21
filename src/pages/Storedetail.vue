@@ -51,14 +51,15 @@
           <span v-if="row.recommended" class="reco-badge">추천</span>
           <div class="reco-top">
             <span class="reco-icon">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+              <img v-if="getCardImage(row)" :src="getCardImage(row)" :alt="`${row.cardName} 이미지`" class="reco-icon-img" />
+              <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
                 <rect x="2" y="5" width="20" height="14" rx="3"></rect>
                 <line x1="2" y1="10" x2="22" y2="10"></line>
               </svg>
             </span>
             <div class="reco-name-block">
               <strong>{{ row.cardName }}</strong>
-              <p>{{ row.benefitDescription || row.reason }}</p>
+              <p v-if="row.benefitDescription">{{ row.benefitDescription }}</p>
             </div>
             <span class="reco-rate" :class="{ 'reco-rate--none': !row.benefitApplicable }">
               {{ row.performanceMet ? '혜택 적용 중' : row.benefitApplicable ? '실적 조건 필요' : '혜택 없음' }}
@@ -90,6 +91,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useMerchantsStore } from '@/stores/merchants';
 import Button from '@/components/common/Button.vue';
 import { fetchMerchantCardRecommendations } from '@/services/recommendationService';
+import { getCardImage } from '@/utils/cardImages';
 
 const route = useRoute();
 const router = useRouter();
@@ -193,7 +195,8 @@ const goToPay = () => {
   margin-bottom: 12px;
   cursor: pointer;
 }
-.reco-card--best { border: 2px solid var(--orange, #ffbc00) !important; padding: 13px !important; }
+/* --best(추천 배지)는 위 reco-badge 태그만으로 표시하고 테두리는 안 준다 - 실제 결제에 쓸
+   카드를 고르는 --selected 테두리와 같은 색이면 "추천"과 "지금 선택됨"이 헷갈린다. */
 .reco-card--selected { border: 2px solid var(--orange, #ffbc00) !important; padding: 13px !important; background: #fffaf0 !important; }
 
 .reco-check {
@@ -210,8 +213,9 @@ const goToPay = () => {
 .reco-top { display: flex; align-items: center; gap: 12px; width: 100%; }
 .reco-icon {
   width: 40px; height: 26px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 auto;
-  background: #24211d;
+  background: #24211d; overflow: hidden;
 }
+.reco-icon-img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .reco-name-block { flex: 1; min-width: 0; }
 .reco-name-block strong { display: block; font-size: 13.5px; color: var(--charcoal, #24211d); margin-bottom: 3px; }
 .reco-name-block p { margin: 0; font-size: 11px; color: var(--muted, #8f897f); }

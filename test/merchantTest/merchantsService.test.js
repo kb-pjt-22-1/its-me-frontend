@@ -19,6 +19,7 @@ import {
   fetchMerchantBrands,
   sortCategories,
 } from '@/services/merchantsService.js'
+import { getCategoryPinIcon } from '@/utils/categoryPinIcons.js'
 
 const rawMerchant = {
   merchantId: 5,
@@ -29,7 +30,6 @@ const rawMerchant = {
   address: '서울시 강남구',
   latitude: 37.5,
   longitude: 127.0,
-  phone: '02-000-0000',
 }
 
 const normalizedMerchant = {
@@ -41,7 +41,6 @@ const normalizedMerchant = {
   address: '서울시 강남구',
   lat: 37.5,
   lng: 127.0,
-  phone: '02-000-0000',
 }
 
 beforeEach(() => {
@@ -73,8 +72,9 @@ describe('fetchRecommendedNearbyMerchants', () => {
       data: [{
         ...rawMerchant,
         benefitAvailable: true,
-        benefitSummary: '이번 달 확정 100원',
-        recommendedCardName: '테스트카드',
+        // benefitSummary/recommendedCardName은 최상위가 아니라 recommendedCards[0]에 온다
+        // (total 기준 1순위 카드) - 예전엔 최상위 필드를 읽어서 항상 undefined였다.
+        recommendedCards: [{ userCardId: 1, cardName: '테스트카드', benefitSummary: '이번 달 확정 100원' }],
         typicalPaymentAmount: 10000,
       }],
     })
@@ -109,8 +109,7 @@ describe('fetchRecommendedNearbyMerchants', () => {
       data: [{
         ...rawMerchant,
         benefitAvailable: false,
-        benefitSummary: null,
-        recommendedCardName: null,
+        recommendedCards: [],
         typicalPaymentAmount: null,
       }],
     })
@@ -121,6 +120,8 @@ describe('fetchRecommendedNearbyMerchants', () => {
     )
 
     expect(result.typicalPaymentAmount).toBeNull()
+    expect(result.benefitSummary).toBeNull()
+    expect(result.recommendedCardName).toBeNull()
   })
 
   it('typicalPaymentAmount 필드가 응답에 아예 없으면 null로 정규화한다', async () => {
@@ -166,8 +167,7 @@ describe('fetchTodayRecommendedMerchants', () => {
         ...rawMerchant,
         distanceMeters: 250,
         benefitAvailable: true,
-        benefitSummary: '이번 달 확정 100원',
-        recommendedCardName: '테스트카드',
+        recommendedCards: [{ userCardId: 1, cardName: '테스트카드', benefitSummary: '이번 달 확정 100원' }],
         typicalPaymentAmount: 10000,
       }],
     })
@@ -210,14 +210,14 @@ describe('fetchMerchantDetail', () => {
 })
 
 describe('fetchMerchantCategories', () => {
-  it('카테고리 목록을 조회한다', async () => {
-    const categories = [{ categoryCode: '5812', categoryName: '음식점', categoryIcon: 'x' }]
+  it('카테고리 목록을 조회하고, 백엔드 categoryIcon(더미 CDN URL)은 로컬 아이콘으로 덮어쓴다', async () => {
+    const categories = [{ categoryCode: '5812', categoryName: '음식점', categoryIcon: 'https://cdn.benepay.com/icons/food.svg' }]
     api.get.mockResolvedValueOnce({ data: categories })
 
     const result = await fetchMerchantCategories()
 
     expect(api.get).toHaveBeenCalledWith('/v1/merchant-categories')
-    expect(result).toEqual(categories)
+    expect(result).toEqual([{ ...categories[0], categoryIcon: getCategoryPinIcon('5812') }])
   })
 
   it('자주 쓰는 카테고리(음식점/카페/편의점)가 앞으로 오도록 응답 순서를 재정렬한다', async () => {
