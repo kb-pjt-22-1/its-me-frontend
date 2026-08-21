@@ -10,6 +10,14 @@ vi.mock('@/services/authService', () => ({
   fetchProfile: vi.fn(),
 }))
 
+vi.mock('@/services/pushNotificationService', () => ({
+  getFcmToken: vi.fn(),
+}))
+
+vi.mock('@/services/memberService', () => ({
+  updateFcmToken: vi.fn(),
+}))
+
 import { useAuthStore } from '@/stores/auth'
 import {
   loginRequest,
@@ -19,6 +27,8 @@ import {
   refreshTokenRequest,
   fetchProfile,
 } from '@/services/authService'
+import { getFcmToken } from '@/services/pushNotificationService'
+import { updateFcmToken } from '@/services/memberService'
 
 const SESSION = {
   accessToken: 'access-1',
@@ -160,6 +170,15 @@ describe('login', () => {
     expect(localStorage.getItem('accessToken')).toBe(SESSION.accessToken)
   })
 
+  it('성공하면 FCM 토큰 등록도 시도한다', async () => {
+    loginRequest.mockResolvedValueOnce(SESSION)
+    const store = useAuthStore()
+
+    await store.login('tester01', 'Test1234!')
+
+    expect(getFcmToken).toHaveBeenCalled()
+  })
+
   it('서버 메시지가 있으면 그 메시지를 errorMessage에 담고 false를 반환한다', async () => {
     loginRequest.mockRejectedValueOnce({ response: { data: { message: '비밀번호가 틀렸습니다' } } })
     const store = useAuthStore()
@@ -235,6 +254,34 @@ describe('signUp', () => {
     expect(store.errorStatus).toBe(409)
     expect(store.justSignedUp).toBe(false)
     expect(store.isAuthenticated).toBe(false)
+  })
+})
+
+describe('registerFcmToken', () => {
+  it('토큰을 받으면 백엔드에 등록한다', async () => {
+    getFcmToken.mockResolvedValueOnce('fcm-token-1')
+    const store = useAuthStore()
+
+    await store.registerFcmToken()
+
+    expect(updateFcmToken).toHaveBeenCalledWith('fcm-token-1')
+  })
+
+  it('토큰이 null이면(권한 거부/설정값 없음 등) 백엔드를 호출하지 않는다', async () => {
+    getFcmToken.mockResolvedValueOnce(null)
+    const store = useAuthStore()
+
+    await store.registerFcmToken()
+
+    expect(updateFcmToken).not.toHaveBeenCalled()
+  })
+
+  it('등록에 실패해도 예외를 던지지 않는다(로그인 흐름에 영향 없음)', async () => {
+    getFcmToken.mockResolvedValueOnce('fcm-token-1')
+    updateFcmToken.mockRejectedValueOnce(new Error('network error'))
+    const store = useAuthStore()
+
+    await expect(store.registerFcmToken()).resolves.toBeUndefined()
   })
 })
 
