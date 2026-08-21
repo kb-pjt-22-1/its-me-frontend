@@ -86,14 +86,14 @@ describe('1단계: 본인인증', () => {
     expect(wrapper.find('#signup-code').exists()).toBe(true)
   })
 
-  it('devVerificationCode가 오면 개발 환경 힌트를 보여주고 코드 입력란을 미리 채워준다', async () => {
+  it('devVerificationCode가 오면 화면에 노출하지 않고 코드 입력란만 미리 채워준다', async () => {
     requestSignupIdentityCode.mockResolvedValueOnce('654321')
     const wrapper = mountPage()
 
     await goToStep1CodeEntry(wrapper)
 
-    expect(wrapper.text()).toContain('654321')
     expect(wrapper.find('#signup-code').element.value).toBe('654321')
+    expect(wrapper.text()).not.toContain('654321')
   })
 
   it('인증번호 발송이 422로 실패하면 KB 미등록 회원 안내를 보여준다', async () => {

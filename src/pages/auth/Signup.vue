@@ -55,8 +55,6 @@
           </Button>
 
           <template v-else>
-            <p v-if="devCode" class="dev-hint">개발 환경 테스트용 인증번호: {{ devCode }}</p>
-
             <div class="input-box">
               <label for="signup-code" class="sr-only">인증번호</label>
               <input
@@ -491,13 +489,6 @@ async function submitSignup() {
 }
 .input-box input::placeholder { color: var(--muted, #8f897f); }
 .input-box input:disabled { color: var(--muted, #b6afa6); }
-
-.dev-hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--orange-deep, #e6aa00);
-  text-align: center;
-}
 
 .error-text {
   color: var(--danger, #d94343);
