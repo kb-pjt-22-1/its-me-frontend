@@ -82,7 +82,7 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
     expect(stores.bookmarksStore.fetchBookmarks).toHaveBeenCalledTimes(1)
     expect(stores.paymentStore.fetchHistory).toHaveBeenCalledTimes(1)
     expect(stores.notificationsStore.fetchNotifications).toHaveBeenCalledTimes(1)
-    // 세션 복원(자동 로그인)은 store의 login/devLogin/signUp을 안 거쳐서 자체적으로
+    // 세션 복원(자동 로그인)은 store의 login/signUp을 안 거쳐서 자체적으로
     // registerFcmToken을 안 부르므로, 이미 인증된 채로 마운트될 때 여기서 한 번 불러야 한다.
     expect(stores.authStore.registerFcmToken).toHaveBeenCalledTimes(1)
   })

@@ -42,7 +42,6 @@ export function setStoredUser(user) {
   localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user))
 }
 
-// devLoginSlot은 일부러 남긴다. 브라우저마다 고정돼야 하는 값이라 로그아웃과 무관하다.
 export function clearAuthStorage() {
   localStorage.removeItem(ACCESS_TOKEN_KEY)
   localStorage.removeItem(REFRESH_TOKEN_KEY)
