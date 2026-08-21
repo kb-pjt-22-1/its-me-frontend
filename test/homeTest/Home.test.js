@@ -160,6 +160,55 @@ describe('오늘의 추천', () => {
 
     expect(routerMock.push).toHaveBeenCalledWith({ path: '/map', query: { merchantId: 42 } })
   })
+
+  it('추천 카드 이미지를 클릭하거나 Enter를 누르면 userCardId로 카드 상세 페이지에 이동한다', async () => {
+    fetchTodayRecommendation.mockResolvedValueOnce({
+      ...recommendation,
+      userCardId: 17,
+      nearbyMerchants: [],
+    })
+
+    const { wrapper } = mountPage([])
+    await flushPromises()
+
+    const cardVisual = wrapper.find('.reco-card-visual')
+    const cardImage = cardVisual.get('img')
+    expect(cardImage.attributes('src')).toBeTruthy()
+    expect(cardImage.attributes('alt')).toBe('청춘대로 톡톡카드 이미지')
+    expect(cardVisual.attributes('role')).toBe('link')
+    expect(cardVisual.attributes('tabindex')).toBe('0')
+
+    await cardVisual.trigger('click')
+    await cardVisual.trigger('keydown', { key: 'Enter' })
+
+    expect(routerMock.push).toHaveBeenNthCalledWith(1, {
+      name: 'card-detail',
+      params: { userCardId: 17 },
+    })
+    expect(routerMock.push).toHaveBeenNthCalledWith(2, {
+      name: 'card-detail',
+      params: { userCardId: 17 },
+    })
+  })
+
+  it('추천 카드의 userCardId가 없으면 상세 페이지로 이동하지 않는다', async () => {
+    fetchTodayRecommendation.mockResolvedValueOnce({
+      ...recommendation,
+      userCardId: null,
+      nearbyMerchants: [],
+    })
+
+    const { wrapper } = mountPage([])
+    await flushPromises()
+
+    const cardVisual = wrapper.find('.reco-card-visual')
+    expect(cardVisual.attributes('role')).toBeUndefined()
+    expect(cardVisual.attributes('tabindex')).toBeUndefined()
+
+    await cardVisual.trigger('click')
+
+    expect(routerMock.push).not.toHaveBeenCalled()
+  })
 })
 
 describe('추천 카드로 결제', () => {
@@ -215,6 +264,16 @@ describe('추천 카드로 결제', () => {
 })
 
 describe('간편 결제 버튼', () => {
+  it('이번 달 혜택을 누르면 혜택 화면으로 이동한다', async () => {
+    const { wrapper } = mountPage([])
+    await flushPromises()
+
+    const benefitButton = wrapper.findAll('button').find((b) => b.text().includes('이번 달 혜택'))
+    await benefitButton.trigger('click')
+
+    expect(routerMock.push).toHaveBeenCalledWith('/benefits')
+  })
+
   it('최근 저장한 매장이 있으면 그 매장으로 결제 화면으로 이동한다', async () => {
     const { wrapper, bookmarksStore } = mountPage([])
     bookmarksStore.bookmarks = [{ bookmarkId: 1, merchantId: 7, createdAt: '2026-08-01T00:00:00' }]
@@ -282,5 +341,28 @@ describe('최근 결제 내역', () => {
     await moreButton.trigger('click')
 
     expect(routerMock.push).toHaveBeenCalledWith('/payments')
+  })
+
+  it('최근 결제를 클릭하거나 Enter를 누르면 쿼리 없이 결제 내역 화면으로 이동한다', async () => {
+    const { wrapper, paymentStore } = mountPage([])
+    paymentStore.history = [{
+      paymentId: 42,
+      merchantName: '스타벅스 강남점',
+      finalAmount: 4500,
+      discountAmount: 500,
+      paymentTime: '2026-08-05T13:30:00',
+      cardName: '청춘대로 톡톡카드',
+    }]
+    await flushPromises()
+
+    const item = wrapper.find('.transaction-item')
+    expect(item.attributes('role')).toBe('button')
+    expect(item.attributes('tabindex')).toBe('0')
+
+    await item.trigger('click')
+    await item.trigger('keydown', { key: 'Enter' })
+
+    expect(routerMock.push).toHaveBeenNthCalledWith(1, '/payments')
+    expect(routerMock.push).toHaveBeenNthCalledWith(2, '/payments')
   })
 })

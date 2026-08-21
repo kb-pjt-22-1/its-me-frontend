@@ -3,7 +3,12 @@ const imageModules = import.meta.glob('../assets/images/Cards/*.png', {
     import: 'default',
 });
 
-const normalizeName = (name) => String(name ?? '').replace(/\s+/g, ' ').trim();
+const normalizeName = (name) =>
+    String(name ?? '')
+        .normalize('NFC')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
 
 const cardImageMap = Object.fromEntries(
     Object.entries(imageModules).map(([path, imageUrl]) => {

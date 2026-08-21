@@ -202,10 +202,16 @@ describe('연회비 본전', () => {
     const { wrapper } = mountPage({ breakevenCards: [makeCard({ isBreakEven: true, netBenefit: 3400 })] })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('청춘대로 톡톡카드')
-    expect(wrapper.text()).toContain('본전 달성 4월 12일')
-    expect(wrapper.find('.success-text').exists()).toBe(true)
-    expect(wrapper.find('.danger-text').exists()).toBe(false)
+    const slide = wrapper.get('.breakeven-slide')
+    const statusBadge = slide.get('.be-status-badge')
+    const statusDescription = slide.get('.be-status-title')
+
+    expect(slide.get('.be-card-name').text()).toBe('청춘대로 톡톡카드')
+    expect(statusBadge.text()).toBe('본전 달성')
+    expect(statusDescription.text()).toBe('4월 12일, 연회비 본전을 뽑았어요')
+    expect(statusBadge.classes()).not.toContain('be-status-badge--pending')
+    expect(slide.findAll('.be-stats-row .success-text')).toHaveLength(2)
+    expect(slide.find('.be-stats-row .danger-text').exists()).toBe(false)
   })
 
   it('본전 전이면 빨강 클래스를 붙인다', async () => {
@@ -234,14 +240,17 @@ describe('연회비 본전', () => {
     expect(wrapper.text()).toContain('연회비 본전 정보를 불러오지 못했어요')
   })
 
-  it('카드가 1장이면 슬라이더 화살표가 안 보인다', async () => {
+  it('카드가 1장이면 카드 한 장을 표시하고 슬라이더 화살표는 없다', async () => {
     const { wrapper } = mountPage({ breakevenCards: [makeCard()] })
     await flushPromises()
 
+    expect(wrapper.findAll('.breakeven-slide')).toHaveLength(1)
+    expect(wrapper.get('.be-card-name').text()).toBe('청춘대로 톡톡카드')
+    expect(wrapper.find('button[aria-label="이전 카드"]').exists()).toBe(false)
     expect(wrapper.find('button[aria-label="다음 카드"]').exists()).toBe(false)
   })
 
-  it('카드가 2장 이상이면 슬라이더 화살표가 보이고, 첫 카드에서는 이전 화살표가 비활성화된다', async () => {
+  it('카드가 2장 이상이면 가로 슬라이드에 모든 카드를 표시하고 화살표는 없다', async () => {
     const { wrapper } = mountPage({
       breakevenCards: [
         makeCard({ userCardId: 1, cardName: '첫번째카드' }),
@@ -250,13 +259,12 @@ describe('연회비 본전', () => {
     })
     await flushPromises()
 
-    const prevButton = wrapper.find('button[aria-label="이전 카드"]')
-    const nextButton = wrapper.find('button[aria-label="다음 카드"]')
-
-    expect(prevButton.exists()).toBe(true)
-    expect(nextButton.exists()).toBe(true)
-    expect(prevButton.attributes('disabled')).toBeDefined()
-    expect(nextButton.attributes('disabled')).toBeUndefined()
+    const slides = wrapper.findAll('.breakeven-slide')
+    expect(slides).toHaveLength(2)
+    expect(slides.map((slide) => slide.get('.be-card-name').text())).toEqual(['첫번째카드', '두번째카드'])
+    expect(slides.every((slide) => slide.get('.be-card-owner').text() === '1234')).toBe(true)
+    expect(wrapper.find('button[aria-label="이전 카드"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="다음 카드"]').exists()).toBe(false)
   })
 })
 

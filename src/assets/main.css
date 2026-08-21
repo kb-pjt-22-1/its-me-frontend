@@ -210,7 +210,7 @@
   transition: width 0.4s;
 }
 .progress-fill--met {
-  background: linear-gradient(90deg, #00c48c, #00a878);
+  background: linear-gradient(90deg, #ffbc00, #ffd84d);
 }
 
 .info-strip {

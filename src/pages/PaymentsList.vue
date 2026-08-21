@@ -72,7 +72,6 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
 import Button from '@/components/common/Button.vue';
 import Footer from '@/layouts/menu/Footer.vue';
 import { usePaymentStore } from '@/stores/payment';
@@ -91,7 +90,6 @@ function closePaymentDetail() {
   selectedPaymentId.value = null;
 }
 
-const router = useRouter();
 const paymentStore = usePaymentStore();
 
 const viewYear = ref(new Date().getFullYear());
