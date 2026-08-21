@@ -72,8 +72,9 @@ describe('fetchRecommendedNearbyMerchants', () => {
       data: [{
         ...rawMerchant,
         benefitAvailable: true,
-        benefitSummary: '이번 달 확정 100원',
-        recommendedCardName: '테스트카드',
+        // benefitSummary/recommendedCardName은 최상위가 아니라 recommendedCards[0]에 온다
+        // (total 기준 1순위 카드) - 예전엔 최상위 필드를 읽어서 항상 undefined였다.
+        recommendedCards: [{ userCardId: 1, cardName: '테스트카드', benefitSummary: '이번 달 확정 100원' }],
         typicalPaymentAmount: 10000,
       }],
     })
@@ -108,8 +109,7 @@ describe('fetchRecommendedNearbyMerchants', () => {
       data: [{
         ...rawMerchant,
         benefitAvailable: false,
-        benefitSummary: null,
-        recommendedCardName: null,
+        recommendedCards: [],
         typicalPaymentAmount: null,
       }],
     })
@@ -120,6 +120,8 @@ describe('fetchRecommendedNearbyMerchants', () => {
     )
 
     expect(result.typicalPaymentAmount).toBeNull()
+    expect(result.benefitSummary).toBeNull()
+    expect(result.recommendedCardName).toBeNull()
   })
 
   it('typicalPaymentAmount 필드가 응답에 아예 없으면 null로 정규화한다', async () => {
@@ -165,8 +167,7 @@ describe('fetchTodayRecommendedMerchants', () => {
         ...rawMerchant,
         distanceMeters: 250,
         benefitAvailable: true,
-        benefitSummary: '이번 달 확정 100원',
-        recommendedCardName: '테스트카드',
+        recommendedCards: [{ userCardId: 1, cardName: '테스트카드', benefitSummary: '이번 달 확정 100원' }],
         typicalPaymentAmount: 10000,
       }],
     })

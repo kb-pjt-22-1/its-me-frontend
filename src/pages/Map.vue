@@ -182,16 +182,16 @@
             >
               <div class="sheet-item-icon"><img :src="shop.displayImage" alt="" /></div>
               <div class="sheet-item-info">
-                <strong>{{ shop.name }}</strong>
-                <p class="muted-text">
-                  {{ shop.categoryName }} · {{ shop.distanceLabel }}
-                </p>
-                <span v-if="shop.recommended" class="pill pill--gold">혜택 매장</span>
+                <div class="sheet-item-row">
+                  <strong>{{ shop.name }}</strong>
+                  <span class="sheet-item-meta muted-text">{{ shop.categoryName }} · {{ shop.distanceLabel }}</span>
+                </div>
+                <div v-if="shop.recommended" class="sheet-item-row">
+                  <span class="pill pill--gold">혜택 매장</span>
+                  <span v-if="shop.benefitSummary" class="sheet-item-benefit">{{ shop.benefitSummary }}</span>
+                </div>
                 <p v-if="shop.recommended && shop.typicalPaymentAmount != null" class="sheet-item-typical-amount">
                   {{ shop.typicalPaymentAmount.toLocaleString() }}원 기준
-                </p>
-                <p v-if="shop.recommended && shop.benefitSummary" class="sheet-item-benefit">
-                  <strong v-if="shop.recommendedCardName">{{ shop.recommendedCardName }}</strong> {{ shop.benefitSummary }}
                 </p>
               </div>
               <span class="sheet-bookmark" :class="{ active: bookmarksStore.isBookmarked(shop.id) }" @click.stop="toggleBookmark(shop)">
@@ -1106,26 +1106,40 @@ onUnmounted(() => {
 .sheet-item-icon {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
-  background: var(--inactive, #f0efec);
   display: grid;
   place-items: center;
   flex: 0 0 auto;
 }
 .sheet-item-icon img {
-  width: 22px;
-  height: 22px;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
 }
 .sheet-item-info { flex: 1; min-width: 0; }
-.sheet-item-info strong { font-size: 14px; color: var(--charcoal, #24211d); }
-.sheet-item-info p { margin: 4px 0 6px; font-size: 11.5px; }
-.sheet-item-info p.sheet-item-typical-amount { margin: 4px 0 0; font-size: 10.5px; font-weight: 700; color: var(--orange-deep, #e6aa00); }
-.sheet-item-benefit {
-  margin: 4px 0 0;
-  font-size: 11.5px;
-  color: #b67a00;
+.sheet-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
 }
-.sheet-item-benefit strong { color: inherit; }
+.sheet-item-row + .sheet-item-row { margin-top: 6px; }
+.sheet-item-info strong {
+  font-size: 14px;
+  color: var(--charcoal, #24211d);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet-item-meta { font-size: 11.5px; flex: 0 0 auto; white-space: nowrap; }
+.sheet-item-info p.sheet-item-typical-amount { margin: 4px 0 0; font-size: 10.5px; color: var(--muted, #8f897f); }
+.sheet-item-benefit {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--orange-deep, #e6aa00);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
 .sheet-bookmark {
   width: 34px;
   height: 34px;

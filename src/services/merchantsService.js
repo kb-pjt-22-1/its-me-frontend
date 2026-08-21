@@ -128,13 +128,17 @@ function normalizeMerchant(dto) {
 
 // fetchRecommendedNearbyMerchants/fetchTodayRecommendedMerchants 둘 다
 // NearbyMerchantRecommendationResponseDto[]를 받는 같은 응답 모양이라 매핑을 공유한다.
+// benefitSummary/recommendedCardName은 DTO 최상위가 아니라 recommendedCards[0](total 기준
+// 1순위 카드)에 들어있다 - 예전엔 최상위 필드를 그대로 읽어서 항상 undefined였고, 그래서
+// 목록에 "OOO원 기준"만 뜨고 정작 얼마 할인되는지 문구는 한 번도 안 보이고 있었다.
 function normalizeRecommendedMerchant(dto) {
+  const topCard = dto.recommendedCards?.[0]
   return {
     ...normalizeMerchant(dto),
     distanceMeters: dto.distanceMeters,
     recommended: dto.benefitAvailable,
-    benefitSummary: dto.benefitSummary,
-    recommendedCardName: dto.recommendedCardName,
+    benefitSummary: topCard?.benefitSummary ?? null,
+    recommendedCardName: topCard?.cardName ?? null,
     typicalPaymentAmount: dto.typicalPaymentAmount ?? null,
   }
 }

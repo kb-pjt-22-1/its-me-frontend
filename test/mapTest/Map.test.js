@@ -715,7 +715,7 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
 
     const items = wrapper.findAll('.sheet-item-info strong').map((el) => el.text())
     expect(items).toEqual(['동네 마트', '동네 카페']) // 이름순(가나다)
-    expect(wrapper.findAll('.sheet-item-info p')[0].text()).toContain('거리 정보 없음')
+    expect(wrapper.findAll('.sheet-item-meta')[0].text()).toContain('거리 정보 없음')
   })
 
   it('내 위치에서 1km 넘게 떨어진 매장도 목록에서 사라지지 않는다 (지도 핀과 같은 매장을 보여줌)', async () => {
