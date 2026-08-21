@@ -61,6 +61,21 @@ describe('fetchTodayRecommendation', () => {
     expect(result.benefitLabel).toBe('')
     expect(result.nearbyMerchants).toEqual([])
   })
+
+  it('categoryName/cardName과 매장별 benefitLabel이 없어도 빈 문자열로 안전하게 정규화한다', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        userCardId: 12,
+        nearbyMerchants: [{ merchantId: 1, merchantName: '메가커피 강남점', distanceMeters: 80 }],
+      },
+    })
+
+    const result = await fetchTodayRecommendation(37.5, 127.0)
+
+    expect(result.categoryName).toBe('')
+    expect(result.cardName).toBe('')
+    expect(result.nearbyMerchants[0].benefitLabel).toBe('')
+  })
 })
 
 describe('fetchMerchantCardRecommendations', () => {

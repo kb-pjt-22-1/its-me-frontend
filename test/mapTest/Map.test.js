@@ -19,6 +19,8 @@ vi.mock('@/services/merchantsService', async () => {
     fetchRecommendedNearbyMerchants: vi.fn(),
     fetchMerchantCategories: vi.fn(),
     fetchMerchantBrands: vi.fn(),
+    fetchMerchantList: vi.fn(),
+    fetchMerchantDetail: vi.fn(),
   }
 })
 
@@ -42,7 +44,14 @@ vi.mock('@/services/recommendationService', () => ({
 import MapPage from '@/pages/Map.vue'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
-import { fetchRecommendedNearbyMerchants, fetchMerchantCategories, fetchMerchantBrands } from '@/services/merchantsService'
+import { useMapViewStore } from '@/stores/mapView'
+import {
+  fetchRecommendedNearbyMerchants,
+  fetchMerchantCategories,
+  fetchMerchantBrands,
+  fetchMerchantList,
+  fetchMerchantDetail,
+} from '@/services/merchantsService'
 import { fetchMerchantCardRecommendations } from '@/services/recommendationService'
 
 // 카카오맵 SDK 대신 Marker/MarkerClusterer 생성과 이벤트 등록을 가로채서 검증하기 위한 최소 mock.
@@ -61,6 +70,11 @@ function createKakaoMock({ level = 3 } = {}) {
     if (!listenerMap.has(target)) listenerMap.set(target, {})
     const events = listenerMap.get(target)
     ;(events[eventName] ??= []).push(handler)
+  }
+  function removeListener(target, eventName, handler) {
+    const events = listenerMap.get(target)
+    if (!events?.[eventName]) return
+    events[eventName] = events[eventName].filter((h) => h !== handler)
   }
   function trigger(target, eventName, ...args) {
     const events = listenerMap.get(target)
@@ -127,6 +141,7 @@ function createKakaoMock({ level = 3 } = {}) {
     getBounds: vi.fn(() => bounds),
     getCenter: vi.fn(() => ({ getLat: () => 37.5, getLng: () => 127.1 })),
     panTo: vi.fn(),
+    setCenter: vi.fn(),
   }
   class KakaoMap {
     constructor() {
@@ -144,7 +159,7 @@ function createKakaoMock({ level = 3 } = {}) {
         Size,
         Point,
         LatLng,
-        event: { addListener },
+        event: { addListener, removeListener },
       },
     },
     markerInstances,
@@ -194,6 +209,8 @@ beforeEach(() => {
   fetchMerchantCategories.mockReset().mockResolvedValue(CATEGORIES)
   fetchMerchantBrands.mockReset().mockResolvedValue([])
   fetchMerchantCardRecommendations.mockReset().mockResolvedValue([])
+  fetchMerchantList.mockReset().mockResolvedValue([])
+  fetchMerchantDetail.mockReset().mockResolvedValue(null)
 })
 
 afterEach(() => {
@@ -1102,6 +1119,144 @@ describe('카카오맵 컨테이너 리사이즈 대응 (ResizeObserver -> relay
       await flushPromises()
     } finally {
       window.ResizeObserver = originalResizeObserver
+    }
+  })
+})
+
+describe('다른 화면에서 넘어온 쿼리로 지도 상태를 복원한다', () => {
+  it('혜택 페이지에서 ?categoryCode=로 들어오면 해당 카테고리 칩이 미리 선택된 채로 필터링된다', async () => {
+    const { kakao } = createKakaoMock()
+    window.kakao = kakao
+    routeMock.query = { categoryCode: '5411' }
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const martChip = wrapper.findAll('.chip').find((btn) => btn.text() === '마트')
+    expect(martChip.classes()).toContain('active')
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
+  })
+
+  it('홈 화면 추천에서 ?merchantId=&lat=&lng=로 들어오면 그 좌표로 지도를 옮기고, 검색 결과가 도착하면 해당 매장 상세를 연다', async () => {
+    const { kakao, trigger, mapInstance } = createKakaoMock()
+    window.kakao = kakao
+    routeMock.query = { merchantId: String(CAFE_MERCHANT.id), lat: '37.5', lng: '127.1' }
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    expect(mapInstance.setCenter).toHaveBeenCalled()
+    expect(fetchMerchantDetail).not.toHaveBeenCalled() // lat/lng이 이미 왔으니 상세 조회로 좌표를 다시 구할 필요가 없다
+    // 최초 검색 결과가 도착하면 그 매장 상세가 자동으로 열린다.
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
+
+    // setCenter로 지도를 옮긴 뒤 실제로 idle해지면, 옮긴 위치 기준으로 한 번 더 재검색한다.
+    fetchRecommendedNearbyMerchants.mockClear()
+    trigger(mapInstance, 'idle')
+    await flushPromises()
+    expect(fetchRecommendedNearbyMerchants).toHaveBeenCalledTimes(1)
+  })
+
+  it('?merchantId=만 있고 좌표가 없으면 매장 상세를 조회해 그 좌표로 지도를 옮긴다', async () => {
+    const { kakao, mapInstance } = createKakaoMock()
+    window.kakao = kakao
+    routeMock.query = { merchantId: String(CAFE_MERCHANT.id) }
+    fetchMerchantDetail.mockResolvedValue({ ...CAFE_MERCHANT, lat: 37.55, lng: 127.15 })
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
+
+    mountMapPage()
+    await flushPromises()
+
+    expect(fetchMerchantDetail).toHaveBeenCalledWith(CAFE_MERCHANT.id)
+    expect(mapInstance.setCenter).toHaveBeenCalled()
+  })
+
+  it('일반 진입(쿼리 없음)이어도 이전에 보던 매장 상세가 mapViewStore에 남아있으면, 검색 결과가 도착하는 대로 다시 그 상세를 연다', async () => {
+    const { kakao } = createKakaoMock()
+    window.kakao = kakao
+    useMapViewStore().selectedMerchantId = CAFE_MERCHANT.id
+    fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
+  })
+})
+
+describe('지도 이동 시 마지막 위치 저장 및 재검색 버튼(카테고리 선택 중)', () => {
+  it('팬/줌이 끝나면(idle) 마지막 중심 좌표와 줌 레벨을 mapViewStore에 저장한다', async () => {
+    const { kakao, trigger, mapInstance } = createKakaoMock({ level: 5 })
+    window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([])
+
+    mountMapPage()
+    await flushPromises()
+
+    trigger(mapInstance, 'idle')
+
+    const mapViewStore = useMapViewStore()
+    expect(mapViewStore.center).toEqual({ lat: 37.5, lng: 127.1 })
+    expect(mapViewStore.level).toBe(5)
+  })
+
+  it('카테고리를 고른 채로 재검색을 누르면 화면 범위가 아니라 그 카테고리 전체를 다시 검색한다', async () => {
+    const { kakao } = createKakaoMock()
+    window.kakao = kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([MART_MERCHANT])
+    fetchMerchantList.mockResolvedValue([MART_MERCHANT])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const martChip = wrapper.findAll('.chip').find((btn) => btn.text() === '마트')
+    await martChip.trigger('click')
+    await flushPromises()
+    fetchRecommendedNearbyMerchants.mockClear()
+
+    await wrapper.find('.research-btn').trigger('click')
+    await flushPromises()
+
+    expect(fetchMerchantList).toHaveBeenCalledWith('5411')
+    expect(fetchRecommendedNearbyMerchants).not.toHaveBeenCalled()
+  })
+
+  it('카카오맵 스크립트 로드가 실패하면 에러 문구를 보여준다', async () => {
+    // window.kakao 없이(afterEach에서 delete됨) 이미 로드 중이던 스크립트 태그가 있던
+    // 상황을 흉내낸다 - 그 스크립트가 에러 이벤트를 내면 loadKakaoMapScript()가 reject된다.
+    const existingScript = document.createElement('script')
+    existingScript.dataset.kakaoMap = 'true'
+    document.head.appendChild(existingScript)
+
+    try {
+      const wrapper = mountMapPage()
+      await flushPromises()
+
+      existingScript.dispatchEvent(new Event('error'))
+      await flushPromises()
+
+      expect(wrapper.find('.map-error').text()).toContain('카카오맵 스크립트 로드 실패')
+    } finally {
+      existingScript.remove()
+    }
+  })
+
+  it('매장 조회가 실패하면 목록을 비우고 콘솔에 경고를 남긴다', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const { kakao } = createKakaoMock()
+      window.kakao = kakao
+      fetchRecommendedNearbyMerchants.mockRejectedValue(new Error('network error'))
+
+      const wrapper = mountMapPage()
+      await flushPromises()
+
+      expect(warnSpy).toHaveBeenCalledWith('매장 조회 실패', expect.any(Error))
+      expect(wrapper.findAll('.sheet-item-info strong')).toHaveLength(0)
+    } finally {
+      warnSpy.mockRestore()
     }
   })
 })

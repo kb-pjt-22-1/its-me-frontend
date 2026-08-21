@@ -499,6 +499,10 @@ function loadKakaoMapScript() {
       resolve(window.kakao)
       return
     }
+    /* v8 ignore start -- 카카오맵 SDK <script> 태그를 실제로 주입/재사용하는 부트스트랩 코드.
+       실제 네트워크로 SDK를 받아와 onload/onerror가 불려야 의미가 있어 유닛 테스트로는
+       DOM 이벤트 타이밍만 흉내내는 수준이라 가치가 낮다 - Map.test.js는 window.kakao.maps를
+       미리 심어 이 블록을 건너뛰는 위 분기(정상 경로)로 모든 테스트를 태운다. */
     const existingScript = document.querySelector('script[data-kakao-map]')
     if (existingScript) {
       existingScript.addEventListener('load', () => {
@@ -523,6 +527,7 @@ function loadKakaoMapScript() {
     script.onerror = () =>
       reject(new Error('카카오맵 스크립트 로드 실패 (네트워크/확장프로그램 차단 여부 확인 필요)'))
     document.head.appendChild(script)
+    /* v8 ignore stop */
   })
 }
 

@@ -60,6 +60,13 @@ export default defineConfig({
                 'src/layouts/menu/DefaultLayout.vue',
                 'src/components/common/PageContainer.vue',
             ],
+            // 통과 기준. 이 밑으로 떨어지면 `npm run test:coverage`(CI 포함)가 실패한다.
+            thresholds: {
+                lines: 60,
+                statements: 60,
+                functions: 60,
+                branches: 60,
+            },
         },
     },
 })
