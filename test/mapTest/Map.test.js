@@ -246,8 +246,29 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(getClusterer().markers).toHaveLength(2) // 추천 여부와 무관하게 둘 다 핀으로 뜬다
     const cafePin = getClusterer().markers.find((m) => m.title === '동네 카페')
     const martPin = getClusterer().markers.find((m) => m.title === '동네 마트')
-    expect(decodedPinSvg(cafePin)).toContain('stroke="#ffbc00"')
+    expect(decodedPinSvg(cafePin)).toContain('stroke="#00a878"')
     expect(decodedPinSvg(martPin)).toContain('stroke="#24211d"')
+  })
+
+  it('혜택 매장이 10곳을 넘으면 응답 순서 앞의 10곳만 초록 핀, 나머지는 노란 핀으로 그린다', async () => {
+    const { kakao, getClusterer } = createKakaoMock()
+    window.kakao = kakao
+    const recommendedMerchants = MANY_MERCHANTS.map((m) => ({ ...m, recommended: true }))
+    fetchRecommendedNearbyMerchants.mockResolvedValue(recommendedMerchants)
+
+    mountMapPage()
+    await flushPromises()
+
+    const markers = getClusterer().markers
+    expect(markers).toHaveLength(12)
+    const pinsInOrder = recommendedMerchants.map((m) => markers.find((marker) => marker.title === m.name))
+
+    pinsInOrder.slice(0, 10).forEach((pin) => {
+      expect(decodedPinSvg(pin)).toContain('stroke="#00a878"')
+    })
+    pinsInOrder.slice(10).forEach((pin) => {
+      expect(decodedPinSvg(pin)).toContain('stroke="#ffbc00"')
+    })
   })
 
   it('recommended=true이고 typicalPaymentAmount가 있으면 목록에 "OOO원 기준" 문구를 보여준다', async () => {
@@ -529,7 +550,7 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
 
     expect(setContentSpy).not.toHaveBeenCalled()
     // jsdom이 style.border 조회 시 색상을 rgb()로 정규화해서 돌려주므로 borderColor로 비교한다.
-    expect(recommendedContent.style.borderColor).toBe('rgb(255, 188, 0)')
+    expect(recommendedContent.style.borderColor).toBe('rgb(0, 168, 120)')
     expect(plainContent.style.borderColor).toBe('transparent')
 
     // 리스너는 MarkerClusterer가 이 div에 이미 걸어둔 것 그대로다 - onClustered가

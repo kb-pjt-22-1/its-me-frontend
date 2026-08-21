@@ -225,6 +225,7 @@ import { onMounted, onUnmounted, ref, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
+import { useMapViewStore } from '@/stores/mapView'
 import { getBrandImage } from '@/utils/brandImages'
 import { getCardImage } from '@/utils/cardImages'
 import { toDataUri } from '@/utils/imageDataUri'
@@ -236,6 +237,7 @@ const route = useRoute()
 const router = useRouter()
 const merchantsStore = useMerchantsStore()
 const bookmarksStore = useBookmarksStore()
+const mapViewStore = useMapViewStore()
 const toast = useToast()
 
 // 바텀시트 상태
@@ -318,11 +320,19 @@ const chipsContainer = ref(null)
 const loadError = ref('')
 const KAKAO_MAP_KEY = import.meta.env.VITE_KAKAO_MAP_KEY
 
-const searchQuery = ref('')
+// 다른 페이지로 갔다가 돌아와도 검색어/카테고리를 그대로 보여주기 위해 mapViewStore에서 복원한다.
+const searchQuery = ref(mapViewStore.searchQuery)
 // 매장 전체를 안 받으니, 칩 목록은 (개수 적은) 카테고리 사전 자체에서 뽑습니다.
 // '전체' 칩은 따로 두지 않고, 선택된 칩을 다시 누르면 해제되어 전체 보기로 돌아갑니다.
 const categories = computed(() => merchantsStore.categories.map((c) => c.categoryName).filter(Boolean))
-const selectedCategory = ref(null)
+const selectedCategory = ref(mapViewStore.selectedCategory)
+
+watch(searchQuery, (value) => {
+  mapViewStore.searchQuery = value
+})
+watch(selectedCategory, (value) => {
+  mapViewStore.selectedCategory = value
+})
 
 // 지도 idle마다 화면(bounds) 안에서 받아온 매장들 - 검색/카테고리 필터는 전부
 // 이 화면 안 매장들을 대상으로만 동작합니다(화면 밖 매장은 애초에 검색 대상이 아님).
@@ -353,15 +363,31 @@ const merchants = computed(() => {
     list = list.filter((m) => m.name?.toLowerCase().includes(query) || m.categoryName?.toLowerCase().includes(query))
   }
 
-  if (!selectedCategory.value) return list
-  return list.filter((m) => m.categoryName === selectedCategory.value)
+  if (selectedCategory.value) {
+    list = list.filter((m) => m.categoryName === selectedCategory.value)
+  }
+
+  // 핀 강조 등급: 백엔드 응답 순서 그대로에서, 혜택 있는 매장(recommended) 중 앞의 10곳만
+  // 초록(top)으로, 나머지 혜택 매장은 기존 노랑(benefit)으로, 혜택 없는 매장은 강조 없음(none).
+  let recommendedCount = 0
+  return list.map((m) => {
+    if (!m.recommended) return { ...m, benefitTier: 'none' }
+    recommendedCount += 1
+    return { ...m, benefitTier: recommendedCount <= 10 ? 'top' : 'benefit' }
+  })
 })
 
 // 매장 상세는 새 페이지로 이동하지 않고, 바텀시트가 목록 대신 상세를 보여주는 방식으로 뜹니다.
-const selectedMerchantId = ref(null)
+// 다른 페이지로 갔다가 돌아와도 보고 있던 매장 상세를 그대로 다시 보여주기 위해
+// mapViewStore에서 복원한다(실제로 다시 열리는 시점은 restoreSelectedMerchant 참고 - 검색
+// 결과가 로드된 뒤에야 이 매장이 boundsMerchants 안에 존재하는지 확인할 수 있다).
+const selectedMerchantId = ref(mapViewStore.selectedMerchantId)
 const selectedMerchant = computed(
   () => boundsMerchantsWithCategory.value.find((m) => m.id === selectedMerchantId.value) ?? null,
 )
+watch(selectedMerchantId, (value) => {
+  mapViewStore.selectedMerchantId = value
+})
 
 // 목록과 상세가 같은 sheet-body 안에서 v-if/v-else로 내용만 바뀌는 구조라, 목록을 스크롤한
 // 채로 매장을 클릭하면 상세도 그 스크롤 위치에서부터 보였다(맨 위 배너/이름이 화면 밖에
@@ -519,18 +545,23 @@ function observeMapContainerResize() {
   mapResizeObserver.observe(mapContainer.value)
 }
 
-function initMap(kakao, center) {
+function initMap(kakao, center, level) {
   const map = new kakao.maps.Map(mapContainer.value, {
     center: new kakao.maps.LatLng(center.lat, center.lng),
-    level: 3,
+    level: level ?? 3,
   })
   // 옵션에 map을 넘기면 생성과 동시에 지도에 올라간다 - 이후 재사용할 일은 없지만,
   // 변수에 담아두는 것만으로 "만들고 버리는" 인스턴스가 아님이 명확해진다.
   // 카카오 기본 마커(검은 물방울)를 그대로 쓰면 매장 핀과 구분이 안 가서, 점+링 아이콘으로
   // 따로 그린다 - buildCurrentLocationMarkerImage 참고.
+  // center는 저장된 마지막 위치일 수 있어(mapViewStore) 지도 중심으로만 쓰고, 이 마커는
+  // 실제 GPS 위치(myLocation)가 있으면 그 자리에 찍는다 - 없으면 지도 중심을 그대로 쓴다.
   const centerMarker = new kakao.maps.Marker({
     map,
-    position: new kakao.maps.LatLng(center.lat, center.lng),
+    position: new kakao.maps.LatLng(
+      myLocation.value?.lat ?? center.lat,
+      myLocation.value?.lng ?? center.lng,
+    ),
     image: buildCurrentLocationMarkerImage(kakao),
     zIndex: 1,
   })
@@ -546,7 +577,7 @@ function initMap(kakao, center) {
     disableClickZoom: true, // 클릭 시 확대하는 대신, 안에 뭉친 매장들을 하단 목록에 보여줍니다.
     minClusterSize: 5, // 5개 미만이면 클러스터로 안 뭉치고 핀을 개별로 보여줍니다.
     // styles를 안 주면 카카오 SDK 기본값(파란 배지)이 나가서 KB 옐로우 톤과 어긋난다.
-    // --dark(간편결제 박스와 동일 톤)로 통일 - 추천 매장 핀의 --orange 후광과도 겹치지 않게.
+    // --dark(간편결제 박스와 동일 톤)로 통일 - 추천 매장 핀의 --green 후광과도 겹치지 않게.
     styles: [{
       width: '36px',
       height: '36px',
@@ -560,16 +591,53 @@ function initMap(kakao, center) {
     }],
   })
   kakao.maps.event.addListener(clusterer, 'clusterclick', onClusterClick)
-  // 클러스터 안에 지금 혜택 받을 수 있는(recommended) 매장이 하나라도 섞여있으면
-  // 배지 테두리를 KB 옐로우로 표시합니다 - 개수 정보(styles)는 그대로 두고, 개별 핀의
-  // 추천 강조(테두리+후광)와 같은 시각 언어를 클러스터에도 얹는 것뿐입니다.
+  // 클러스터 안에 등급이 있는(benefitTier top/benefit) 매장이 섞여있으면 배지 테두리를
+  // 그 등급 색으로 표시합니다 - 개수 정보(styles)는 그대로 두고, 개별 핀의 추천 강조
+  // (테두리+후광)와 같은 시각 언어를 클러스터에도 얹는 것뿐입니다.
   kakao.maps.event.addListener(clusterer, 'clustered', onClustered)
 
-  // 최초 진입 시 1회만 자동으로 현재 위치 기준 검색합니다 - 이후 팬/줌으로는 더 이상
-  // 자동 재조회하지 않고, 재검색 버튼이나 카테고리 칩을 눌러야 다시 조회합니다.
-  searchNearbyCurrentView()
+  // 팬/줌이 끝날 때마다(idle) 마지막 위치를 기억해둔다 - 다른 페이지로 갔다가 돌아오면
+  // 이 위치로 지도를 다시 띄우기 위함이다(searchNearbyCurrentView처럼 명시적 트리거가
+  // 아니라 사용자가 지도를 움직이기만 해도 계속 최신 위치로 갱신된다).
+  kakao.maps.event.addListener(map, 'idle', () => {
+    const c = map.getCenter()
+    mapViewStore.center = { lat: c.getLat(), lng: c.getLng() }
+    mapViewStore.level = map.getLevel()
+  })
+
+  // 검색이 시작되기 전에 복원 대상 매장 id를 먼저 붙잡아둔다 - 검색 결과가 도착하면
+  // withMerchantsLoading이 열려있던 상세를 항상 닫으므로(selectedMerchantId.value = null),
+  // 그 이후에 selectedMerchantId.value를 읽으면 이미 비어있다.
+  if (!route.query.merchantId) {
+    restoreSelectedMerchant(selectedMerchantId.value)
+  }
+
+  // 최초 진입 시 1회만 자동으로 검색합니다 - 이후 팬/줌으로는 더 이상 자동 재조회하지
+  // 않고, 재검색 버튼이나 카테고리 칩을 눌러야 다시 조회합니다. 이전에 카테고리를 골라둔
+  // 채로 페이지를 떠났다 돌아왔다면(selectedCategory가 mapViewStore에서 복원됨) 그
+  // 카테고리로, 아니면 현재 화면 기준으로 검색합니다.
+  if (selectedCategory.value) {
+    searchCategoryInView(selectedCategory.value)
+  } else {
+    searchNearbyCurrentView()
+  }
 
   focusMerchantFromQuery()
+}
+
+// 다른 페이지로 갔다가 돌아왔을 때, 이전에 상세를 보고 있던 매장이 있으면(mapViewStore에서
+// 복원) 검색 결과가 도착하는 대로 그 매장 상세를 다시 연다 - focusMerchantFromQuery와 같은
+// 이유로(bounds 조회가 비동기라 즉시는 안 됨) boundsMerchants를 지켜보다가 그 매장이
+// 들어오면 선택한다. 이번 검색 결과에 없으면(위치가 바뀌었거나 매장이 없어졌거나) 조용히
+// 포기한다.
+function restoreSelectedMerchant(merchantId) {
+  if (!merchantId) return
+  const stopWatchingBounds = watch(boundsMerchants, (list) => {
+    stopWatchingBounds()
+    if (list.some((m) => m.id === merchantId)) {
+      selectMerchant(merchantId)
+    }
+  })
 }
 
 // 홈 화면 "오늘의 카드 추천"의 가까운 혜택 매장을 누르면 매장 상세 페이지 대신 이
@@ -639,11 +707,15 @@ function onClusterClick(cluster) {
 function onClustered(clusters) {
   clusters.forEach((cluster) => {
     const clusterMarkers = cluster.getMarkers()
-    const hasRecommended = clusterMarkers.some((marker) => marker.merchantRef?.recommended)
+    const hasTop = clusterMarkers.some((marker) => marker.merchantRef?.benefitTier === 'top')
+    const hasBenefit = clusterMarkers.some((marker) => marker.merchantRef?.benefitTier === 'benefit')
     const content = cluster.getClusterMarker()?.getContent()
     if (!(content instanceof HTMLElement)) return
     content.style.boxSizing = 'border-box'
-    content.style.border = hasRecommended ? '2px solid #ffbc00' : '2px solid transparent'
+    // 안에 상위 10곳(top) 매장이 하나라도 있으면 초록, 없고 다른 혜택 매장만 있으면 노랑 -
+    // 개별 매장 핀의 등급 색과 맞춘다.
+    const borderColor = hasTop ? '#00a878' : hasBenefit ? '#ffbc00' : 'transparent'
+    content.style.border = `2px solid ${borderColor}`
   })
 }
 
@@ -736,7 +808,7 @@ function onResearchClick() {
 // 핀 모양(원형 배지 + 아이콘)을 SVG로 그려서 MarkerImage로 씁니다. MarkerClusterer가
 // CustomOverlay를 못 받고 Marker만 받아서(SDK 제약) DOM 대신 이 방식을 씁니다.
 // 카테고리 아이콘(브랜드 로고는 목록/상세 전용, 핀엔 안 씀)을 SVG <image>로 그대로 참조합니다.
-// recommended=true인 매장만 테두리 색과 은은한 후광으로 강조합니다 -
+// benefitTier가 있는 매장만(top/benefit) 테두리 색과 은은한 후광으로 강조합니다 -
 // 나머지 매장도 똑같이 핀은 그려지고, 강조만 빠집니다(필터링이 아니라 하이라이트).
 // 원래 물방울 핀은 테두리가 옅은 회갈색(#8f897f)이라 카카오맵의 복잡한 배경 위에서 묻혀
 // 보이던 문제가 있어서, 클러스터 배지와 같은 원형으로 바꾸고 진한 charcoal 테두리 +
@@ -746,10 +818,15 @@ const PIN_SIZE = 36
 // <img src="data:image/svg+xml,...">로 쓰이는 SVG 안에서는 <image href="외부 URL">가
 // 가리키는 이미지를 보안상 아예 안 불러오기 때문에(같은 오리진이어도), 미리 fetch해서
 // base64로 SVG 안에 통째로 박아 넣어야 실제로 보입니다. createMerchantMarker 참고.
+// 핀 강조 등급(benefitTier, merchants computed에서 계산)별 색상 - top(혜택 매장 중 상위
+// 10곳)은 --green(#00a878), benefit(나머지 혜택 매장)은 --orange(#ffbc00, 기존 색 유지),
+// none(혜택 없음)은 강조 없이 기본 charcoal 테두리만.
+const PIN_TIER_COLORS = { top: '#00a878', benefit: '#ffbc00' }
+
 function buildMerchantMarkerImage(kakao, merchant, iconDataUri) {
-  const recommended = !!merchant.recommended
-  const borderColor = recommended ? '#ffbc00' : '#24211d'
-  const glow = recommended ? '<circle cx="18" cy="18" r="17" fill="#ffbc00" fill-opacity="0.22"/>' : ''
+  const tierColor = PIN_TIER_COLORS[merchant.benefitTier]
+  const borderColor = tierColor ?? '#24211d'
+  const glow = tierColor ? `<circle cx="18" cy="18" r="17" fill="${tierColor}" fill-opacity="0.22"/>` : ''
   // 브랜드 로고/카테고리 아이콘 원본이 정사각형이 아니거나 배경이 꽉 찬 사진이어도, 핀
   // 밖으로 삐져나오지 않도록 원형 clipPath로 잘라서 넣습니다(정사각형 통짜 이미지가 원형
   // 배지 위에 그대로 얹히는 문제 방지) - preserveAspectRatio="slice"로 비율은 유지한 채
@@ -924,17 +1001,22 @@ onMounted(async () => {
   }
 
   const defaultCenter = { lat: 37.5665, lng: 126.978 } // 서울시청
+  // 이전에 지도에서 이동해뒀던 위치가 있으면(mapViewStore) 그 자리로 다시 띄운다 - 현재
+  // 위치 마커(myLocation)와 "내 위치" 버튼용 geolocation은 별개로 계속 가져오되, 지도의
+  // 초기 중심은 저장된 위치를 우선한다.
+  const savedCenter = mapViewStore.center
+  const savedLevel = mapViewStore.level
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const center = { lat: position.coords.latitude, lng: position.coords.longitude }
         myLocation.value = center
-        initMap(kakao, center)
+        initMap(kakao, savedCenter ?? center, savedCenter ? savedLevel : undefined)
       },
-      () => initMap(kakao, defaultCenter),
+      () => initMap(kakao, savedCenter ?? defaultCenter, savedCenter ? savedLevel : undefined),
     )
   } else {
-    initMap(kakao, defaultCenter)
+    initMap(kakao, savedCenter ?? defaultCenter, savedCenter ? savedLevel : undefined)
   }
 })
 
