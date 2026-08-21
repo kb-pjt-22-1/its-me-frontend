@@ -19,6 +19,7 @@ import {
   fetchMerchantBrands,
   sortCategories,
 } from '@/services/merchantsService.js'
+import { getCategoryPinIcon } from '@/utils/categoryPinIcons.js'
 
 const rawMerchant = {
   merchantId: 5,
@@ -208,14 +209,14 @@ describe('fetchMerchantDetail', () => {
 })
 
 describe('fetchMerchantCategories', () => {
-  it('카테고리 목록을 조회한다', async () => {
-    const categories = [{ categoryCode: '5812', categoryName: '음식점', categoryIcon: 'x' }]
+  it('카테고리 목록을 조회하고, 백엔드 categoryIcon(더미 CDN URL)은 로컬 아이콘으로 덮어쓴다', async () => {
+    const categories = [{ categoryCode: '5812', categoryName: '음식점', categoryIcon: 'https://cdn.benepay.com/icons/food.svg' }]
     api.get.mockResolvedValueOnce({ data: categories })
 
     const result = await fetchMerchantCategories()
 
     expect(api.get).toHaveBeenCalledWith('/v1/merchant-categories')
-    expect(result).toEqual(categories)
+    expect(result).toEqual([{ ...categories[0], categoryIcon: getCategoryPinIcon('5812') }])
   })
 
   it('자주 쓰는 카테고리(음식점/카페/편의점)가 앞으로 오도록 응답 순서를 재정렬한다', async () => {
