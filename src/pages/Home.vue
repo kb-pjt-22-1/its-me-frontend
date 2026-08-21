@@ -30,36 +30,43 @@
                 <p class="reco-sub muted-text">
                   {{ recommendation.benefitLabel }}
                 </p>
+
+                <Button variant="box" class="reco-cta" @click="goToRecommendedPayment">
+                  추천 카드로 결제 →
+                </Button>
               </div>
 
-              <span class="reco-card-icon">
-          <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-          >
-            <rect
-                x="2"
-                y="5"
-                width="20"
-                height="14"
-                rx="3"
-            />
-            <line x1="2" y1="10" x2="22" y2="10" />
-          </svg>
-        </span>
+              <span v-if="getCardImage(recommendation)" class="reco-card-media">
+                <span
+                    class="reco-card-visual"
+                    :class="{ 'reco-card-visual--clickable': recommendation?.userCardId }"
+                    :role="recommendation?.userCardId ? 'link' : undefined"
+                    :tabindex="recommendation?.userCardId ? 0 : undefined"
+                    :aria-label="recommendation?.userCardId ? `${recommendation.cardName} 카드 상세 보기` : undefined"
+                    @click="goToRecommendedCardDetail"
+                    @keydown.enter="goToRecommendedCardDetail"
+                >
+                  <img
+                      :src="getCardImage(recommendation)"
+                      :alt="`${recommendation.cardName} 이미지`"
+                      class="reco-card-image"
+                  />
+                </span>
+              </span>
+              <span v-else class="reco-card-icon" aria-hidden="true">
+                <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                >
+                  <rect x="2" y="5" width="20" height="14" rx="3" />
+                  <line x1="2" y1="10" x2="22" y2="10" />
+                </svg>
+              </span>
             </div>
-
-            <Button
-                variant="box"
-                class="reco-cta"
-                @click="goToRecommendedPayment"
-            >
-              추천 카드로 결제
-            </Button>
 
             <div class="reco-divider"></div>
 
@@ -129,24 +136,22 @@
 
       <!-- 간편결제 / 이번 달 혜택 (작게 줄여서 유지) -->
       <div class="bottom-container">
-        <Button variant="box" class="bottom-box bottom-box--compact" @click="goToPay">
+        <Button variant="box" class="bottom-box bottom-box--compact quick-pay-box" @click="goToPay">
           <h3>간편 결제</h3>
-          <div class="quick-pay-row">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.6" class="barcode-icon">
-              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
-              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
-              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
-              <line x1="14" y1="14" x2="14" y2="17"></line>
-              <line x1="17" y1="14" x2="17" y2="14.01"></line>
-              <line x1="20" y1="14" x2="20" y2="17"></line>
-              <line x1="14" y1="20" x2="17" y2="20"></line>
-              <line x1="20" y1="20" x2="20" y2="20.01"></line>
-            </svg>
-            <span v-if="latestBookmarkMerchantName" class="quick-pay-merchant">{{ latestBookmarkMerchantName }}</span>
-          </div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.6" class="barcode-icon">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+            <line x1="14" y1="14" x2="14" y2="17"></line>
+            <line x1="17" y1="14" x2="17" y2="14.01"></line>
+            <line x1="20" y1="14" x2="20" y2="17"></line>
+            <line x1="14" y1="20" x2="17" y2="20"></line>
+            <line x1="20" y1="20" x2="20" y2="20.01"></line>
+          </svg>
           <span class="pay-link-text">지금 결제 →</span>
+          <span v-if="latestBookmarkMerchantName" class="quick-pay-merchant">{{ latestBookmarkMerchantName }}</span>
         </Button>
-        <Button tag="div" variant="box-outline" class="bottom-box bottom-box--compact">
+        <Button variant="box-outline" class="bottom-box bottom-box--compact monthly-benefit-box" @click="router.push('/benefits')">
           <h3>이번 달 혜택</h3>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--orange, #ffbc00)" stroke-width="1.8" class="gift-icon">
             <rect x="3" y="8" width="18" height="4"></rect>
@@ -155,6 +160,7 @@
             <path d="M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5"></path>
           </svg>
           <p class="benefit-amount">{{ monthlyBenefitTotal.toLocaleString() }}원</p>
+          <p class="benefit-caption">할인 및 적립 포함</p>
         </Button>
       </div>
 
@@ -189,11 +195,6 @@
               <p class="muted-text">{{ expiring.expiringBenefits.map((b) => b.label).join(' · ') }}</p>
             </div>
             <span v-if="expiring.daysRemaining != null" class="pill pill--gold">D-{{ expiring.daysRemaining }}</span>
-            <span class="expiring-chevron">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-            </span>
           </div>
 
           <div
@@ -245,7 +246,15 @@
         <div v-if="recentTransactions.length === 0" class="empty-text muted-text">최근 결제 내역이 없어요.</div>
 
         <Button v-else tag="div" variant="box-outline" style="min-height: auto;">
-          <div v-for="item in recentTransactions" :key="item.paymentId" class="transaction-item">
+          <div
+            v-for="item in recentTransactions"
+            :key="item.paymentId"
+            class="transaction-item"
+            role="button"
+            tabindex="0"
+            @click="router.push('/payments')"
+            @keydown.enter="router.push('/payments')"
+          >
             <div class="item-info">
               <div class="item-left">
                 <strong>{{ item.merchantName }}</strong>
@@ -273,6 +282,7 @@ import { usePaymentStore } from '@/stores/payment';
 import { useBookmarksStore } from '@/stores/bookmarks';
 import { useMerchantsStore } from '@/stores/merchants';
 import { useHomeStore } from '@/stores/home';
+import { getCardImage } from '@/utils/cardImages';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -295,6 +305,13 @@ function goToRecommendedPayment() {
     return;
   }
   router.push({ path: '/pay', query: { userCardId: recommendation.value.userCardId } });
+}
+
+function goToRecommendedCardDetail() {
+  const userCardId = recommendation.value?.userCardId;
+  if (!recommendation.value || !userCardId) return;
+
+  router.push({ name: 'card-detail', params: { userCardId } });
 }
 
 // 홈 화면 "간편 결제" 버튼 - 기본은 그냥 결제 화면(/pay)으로 보내지만, 최근 저장한(북마크한)
@@ -427,28 +444,120 @@ onMounted(() => {
 /* 오늘의 카드 추천 - 제목은 흰 박스 밖에, gap:14px로 박스랑 간격 통일
    (최근 결제 내역이랑 같은 패턴) */
 .reco-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 15px; }
-.reco-card { padding: 20px; border-radius: 22px; }
-.reco-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.reco-summary { flex: 1; min-width: 0; }
-.reco-badge { display: inline-flex; margin-bottom: 12px; }
-.reco-title { margin: 0 0 5px; color: var(--charcoal, #24211d); font-size: 16px; font-weight: 700; line-height: 1.45; }
-.reco-sub { margin: 0; font-size: 12.5px; }
-.reco-card-icon { width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; background: var(--dark, #545045); color: #ffffff; }
-:deep(.reco-cta) { width: 100%; min-height: 52px; margin: 20px 0; padding: 0 20px; align-items: center; justify-content: center; flex-direction: row; border-radius: 12px; background: var(--dark, #545045); color: var(--orange, #ffbc00); font-size: 15px; font-weight: 700; }
 
+.reco-card { padding: 20px; border-radius: 22px; overflow: visible; }
+
+.reco-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+
+.reco-summary { flex: 1; min-width: 0; }
+
+.reco-badge { display:inline-flex; align-items:center; gap:7px; margin:0 0 7px 3px; padding:0 !important; border:none !important; border-radius:0; background:transparent !important; color:#76613a; font-size:12px; font-weight:700; letter-spacing:.02em; }
+.reco-badge::before { content:''; width:6px; height:6px; border-radius:50%; background:#c89b32; }
+
+.reco-title { margin: 0 0 5px; color: var(--charcoal, #24211d); font-size: 16px; font-weight: 700; line-height: 1.45; }
+
+.reco-sub { margin: 0; font-size: 12.5px; }
+
+.reco-card-media {
+  --reco-card-x: -3px;
+  --reco-card-y: 22px;
+  position: relative;
+  width: 160px;
+  height: 101px;
+  flex: 0 0 152px;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  transform: translate(var(--reco-card-x), var(--reco-card-y));
+}
+
+.reco-card-media::before {
+  content: '';
+  position: absolute;
+  inset: 20px 14px 6px;
+  border-radius: 50%;
+  background: rgba(255, 188, 0, 0.2);
+  filter: blur(16px);
+}
+
+.reco-card-visual {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 7px;
+  transform: rotate(3deg);
+  filter: drop-shadow(0 10px 9px rgba(36, 33, 29, .22));
+}
+
+.reco-card-visual--clickable { cursor: pointer; }
+
+.reco-card-visual::after {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  top: -35%;
+  bottom: -35%;
+  left: -55%;
+  width: 38%;
+  background: linear-gradient(
+    105deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, .08) 35%,
+    rgba(255, 255, 255, .3) 50%,
+    rgba(255, 255, 255, .08) 65%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: skewX(-16deg);
+  animation: reco-card-shimmer 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.reco-card-image { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+@keyframes reco-card-shimmer {
+  0% { left: -55%; }
+  30%, 100% { left: 125%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reco-card-visual::after { animation: none; }
+}
+
+.reco-card-icon { width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; background: var(--dark, #545045); color: #ffffff; }
+:deep(.reco-cta) {
+  width: 170px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  margin: 14px 0 20px;
+  padding: 0 18px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(213, 177, 99, .45) !important;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #625b4d 0%, #49443b 48%, #403b34 100%) !important;
+  box-shadow: 0 7px 15px rgba(42, 37, 30, .24), inset 0 1px 0 rgba(255, 255, 255, .12);
+  color: #f5dfab !important;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -.2px;
+}
 .reco-divider { height: 1px; margin-bottom: 18px; background: var(--line, #e7e4de); }
 .reco-nearby-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .reco-nearby-header h5 { margin: 0; color: var(--charcoal, #24211d); font-size: 14px; font-weight: 700; }
 
-.reco-merchant-list { display: flex; flex-direction: column; gap: 9px; }
-.reco-merchant-item { width: 100%; min-height: 52px; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto 12px; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid var(--line, #e7e4de); border-radius: 12px; background: #ffffff; text-align: left; }
-.reco-merchant-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: var(--inactive, #f0efec); color: var(--dark, #545045); }
-.reco-merchant-info { min-width: 0; display: flex; align-items: baseline; gap: 5px; }
-.reco-merchant-info strong { overflow: hidden; color: var(--charcoal, #24211d); font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.reco-merchant-info small { flex: 0 0 auto; color: var(--muted, #8f897f); font-size: 11px; }
-
-.reco-merchant-benefit { padding: 5px 8px; border-radius: 8px; background: #ebf7f3; color: var(--green, #00a878); font-size: 11px; font-weight: 700; white-space: nowrap; }
-.reco-merchant-chevron { color: var(--muted, #8f897f); font-size: 16px; }
+.reco-merchant-list { display:flex; flex-direction:column; gap:9px; }
+.reco-merchant-item { width:100%; min-height:52px; display:grid; grid-template-columns:34px minmax(0,1fr) auto 12px; align-items:center; gap:9px; padding:8px 11px; border:1px solid rgba(218,211,200,.65); border-radius:14px; background:#fff; box-shadow:0 2px 8px rgba(48,43,35,.07); text-align:left; transition:transform 120ms ease,box-shadow 120ms ease; }
+.reco-merchant-item:active { transform:scale(.985); box-shadow:0 2px 8px rgba(48,43,35,.08); }
+.reco-merchant-icon { width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:#f3f0ea; color:#625b50; }
+.reco-merchant-info { min-width:0; display:flex; align-items:baseline; gap:5px; }
+.reco-merchant-info strong { overflow:hidden; color:var(--charcoal,#24211d); font-size:13px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+.reco-merchant-info small { flex:0 0 auto; color:var(--muted,#8f897f); font-size:11px; }
+.reco-merchant-benefit { padding:0; border-radius:0; background:transparent; color:#2f826c; font-size:11px; font-weight:700; white-space:nowrap; }
+.reco-merchant-chevron { color:#b3a994; font-size:16px; }
 
 /* 간편결제 / 이번 달 혜택 (기존 박스를 작게 줄여서 유지) */
 .bottom-container {
@@ -457,46 +566,103 @@ onMounted(() => {
   margin: 22px 0;
 }
 .bottom-container > * { flex: 1; width: 0; }
-:deep(.bottom-box.bottom-box--compact) {
+.bottom-container :deep(.bottom-box.bottom-box--compact) {
+  position: relative;
+  min-height: 104px;
+  height: 104px;
   padding: 14px;
-  min-height: auto;
+  gap: 0;
+  overflow: hidden;
   border: none;
   box-shadow: 0 2px 12px rgba(46, 42, 36, 0.06);
 }
-.bottom-box h3 { margin: 0 0 6px; font-size: 13px; }
-.pay-link-text { color: var(--orange, #ffbc00); font-weight: 700; font-size: 12px; margin-top: 6px; display: block; }
-.quick-pay-row { display: flex; align-items: center; gap: 6px; }
-.quick-pay-merchant {
-  color: #ffffff; font-size: 11px; font-weight: 700; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+.bottom-container .bottom-box--compact h3 {
+  max-width: calc(100% - 30px);
+  margin: 3px 0 7px;
+  font-weight: 300;
+  font-size: 14px;
+  line-height: 1.25;
 }
-.gift-icon { margin: 2px 0; }
-.barcode-icon { margin: 2px 0; flex: 0 0 auto; }
-.benefit-amount { margin: 4px 0 0; font-size: 16px; font-weight: 700; }
+.bottom-container .bottom-box--compact .pay-link-text {
+  display: block;
+  margin-top: 3px;
+  color: var(--orange, #ffbc00);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.bottom-container .bottom-box--compact .quick-pay-merchant {
+  display: block;
+  max-width: calc(100% - 30px);
+  margin-top: 4px;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bottom-container .bottom-box--compact .gift-icon,
+.bottom-container .bottom-box--compact .barcode-icon {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+}
+.bottom-container .bottom-box--compact .benefit-amount {
+  margin: 0 0 3px ;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.bottom-container .bottom-box--compact .benefit-caption {
+  margin-top: 4px;
+  color: var(--muted, #8f897f);
+  font-size: 10px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.bottom-container :deep(.quick-pay-box) {
+  background: var(--dark, #545045) !important;
+  box-shadow: 0 8px 18px rgba(48, 43, 35, .32) !important;
+}
+
+.bottom-container :deep(.monthly-benefit-box) {
+  border: 1px solid rgba(220, 215, 205, .5) !important;
+  background: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(48, 43, 35, .12) !important;
+  cursor: pointer;
+}
 
 /* 놓치기 쉬운 혜택 - 오늘의 카드 추천이랑 같은 패턴 */
-.expiring-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 30px; }
-.expiring-card { padding: 20px; display: flex; flex-direction: column; gap: 0; }
+.expiring-section { display: flex; flex-direction: column; gap: 0; margin-bottom: 20px; }
+.expiring-card { padding: 10px 20px 5px; display: flex; flex-direction: column; gap: 0; }
 .expiring-row {
-  display: flex; align-items: flex-start; gap: 12px; padding: 14px 0;
+  display: flex; align-items: flex-start; gap: 12px; padding: 10px 0;
 }
-.expiring-row + .expiring-row { border-top: 1px solid var(--line, #e7e4de); }
+.expiring-row + .expiring-row { border-top: 1px solid var(--line, #e7e4de); padding-top: 15px;}
 .expiring-row--clickable { cursor: pointer; }
-.expiring-icon { flex: 0 0 auto; margin-top: 1px; }
+.expiring-icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: grid;
+  place-items: center;
+  margin-top: 0;
+}
+
+.expiring-icon svg {
+  width: 24px;
+  height: 24px;
+}
 .expiring-main { flex: 1; min-width: 0; }
-.expiring-main strong { display: block; font-size: 13px; color: var(--charcoal, #24211d); margin-bottom: 3px; }
+.expiring-main strong { display: block; font-size: 14px; font-weight: 500; color: var(--charcoal, #24211d); margin-bottom: 3px; }
 .expiring-main p { margin: 0; font-size: 12px; }
 .expiring-chevron { flex: 0 0 auto; color: var(--muted, #8f897f); }
-
-.benefit-amount {
-  margin: 0 0 2px;
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.benefit-caption {
-  font-size: 11px;
-}
 
 .transaction-section {
   margin-top: 0;
@@ -514,7 +680,7 @@ onMounted(() => {
   margin-bottom: 15px;
 }
 
-.transaction-item { width: 100%; padding: 10px 0; }
+.transaction-item { width: 100%; padding: 10px 0; cursor: pointer; }
 .transaction-item:first-child { padding-top: 0; }
 .transaction-item:last-child { padding-bottom: 0; }
 .transaction-item + .transaction-item { border-top: 1px solid var(--line, #e7e4de); }

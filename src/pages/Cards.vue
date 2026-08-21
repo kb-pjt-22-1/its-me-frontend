@@ -1,6 +1,5 @@
 <template>
   <div class="layout-container">
-    <h1 class="page-title">내 카드</h1>
 
     <div v-if="cardsStore.isLoading && myCards.length === 0" class="loading-text muted-text">
       카드 목록을 불러오는 중...
@@ -161,13 +160,6 @@ const getCardLast4 = (value) => String(value ?? '').replace(/\D/g, '').slice(-4)
 <style scoped>
 .layout-container {
   padding: 8px 18px 24px;
-}
-
-.page-title {
-  margin: 0 0 18px;
-  font-size: 22px;
-  letter-spacing: -.5px;
-  color: var(--charcoal, #24211d);
 }
 
 .loading-text,
