@@ -59,7 +59,7 @@
             </span>
             <div class="reco-name-block">
               <strong>{{ row.cardName }}</strong>
-              <p>{{ row.benefitDescription || row.reason }}</p>
+              <p v-if="row.benefitDescription">{{ row.benefitDescription }}</p>
             </div>
             <span class="reco-rate" :class="{ 'reco-rate--none': !row.benefitApplicable }">
               {{ row.performanceMet ? '혜택 적용 중' : row.benefitApplicable ? '실적 조건 필요' : '혜택 없음' }}

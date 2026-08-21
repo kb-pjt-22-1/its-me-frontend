@@ -84,8 +84,17 @@
             <p v-else class="sheet-meta muted-text">현재 위치 기준 · {{ nearbyMerchants.length }}곳</p>
 
             <div v-if="selectedMerchant" class="sheet-title-row">
-              <p class="sheet-title sheet-title--detail">{{ selectedMerchant.name }}</p>
-              <span class="pill pill--gold">{{ selectedMerchant.categoryName }}</span>
+              <div class="sheet-title-main">
+                <p class="sheet-title sheet-title--detail">{{ selectedMerchant.name }}</p>
+                <span class="pill pill--gold">{{ selectedMerchant.categoryName }}</span>
+              </div>
+              <button
+                class="pay-btn-header"
+                :disabled="!selectedCardId"
+                @click.stop="goToPay"
+              >
+                결제하기
+              </button>
             </div>
             <p v-else class="sheet-title">주변 제휴 매장</p>
 
@@ -150,7 +159,7 @@
                 </span>
                 <div class="reco-name-block">
                   <strong>{{ row.cardName }}</strong>
-                  <p>{{ row.benefitDescription || row.reason }}</p>
+                  <p v-if="row.benefitDescription">{{ row.benefitDescription }}</p>
                 </div>
                 <span class="reco-rate" :class="{ 'reco-rate--none': !row.benefitApplicable }">
                   {{ row.performanceMet ? '혜택 적용 중' : row.benefitApplicable ? '실적 조건 필요' : '혜택 없음' }}
@@ -158,8 +167,6 @@
               </div>
             </button>
           </section>
-
-          <button class="pay-btn" @click="goToPay">결제하기</button>
         </template>
 
         <!-- 목록: bounds 안 제휴 매장을 10개씩 페이징해서 보여줍니다 -->
@@ -1059,9 +1066,16 @@ onUnmounted(() => {
 .sheet-meta { margin: 0; font-size: 11px; }
 .sheet-title { margin: 2px 0 0; font-size: 15px; font-weight: 800; color: var(--charcoal, #24211d); }
 
-.sheet-title-row { display: flex; align-items: center; gap: 8px; margin: 2px 0 0; }
+.sheet-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 0; }
+.sheet-title-main { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
 .sheet-title-row .sheet-title { margin: 0; }
-.sheet-title--detail { font-size: 20px; }
+.sheet-title--detail {
+  font-size: 20px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .sheet-body {
   padding: 0 18px 18px;
@@ -1246,10 +1260,19 @@ onUnmounted(() => {
 }
 .link-muted:hover { color: var(--charcoal, #24211d); }
 
-.pay-btn {
-  width: 100%; height: 54px; border-radius: 14px; border: none;
-  background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900; font-size: 15px; cursor: pointer;
+.pay-btn-header {
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: none;
+  background: var(--orange, #ffbc00);
+  color: var(--charcoal, #24211d);
+  font-weight: 900;
+  font-size: 13px;
+  cursor: pointer;
 }
+.pay-btn-header:disabled { background: var(--inactive, #f0efec); color: var(--muted, #8f897f); cursor: not-allowed; }
 
 .cluster-filter-banner {
   display: flex;

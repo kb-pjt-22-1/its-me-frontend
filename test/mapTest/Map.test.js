@@ -318,10 +318,12 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
         {
           userCardId: 2,
           cardName: '실적 미달 카드',
-          benefitDescription: '',
+          // benefitApplicable=true면 실제 백엔드는 다음 구간 혜택으로 benefitDescription을
+          // 채워준다(비어있지 않음) - reason은 benefitApplicable=false일 때만 온다.
+          benefitDescription: '카페 10% 할인',
           benefitApplicable: true,
           performanceMet: false,
-          reason: '전월 실적 30만원 이상 필요',
+          reason: '',
           recommended: false,
         },
       ])
@@ -334,7 +336,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
 
       const recoCard = wrapper.find('.reco-card')
       expect(recoCard.text()).toContain('실적 조건 필요')
-      expect(recoCard.text()).toContain('전월 실적 30만원 이상 필요')
+      expect(recoCard.text()).toContain('카페 10% 할인')
     })
 
     it('추천 카드가 없으면(모두 혜택 없음) "적용되는 혜택이 없어요" 문구를 보여준다', async () => {
