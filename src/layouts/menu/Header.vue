@@ -7,6 +7,7 @@
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
           <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
         </svg>
+        <span v-if="notificationsStore.unreadCount > 0" class="unread-badge" aria-hidden="true"></span>
       </button>
       <button type="button" class="icon-btn" aria-label="북마크" @click="goToBookmarks">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -27,7 +28,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useToast } from '@/composables/useToast';
+import { useNotificationsStore } from '@/stores/notifications';
 
 const route = useRoute();
 const router = useRouter();
@@ -43,8 +44,8 @@ const PAGE_TITLES = {
 };
 const pageTitle = computed(() => PAGE_TITLES[route.name] ?? '');
 
-const toast = useToast();
-const goToNotification = () => toast.info('알림 페이지로 이동');
+const notificationsStore = useNotificationsStore();
+const goToNotification = () => router.push('/notifications');
 const goToBookmarks = () => {
   router.push('/bookmarks');
 };
@@ -87,6 +88,7 @@ const goToMenu = () => {
 }
 
 .icon-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   background: none;
@@ -94,5 +96,16 @@ const goToMenu = () => {
   cursor: pointer;
   padding: 7px;
   color: var(--charcoal, #24211d);
+}
+
+.unread-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger, #d94343);
+  border: 1.5px solid var(--page, #f7f7f5);
 }
 </style>

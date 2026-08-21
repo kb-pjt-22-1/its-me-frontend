@@ -54,6 +54,7 @@ import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
 import { useBookmarksStore } from '@/stores/bookmarks';
 import { usePaymentStore } from '@/stores/payment';
+import { useNotificationsStore } from '@/stores/notifications';
 import ToastHost from '@/components/common/ToastHost.vue';
 import ConfirmDialogHost from '@/components/common/ConfirmDialogHost.vue';
 
@@ -62,12 +63,14 @@ const cardsStore = useCardsStore();
 const merchantsStore = useMerchantsStore();
 const bookmarksStore = useBookmarksStore();
 const paymentStore = usePaymentStore();
+const notificationsStore = useNotificationsStore();
 
 function fetchAllUserData() {
   cardsStore.fetchCards();
   merchantsStore.fetchMerchants();
   bookmarksStore.fetchBookmarks();
   paymentStore.fetchHistory();
+  notificationsStore.fetchNotifications();
 }
 
 onMounted(() => {

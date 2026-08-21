@@ -83,6 +83,13 @@ const router = createRouter({
             component: () => import('@/pages/Storedetail.vue'),
             meta: {requiresAuth: true},
         },
+        // 헤더 '알림' 아이콘에서 진입하는 알림 목록 화면
+        {
+            path: '/notifications',
+            name: 'notifications',
+            component: () => import('@/pages/Notifications.vue'),
+            meta: {requiresAuth: true},
+        },
     ],
 })
 
