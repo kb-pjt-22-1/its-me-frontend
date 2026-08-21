@@ -172,6 +172,9 @@ describe('오늘의 추천', () => {
     await flushPromises()
 
     const cardVisual = wrapper.find('.reco-card-visual')
+    const cardImage = cardVisual.get('img')
+    expect(cardImage.attributes('src')).toBeTruthy()
+    expect(cardImage.attributes('alt')).toBe('청춘대로 톡톡카드 이미지')
     expect(cardVisual.attributes('role')).toBe('link')
     expect(cardVisual.attributes('tabindex')).toBe('0')
 
@@ -261,6 +264,16 @@ describe('추천 카드로 결제', () => {
 })
 
 describe('간편 결제 버튼', () => {
+  it('이번 달 혜택을 누르면 혜택 화면으로 이동한다', async () => {
+    const { wrapper } = mountPage([])
+    await flushPromises()
+
+    const benefitButton = wrapper.findAll('button').find((b) => b.text().includes('이번 달 혜택'))
+    await benefitButton.trigger('click')
+
+    expect(routerMock.push).toHaveBeenCalledWith('/benefits')
+  })
+
   it('최근 저장한 매장이 있으면 그 매장으로 결제 화면으로 이동한다', async () => {
     const { wrapper, bookmarksStore } = mountPage([])
     bookmarksStore.bookmarks = [{ bookmarkId: 1, merchantId: 7, createdAt: '2026-08-01T00:00:00' }]

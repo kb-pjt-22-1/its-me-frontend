@@ -162,7 +162,7 @@
               <div class="usage-main">
                 <div class="usage-top-row">
                   <strong>{{ item.category }}</strong>
-                  <button type="button" class="usage-link">이 혜택 사용하기 &gt;</button>
+                  <button type="button" class="usage-link" @click="goToBenefitMap(item.categoryCode)">이 혜택 사용하기 &gt;</button>
                 </div>
                 <p class="usage-sub muted-text">{{ item.cardName }} · {{ item.serviceName }}</p>
                 <p class="usage-desc muted-text">{{ item.used.toLocaleString() }}원 사용 / {{ limitLabel(item) }}</p>
@@ -353,11 +353,12 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useBenefitsStore } from '@/stores/benefits';
 import { getCardImage } from '@/utils/cardImages';
 
 const route = useRoute();
+const router = useRouter();
 const benefitsStore = useBenefitsStore();
 const {
   reportMonthLabel,
@@ -434,6 +435,10 @@ function limitLabel(item) {
 function remainingLabel(item) {
   if (item.limit == null) return '한도 없이 계속 받을 수 있어요';
   return `남은 혜택 ${(item.remaining ?? 0).toLocaleString()}원`;
+}
+
+function goToBenefitMap(categoryCode) {
+  router.push({ path: '/map', query: { categoryCode } });
 }
 
 // ---------------------------------------------------------
