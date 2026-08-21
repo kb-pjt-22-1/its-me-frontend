@@ -33,20 +33,17 @@ vi.mock('@/utils/imageDataUri', () => ({
   toDataUri: vi.fn((url) => Promise.resolve(url ?? null)),
 }))
 
-// findBenefitForCategory/formatBenefit(매칭 로직)은 실제 구현을 그대로 쓰고, fetchCardBenefits만
-// 목으로 대체 - benefitsInfo가 없는 카드를 ensureBenefitsLoaded가 실제로 채워주는지 검증하려면
-// 매칭 로직 자체는 진짜여야 한다.
-vi.mock('@/services/cardService', async () => {
-  const actual = await vi.importActual('@/services/cardService')
-  return { ...actual, fetchCardBenefits: vi.fn() }
-})
+// 매장 상세(바텀시트)의 "이 매장 추천 카드"는 Storedetail.vue와 같은 백엔드 엔드포인트를
+// 쓴다 - 프론트에서 카드 혜택을 자체 매칭하지 않으므로 이 서비스만 목으로 대체하면 된다.
+vi.mock('@/services/recommendationService', () => ({
+  fetchMerchantCardRecommendations: vi.fn(),
+}))
 
 import MapPage from '@/pages/Map.vue'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
-import { useCardsStore } from '@/stores/cards'
 import { fetchRecommendedNearbyMerchants, fetchMerchantCategories, fetchMerchantBrands } from '@/services/merchantsService'
-import { fetchCardBenefits } from '@/services/cardService'
+import { fetchMerchantCardRecommendations } from '@/services/recommendationService'
 
 // 카카오맵 SDK 대신 Marker/MarkerClusterer 생성과 이벤트 등록을 가로채서 검증하기 위한 최소 mock.
 // Map.vue의 loadKakaoMapScript()는 window.kakao.maps가 이미 있으면 그대로 resolve하므로
@@ -196,7 +193,7 @@ beforeEach(() => {
   fetchRecommendedNearbyMerchants.mockReset().mockResolvedValue([])
   fetchMerchantCategories.mockReset().mockResolvedValue(CATEGORIES)
   fetchMerchantBrands.mockReset().mockResolvedValue([])
-  fetchCardBenefits.mockReset()
+  fetchMerchantCardRecommendations.mockReset().mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -279,36 +276,25 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(cafeItem.find('.sheet-item-typical-amount').exists()).toBe(false)
   })
 
-  // fetchCards()는 카드 실적만 받아오고 benefitsInfo는 안 채운다 - 매장 상세를 열 때
-  // ensureBenefitsLoaded로 그때그때 채워야 findBenefitForCategory가 제대로 매칭한다.
-  // (마이핏카드(할인형)에 적용 가능한 혜택이 없다고 잘못 뜨던 버그의 재현/회귀 테스트)
-  describe('매장 상세 - 보유 카드 혜택 매칭', () => {
-    it('benefitsInfo가 없는 카드도 매장을 선택하면 자동으로 불러와서 혜택을 매칭한다', async () => {
+  // 매장 상세(바텀시트)의 "이 매장 추천 카드"는 지도 핀의 benefitAvailable과 같은 백엔드
+  // 엔진(RecommendationServiceImpl)을 쓰는 /v1/recommendations/merchants/{id}/cards를 그대로
+  // 부른다 - 예전에는 프론트에서 카드의 "현재 실적 구간"에만 맞는 혜택을 자체적으로 찾아서,
+  // 핀은 "혜택 매장"인데 상세를 열면 "혜택 없음"이 뜨는 불일치가 있었다(회귀 테스트).
+  describe('매장 상세 - 이 매장 추천 카드', () => {
+    it('매장을 선택하면 그 매장 id로 카드 비교를 불러와서 렌더링한다', async () => {
       window.kakao = createKakaoMock().kakao
       fetchRecommendedNearbyMerchants.mockResolvedValue([{ ...CAFE_MERCHANT }])
-
-      const cardsStore = useCardsStore()
-      cardsStore.cards = [
-        // 실제 마이핏카드(할인형) 응답 재현: 전월 실적 30만원(충족), 이번 달은 아직 24만원(진행 중,
-        // 1구간 문턱 미달) - 혜택은 "전월" 실적 기준으로 적용돼야 하므로 여전히 1구간이 맞아야 한다.
+      fetchMerchantCardRecommendations.mockResolvedValue([
         {
           userCardId: 1,
           cardName: '마이핏카드(할인형)',
-          status: 'ACTIVE',
-          currentAmount: 240000,
-          previousMonthAmount: 300000,
-        }, // benefitsInfo 없음 - fetchCards()만 탄 상태 재현
-      ]
-      fetchCardBenefits.mockResolvedValue({
-        performanceTiers: [
-          { tierName: '0구간', minimumSpending: 0, benefits: [] },
-          {
-            tierName: '1구간',
-            minimumSpending: 300000,
-            benefits: [{ categoryCodes: ['5813'], discountRate: 5, description: '외식 및 커피 이용금액 5% 청구할인' }],
-          },
-        ],
-      })
+          benefitDescription: '외식 및 커피 이용금액 5% 청구할인',
+          benefitApplicable: true,
+          performanceMet: true,
+          reason: '',
+          recommended: true,
+        },
+      ])
 
       const wrapper = mountMapPage()
       await flushPromises()
@@ -316,27 +302,29 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
       await wrapper.find('.sheet-item').trigger('click')
       await flushPromises()
 
-      expect(fetchCardBenefits).toHaveBeenCalledWith(1)
+      expect(fetchMerchantCardRecommendations).toHaveBeenCalledWith(CAFE_MERCHANT.id)
       const recoCard = wrapper.find('.reco-card')
       expect(recoCard.text()).toContain('마이핏카드(할인형)')
-      expect(recoCard.text()).toContain('5% 할인')
+      expect(recoCard.text()).toContain('혜택 적용 중')
       expect(recoCard.find('.reco-rate--none').exists()).toBe(false)
     })
 
-    it('benefitsInfo가 이미 있는 카드는 다시 불러오지 않는다', async () => {
+    // total(다음 달 기대값 포함)이 아니라 now(지금 당장 확정 혜택) 기준으로 매칭돼야 하므로,
+    // "실적 조건은 채웠지만 지금 당장은 혜택이 없는" 카드는 혜택 없음으로 보여야 한다.
+    it('benefitApplicable이어도 performanceMet=false면 "실적 조건 필요"를 보여준다', async () => {
       window.kakao = createKakaoMock().kakao
       fetchRecommendedNearbyMerchants.mockResolvedValue([{ ...CAFE_MERCHANT }])
-
-      const cardsStore = useCardsStore()
-      cardsStore.cards = [
+      fetchMerchantCardRecommendations.mockResolvedValue([
         {
-          userCardId: 1,
-          cardName: '이미 로드된 카드',
-          status: 'ACTIVE',
-          currentAmount: 0,
-          benefitsInfo: { performanceTiers: [{ tierName: '0구간', minimumSpending: 0, benefits: [] }] },
+          userCardId: 2,
+          cardName: '실적 미달 카드',
+          benefitDescription: '',
+          benefitApplicable: true,
+          performanceMet: false,
+          reason: '전월 실적 30만원 이상 필요',
+          recommended: false,
         },
-      ]
+      ])
 
       const wrapper = mountMapPage()
       await flushPromises()
@@ -344,7 +332,34 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
       await wrapper.find('.sheet-item').trigger('click')
       await flushPromises()
 
-      expect(fetchCardBenefits).not.toHaveBeenCalled()
+      const recoCard = wrapper.find('.reco-card')
+      expect(recoCard.text()).toContain('실적 조건 필요')
+      expect(recoCard.text()).toContain('전월 실적 30만원 이상 필요')
+    })
+
+    it('추천 카드가 없으면(모두 혜택 없음) "적용되는 혜택이 없어요" 문구를 보여준다', async () => {
+      window.kakao = createKakaoMock().kakao
+      fetchRecommendedNearbyMerchants.mockResolvedValue([{ ...CAFE_MERCHANT }])
+      fetchMerchantCardRecommendations.mockResolvedValue([
+        {
+          userCardId: 3,
+          cardName: '혜택 없는 카드',
+          benefitDescription: '',
+          benefitApplicable: false,
+          performanceMet: false,
+          reason: '이 카테고리에 적용되는 혜택이 없어요',
+          recommended: false,
+        },
+      ])
+
+      const wrapper = mountMapPage()
+      await flushPromises()
+
+      await wrapper.find('.sheet-item').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('.benefit-strip--muted').text()).toContain('적용되는 혜택이 없어요')
+      expect(wrapper.find('.reco-rate--none').exists()).toBe(true)
     })
   })
 

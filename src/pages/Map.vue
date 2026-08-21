@@ -114,9 +114,9 @@
         <!-- 매장 상세: 새 페이지로 이동하지 않고 이 바텀시트 자리에서 그대로 보여줍니다 -->
         <template v-if="selectedMerchant">
           <div class="store-info">
-            <div v-if="bestCardForSelected" class="benefit-strip">
-              제휴 혜택: 이 매장에서 <strong>{{ bestCardForSelected.cardName }}</strong>로 결제하면
-              <strong>{{ formatBenefit(bestMatchForSelected) }}</strong>
+            <div v-if="bestCard" class="benefit-strip">
+              제휴 혜택: 이 매장에서 <strong>{{ bestCard.cardName }}</strong>로 결제하면
+              <strong>{{ bestCard.benefitDescription }}</strong>
             </div>
             <div v-else class="benefit-strip benefit-strip--muted">
               보유하신 카드 중 이 매장에 적용되는 혜택이 없어요.
@@ -126,27 +126,34 @@
           <section class="recommend-section">
             <h3 class="section-title">이 매장 추천 카드</h3>
 
+            <p v-if="cardComparisonsLoading" class="muted-text">불러오는 중...</p>
+            <p v-else-if="cardComparisonsError" class="muted-text">
+              카드 비교 정보를 불러오지 못했어요.
+              <button class="link-muted" @click="loadCardComparisons">다시 시도</button>
+            </p>
+
             <button
-              v-for="row in recommendedCardsForSelected"
-              :key="row.card.userCardId"
+              v-for="row in sortedCards"
+              :key="row.userCardId"
               class="reco-card"
-              :class="{ 'reco-card--best': row.isBest, 'reco-card--selected': selectedCardId === row.card.userCardId }"
-              @click="selectedCardId = row.card.userCardId"
+              :class="{ 'reco-card--best': row.recommended, 'reco-card--selected': selectedCardId === row.userCardId }"
+              @click="selectedCardId = row.userCardId"
             >
-              <span v-if="row.isBest" class="reco-badge">추천</span>
+              <span v-if="row.recommended" class="reco-badge">추천</span>
               <div class="reco-top">
-                <span class="reco-icon" :style="{ background: row.card.color || '#24211d' }">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+                <span class="reco-icon">
+                  <img v-if="getCardImage(row)" :src="getCardImage(row)" :alt="`${row.cardName} 이미지`" class="reco-icon-img" />
+                  <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
                     <rect x="2" y="5" width="20" height="14" rx="3"></rect>
                     <line x1="2" y1="10" x2="22" y2="10"></line>
                   </svg>
                 </span>
                 <div class="reco-name-block">
-                  <strong>{{ row.card.cardName }}</strong>
-                  <p>{{ row.description }}</p>
+                  <strong>{{ row.cardName }}</strong>
+                  <p>{{ row.benefitDescription || row.reason }}</p>
                 </div>
-                <span class="reco-rate" :class="{ 'reco-rate--none': !row.match }">
-                  {{ row.match ? formatBenefit(row.match) : '혜택 없음' }}
+                <span class="reco-rate" :class="{ 'reco-rate--none': !row.benefitApplicable }">
+                  {{ row.performanceMet ? '혜택 적용 중' : row.benefitApplicable ? '실적 조건 필요' : '혜택 없음' }}
                 </span>
               </div>
             </button>
@@ -211,18 +218,17 @@ import { onMounted, onUnmounted, ref, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
-import { useCardsStore } from '@/stores/cards'
-import { findBenefitForCategory, formatBenefit } from '@/services/cardService'
 import { getBrandImage } from '@/utils/brandImages'
+import { getCardImage } from '@/utils/cardImages'
 import { toDataUri } from '@/utils/imageDataUri'
 import { fetchRecommendedNearbyMerchants, fetchMerchantList } from '@/services/merchantsService'
+import { fetchMerchantCardRecommendations } from '@/services/recommendationService'
 import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
 const router = useRouter()
 const merchantsStore = useMerchantsStore()
 const bookmarksStore = useBookmarksStore()
-const cardsStore = useCardsStore()
 const toast = useToast()
 
 // 바텀시트 상태
@@ -361,11 +367,7 @@ watch(selectedMerchantId, () => {
 function selectMerchant(merchantId) {
   selectedMerchantId.value = merchantId
   sheetExpanded.value = true
-  // 매장 상세를 열 때만 카드별 혜택(benefitsInfo)을 채운다 - recommendedCardsForSelected가
-  // 이걸 써서 매칭하는데, fetchCards()는 실적만 받아오고 benefitsInfo는 안 채워준다.
-  cardsStore.ensureBenefitsLoaded(
-    cardsStore.cards.filter((c) => c.status === 'ACTIVE').map((c) => c.userCardId)
-  )
+  loadCardComparisons()
 }
 
 function closeMerchantDetail() {
@@ -390,41 +392,50 @@ watch(searchQuery, () => {
   selectedMerchantId.value = null
 })
 
-// 선택된 매장에 적용 가능한 보유 카드 혜택을 비교합니다 (Storedetail.vue와 동일한 로직).
-const recommendedCardsForSelected = computed(() => {
-  if (!selectedMerchant.value) return []
+// 선택된 매장에 적용 가능한 보유 카드 혜택을 비교합니다 - Storedetail.vue와 같은 백엔드
+// 엔드포인트(/v1/recommendations/merchants/{id}/cards)를 그대로 씁니다. 예전에는 프론트에서
+// 카드의 "현재 실적 구간"에만 맞는 혜택을 자체적으로 찾았는데, 그 로직은 지도 핀의
+// benefitAvailable 판단(다음 달 실적을 채웠을 때의 기대값까지 포함)과 서로 다른 기준이라
+// "혜택 매장"으로 표시된 매장을 열어봐도 "혜택 없음"이 뜨는 경우가 흔했다. 같은 백엔드
+// 로직(RecommendationServiceImpl)을 쓰게 되므로 더는 어긋나지 않는다.
+const cardComparisons = ref([])
+const cardComparisonsLoading = ref(false)
+const cardComparisonsError = ref(false)
 
-  const rows = cardsStore.cards
-    .filter((card) => card.status === 'ACTIVE')
-    .map((card) => {
-      const match = findBenefitForCategory(card.benefitsInfo, selectedMerchant.value.categoryCode, card.previousMonthAmount ?? 0)
-      return {
-        card,
-        match,
-        description: match
-          ? (match.description ?? `${selectedMerchant.value.categoryName ?? ''} 업종 혜택 적용 중`)
-          : '이 매장 카테고리에 적용 가능한 혜택이 없어요',
-      }
-    })
-    .sort((a, b) => {
-      const rateA = a.match?.discountRate ?? a.match?.discountAmount ?? -1
-      const rateB = b.match?.discountRate ?? b.match?.discountAmount ?? -1
-      return rateB - rateA
-    })
+async function loadCardComparisons() {
+  if (!selectedMerchant.value) return
+  cardComparisonsLoading.value = true
+  cardComparisonsError.value = false
+  try {
+    cardComparisons.value = await fetchMerchantCardRecommendations(selectedMerchant.value.id)
+  } catch (err) {
+    console.error('[Map] 카드 비교 조회 실패', err)
+    cardComparisonsError.value = true
+    cardComparisons.value = []
+  } finally {
+    cardComparisonsLoading.value = false
+  }
+}
 
-  return rows.map((row, index) => ({ ...row, isBest: index === 0 && !!row.match }))
+// 추천 카드를 맨 위로, 그다음 실적만 채우면 되는 카드, 마지막으로 혜택 자체가 없는 카드 순.
+const sortedCards = computed(() => {
+  return [...cardComparisons.value].sort((a, b) => {
+    if (a.recommended !== b.recommended) return a.recommended ? -1 : 1
+    if (a.performanceMet !== b.performanceMet) return a.performanceMet ? -1 : 1
+    if (a.benefitApplicable !== b.benefitApplicable) return a.benefitApplicable ? -1 : 1
+    return 0
+  })
 })
 
-const bestCardForSelected = computed(() => recommendedCardsForSelected.value.find((r) => r.isBest)?.card ?? null)
-const bestMatchForSelected = computed(() => recommendedCardsForSelected.value.find((r) => r.isBest)?.match ?? null)
+const bestCard = computed(() => cardComparisons.value.find((c) => c.recommended) ?? null)
 
 const selectedCardId = ref(null)
-watch(recommendedCardsForSelected, (rows) => {
+watch(sortedCards, (rows) => {
   if (!rows.length) {
     selectedCardId.value = null
     return
   }
-  selectedCardId.value = (rows.find((r) => r.isBest) ?? rows[0]).card.userCardId
+  selectedCardId.value = (rows.find((r) => r.recommended) ?? rows[0]).userCardId
 })
 
 function goToPay() {
@@ -884,8 +895,6 @@ function onChipClick(cat) {
 onMounted(async () => {
   const categoriesPromise = merchantsStore.fetchCategories()
   merchantsStore.fetchBrands()
-  // 매장 상세(추천 카드)에 쓸 보유 카드 - Storedetail.vue와 동일하게, 이미 있으면 다시 안 받습니다.
-  if (cardsStore.cards.length === 0) cardsStore.fetchCards()
 
   // 혜택 페이지 "이 혜택 사용하기"에서 ?categoryCode=로 넘어온 경우, 그 카테고리 칩을
   // 미리 선택해둔다. merchants computed가 이미 selectedCategory로 클라이언트 필터링을
@@ -1189,7 +1198,8 @@ onUnmounted(() => {
   cursor: pointer;
   text-align: left;
 }
-.reco-card--best { border: 2px solid var(--orange, #ffbc00); padding: 13px; }
+/* --best(추천 배지)는 위 reco-badge 태그만으로 표시하고 테두리는 안 준다 - 실제 결제에 쓸
+   카드를 고르는 --selected 테두리와 같은 색이면 "추천"과 "지금 선택됨"이 헷갈린다. */
 .reco-card--selected { border: 2px solid var(--orange, #ffbc00); padding: 13px; background: #fffaf0; }
 
 .reco-badge {
@@ -1198,7 +1208,11 @@ onUnmounted(() => {
 }
 
 .reco-top { display: flex; align-items: center; gap: 12px; width: 100%; }
-.reco-icon { width: 40px; height: 26px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 auto; }
+.reco-icon {
+  width: 40px; height: 26px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 auto;
+  background: #24211d; overflow: hidden;
+}
+.reco-icon-img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .reco-name-block { flex: 1; min-width: 0; }
 .reco-name-block strong { display: block; font-size: 13.5px; color: var(--charcoal, #24211d); margin-bottom: 3px; }
 .reco-name-block p { margin: 0; font-size: 11px; color: var(--muted, #8f897f); }
@@ -1211,6 +1225,12 @@ onUnmounted(() => {
   text-align: right;
 }
 .reco-rate--none { color: var(--muted, #8f897f); font-weight: 600; }
+
+.link-muted {
+  background: none; border: none; padding: 0; color: var(--muted, #8f897f);
+  font-weight: 700; font-size: inherit; cursor: pointer; text-decoration: underline;
+}
+.link-muted:hover { color: var(--charcoal, #24211d); }
 
 .pay-btn {
   width: 100%; height: 54px; border-radius: 14px; border: none;

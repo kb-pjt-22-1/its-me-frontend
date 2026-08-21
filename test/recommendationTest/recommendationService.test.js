@@ -71,6 +71,7 @@ describe('fetchMerchantCardRecommendations', () => {
           {
             userCardId: 1,
             cardName: '청춘대로 톡톡카드',
+            cardImageUrl: 'https://cdn.benepay.com/cards/card-1.png',
             benefitDescription: '카페 10% 할인',
             benefitApplicable: true,
             performanceMet: true,
@@ -95,6 +96,7 @@ describe('fetchMerchantCardRecommendations', () => {
       {
         userCardId: 1,
         cardName: '청춘대로 톡톡카드',
+        cardImageUrl: 'https://cdn.benepay.com/cards/card-1.png',
         benefitDescription: '카페 10% 할인',
         benefitApplicable: true,
         performanceMet: true,
@@ -104,6 +106,7 @@ describe('fetchMerchantCardRecommendations', () => {
       {
         userCardId: 2,
         cardName: '굿데이카드',
+        cardImageUrl: null,
         benefitDescription: '',
         benefitApplicable: false,
         performanceMet: false,
