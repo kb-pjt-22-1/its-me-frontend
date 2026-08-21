@@ -32,12 +32,17 @@
 
           <div class="input-box">
             <label for="signup-phone" class="sr-only">휴대폰 번호</label>
+            <!-- maxlength=13("010-1234-5678")이 필요한 이유: onPhoneInput이 11자리로
+                 자르고 나온 값이 직전 값과 같으면(11자리를 이미 채운 채로 더 입력한
+                 경우) phoneNumber ref가 안 바뀌어서 :value 바인딩이 DOM을 되돌리지
+                 않는다 - 브라우저 자체가 더 못 치게 막아야 한다. -->
             <input
               id="signup-phone"
               :value="phoneNumber"
               type="text"
               inputmode="numeric"
               placeholder="휴대폰 번호"
+              maxlength="13"
               :disabled="codeStep !== 'form'"
               @input="onPhoneInput"
             />
