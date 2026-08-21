@@ -22,6 +22,7 @@ function setupStores() {
   merchantsStore.fetchMerchants = vi.fn()
   bookmarksStore.fetchBookmarks = vi.fn()
   paymentStore.fetchHistory = vi.fn()
+  authStore.registerFcmToken = vi.fn()
 
   return { authStore, cardsStore, merchantsStore, bookmarksStore, paymentStore }
 }
@@ -61,9 +62,10 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
     expect(stores.merchantsStore.fetchMerchants).not.toHaveBeenCalled()
     expect(stores.bookmarksStore.fetchBookmarks).not.toHaveBeenCalled()
     expect(stores.paymentStore.fetchHistory).not.toHaveBeenCalled()
+    expect(stores.authStore.registerFcmToken).not.toHaveBeenCalled()
   })
 
-  it('이미 로그인 상태로 마운트되면 모든 사용자 데이터를 불러온다', () => {
+  it('이미 로그인 상태로 마운트되면 모든 사용자 데이터를 불러오고 FCM 토큰도 등록한다', () => {
     const stores = setupStores()
     stores.authStore.isBootstrapped = true
     stores.authStore.accessToken = 'token'
@@ -75,6 +77,9 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
     expect(stores.merchantsStore.fetchMerchants).toHaveBeenCalledTimes(1)
     expect(stores.bookmarksStore.fetchBookmarks).toHaveBeenCalledTimes(1)
     expect(stores.paymentStore.fetchHistory).toHaveBeenCalledTimes(1)
+    // 세션 복원(자동 로그인)은 store의 login/devLogin/signUp을 안 거쳐서 자체적으로
+    // registerFcmToken을 안 부르므로, 이미 인증된 채로 마운트될 때 여기서 한 번 불러야 한다.
+    expect(stores.authStore.registerFcmToken).toHaveBeenCalledTimes(1)
   })
 
   it('마운트 후 로그인에 성공하면(false->true) 그 시점에 사용자 데이터를 불러온다', async () => {

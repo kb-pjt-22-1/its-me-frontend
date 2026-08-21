@@ -72,7 +72,13 @@ function fetchAllUserData() {
 
 onMounted(() => {
   // main.js/라우터 가드에서 세션 복원이 끝난 뒤 이 컴포넌트가 뜨므로, 이미 로그인 상태일 수 있습니다.
-  if (authStore.isAuthenticated) fetchAllUserData();
+  if (authStore.isAuthenticated) {
+    fetchAllUserData();
+    // 세션 복원(자동 로그인)은 stores/auth.js의 login/devLogin/signUp을 안 거쳐서
+    // registerFcmToken이 자동으로 안 불린다 - 웹 SDK엔 토큰 갱신 콜백이 없어서, 앱을 다시
+    // 열 때마다 여기서 한 번 더 확인해야 그 사이 브라우저가 조용히 갱신한 토큰을 놓치지 않는다.
+    authStore.registerFcmToken();
+  }
 });
 
 // 앱이 이미 떠있는 상태에서 방금 로그인에 성공한 경우 - isAuthenticated가

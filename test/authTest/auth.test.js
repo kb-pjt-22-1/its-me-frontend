@@ -19,12 +19,22 @@ vi.mock('@/utils/tokenStorage', () => ({
   clearAuthStorage: vi.fn(),
 }))
 
+vi.mock('@/services/pushNotificationService', () => ({
+  getFcmToken: vi.fn(),
+}))
+
+vi.mock('@/services/memberService', () => ({
+  updateFcmToken: vi.fn(),
+}))
+
 // stores/auth.js는 bootstrapSession()의 중복 호출을 막으려고 모듈 스코프에 Promise를
 // 들고 있다(let bootstrapPromise). 테스트마다 그 상태가 이전 테스트에 오염되지 않도록
 // 매번 모듈 레지스트리를 초기화하고 스토어/목을 새로 import한다.
 let useAuthStore
 let authService
 let tokenStorage
+let pushNotificationService
+let memberService
 
 beforeEach(async () => {
   vi.resetModules()
@@ -32,6 +42,8 @@ beforeEach(async () => {
   setActivePinia(createPinia())
   authService = await import('@/services/authService')
   tokenStorage = await import('@/utils/tokenStorage')
+  pushNotificationService = await import('@/services/pushNotificationService')
+  memberService = await import('@/services/memberService')
   ;({ useAuthStore } = await import('@/stores/auth'))
 })
 
@@ -163,6 +175,18 @@ describe('login', () => {
     expect(tokenStorage.setTokens).toHaveBeenCalledWith({ accessToken: 'access-1', refreshToken: 'refresh-1' })
   })
 
+  it('성공하면 FCM 토큰 등록도 시도한다', async () => {
+    authService.loginRequest.mockResolvedValue({
+      accessToken: 'access-1', refreshToken: 'refresh-1',
+      user: { userId: 1, loginId: 'tester', name: '홍길동' },
+    })
+
+    const store = useAuthStore()
+    await store.login('tester', 'Test1234!')
+
+    expect(pushNotificationService.getFcmToken).toHaveBeenCalled()
+  })
+
   it('실패하면 서버 메시지를 errorMessage에 담고 false를 반환한다', async () => {
     authService.loginRequest.mockRejectedValue({ response: { data: { message: 'invalid login id or password' } } })
 
@@ -268,6 +292,34 @@ describe('signUp', () => {
     await store.signUp({ loginId: 'dup', password: 'Test1234!', pin: '481027' })
 
     expect(store.errorMessage).toBe('회원가입에 실패했습니다.')
+  })
+})
+
+describe('registerFcmToken', () => {
+  it('토큰을 받으면 백엔드에 등록한다', async () => {
+    pushNotificationService.getFcmToken.mockResolvedValue('fcm-token-1')
+
+    const store = useAuthStore()
+    await store.registerFcmToken()
+
+    expect(memberService.updateFcmToken).toHaveBeenCalledWith('fcm-token-1')
+  })
+
+  it('토큰이 null이면 백엔드를 호출하지 않는다', async () => {
+    pushNotificationService.getFcmToken.mockResolvedValue(null)
+
+    const store = useAuthStore()
+    await store.registerFcmToken()
+
+    expect(memberService.updateFcmToken).not.toHaveBeenCalled()
+  })
+
+  it('등록에 실패해도 예외를 던지지 않는다', async () => {
+    pushNotificationService.getFcmToken.mockResolvedValue('fcm-token-1')
+    memberService.updateFcmToken.mockRejectedValue(new Error('network error'))
+
+    const store = useAuthStore()
+    await expect(store.registerFcmToken()).resolves.toBeUndefined()
   })
 })
 
