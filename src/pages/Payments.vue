@@ -1,145 +1,96 @@
 <template>
-  <!-- 간편 비밀번호 입력 화면 - 결제 페이지 전체를 대체하는 별도 화면 -->
-  <div v-if="isEnteringPin" class="pin-page">
-    <header class="pin-header">
-      <button class="back-btn" @click="isEnteringPin = false" aria-label="뒤로가기">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-      </button>
-      <h2>간편 비밀번호 인증</h2>
-    </header>
+  <div class="layout-container">
+    <section class="payment-box surface-card" :class="{ 'payment-box--ready': !isAuthenticated }" @click="handlePaymentBoxClick">
+      <div class="payment-content">
+        <div v-if="!isAuthenticated" class="auth-prompt">
+          <div class="lock-icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <rect x="5" y="10" width="14" height="11" rx="2"></rect>
+              <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+              <circle cx="12" cy="15" r="1"></circle>
+            </svg>
+          </div>
+          <h3>간편 결제</h3>
+          <p>간편 비밀번호 인증 후 바코드가 표시됩니다</p>
+        </div>
 
-    <div class="pin-body">
-      <h1 class="pin-title">간편 비밀번호를 입력해주세요</h1>
-      <p class="pin-subtitle">안전한 결제를 위해 6자리 비밀번호를 입력해주세요</p>
+        <div v-else-if="isIssuingToken" class="payment-top-state">
+          <p class="muted-text">바코드 발급 중...</p>
+        </div>
 
-      <div class="pin-card-row">
-        <span>결제 카드</span>
-        <strong>{{ selectedMethod?.cardName }}</strong>
+        <div v-else class="barcode-prompt">
+          <canvas ref="barcodeCanvasRef" class="barcode-canvas"></canvas>
+
+          <div class="token-expiry" :class="{ 'token-expiry--expired': isTokenExpired }">
+            <span v-if="!isTokenExpired">바코드 유효시간 {{ remainingLabel }}</span>
+            <span v-else>바코드가 만료됐어요</span>
+            <button type="button" class="reissue-btn" :disabled="isReissuing" @click.stop="reissueToken">{{ isReissuing ? '재발급 중...' : '다시 발급' }}</button>
+          </div>
+        </div>
+
+        <div class="card-stage">
+          <div v-if="cardsStore.isLoading && paymentRows.length === 0" class="loading-text muted-text">불러오는 중...</div>
+          <p v-else-if="paymentRows.length === 0" class="loading-text muted-text">사용 가능한 카드가 없어요.</p>
+
+          <template v-else>
+            <div ref="cardSliderRef" class="card-slider" :class="{ 'is-locked': isAuthenticated || isIssuingToken }" @scroll.passive="handleCardSlide">
+              <button v-for="(row, index) in paymentRows" :key="row.card.userCardId" type="button" class="card-slide" :class="{ selected: selectedMethodId === row.card.userCardId }" :disabled="isAuthenticated || isIssuingToken" :aria-label="`${row.card.cardName} 선택`" @click.stop="selectSlide(row, index)">
+                <img v-if="getCardImage(row.card)" :src="getCardImage(row.card)" :alt="`${row.card.cardName} 이미지`" class="slide-card-image">
+                <span v-else class="slide-card-image slide-card-fallback" :style="{ background: row.card.color || '#24211d' }"></span>
+              </button>
+            </div>
+
+            <strong class="selected-card-name">{{ selectedMethod?.cardName }}</strong>
+          </template>
+        </div>
+
+        <button v-if="!isAuthenticated" type="button" class="main-action-btn payment-start-btn" :disabled="!selectedMethodId" @click.stop="openPinSheet">간편 비밀번호 인증 후 결제하기</button>
+
+        <button v-else-if="!isIssuingToken" type="button" class="main-action-btn payment-complete-btn" :disabled="isCompleting" @click.stop="completePayment">
+          {{ isCompleting ? '처리 중...' : '결제 완료하기' }}
+        </button>
       </div>
-
-      <div class="pin-dots" :class="{ shake: pinError }">
-        <span v-for="i in 6" :key="i" class="pin-dot" :class="{ filled: i <= pin.length }"></span>
-      </div>
-
-      <p v-if="pinError" class="pin-error">비밀번호가 올바르지 않습니다. 다시 입력해주세요.</p>
-    </div>
-
-    <div class="keypad">
-      <button
-        v-for="key in keypadKeys"
-        :key="key.label"
-        class="keypad-key"
-        :class="{ 'keypad-key--action': key.type !== 'digit' }"
-        :disabled="key.type === 'blank'"
-        @click="handleKeypadPress(key)"
-      >
-        <svg v-if="key.type === 'backspace'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
-          <line x1="18" y1="9" x2="12" y2="15"></line>
-          <line x1="12" y1="9" x2="18" y2="15"></line>
-        </svg>
-        <template v-else>{{ key.label }}</template>
-      </button>
-    </div>
+    </section>
   </div>
 
-  <!-- 결제 화면 -->
-  <div v-else class="layout-container">
-    <div v-if="!isAuthenticated" class="display-box surface-card">
-      <div class="auth-prompt">
-        <div class="lock-icon" aria-hidden="true">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <rect x="5" y="10" width="14" height="11" rx="2"></rect>
-            <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
-            <circle cx="12" cy="15" r="1"></circle>
-          </svg>
+  <Transition name="pin-bottom-sheet">
+    <div v-if="isEnteringPin" class="pin-sheet-overlay" @click.self="closePinSheet">
+      <section class="pin-sheet" role="dialog" aria-modal="true" aria-labelledby="pin-sheet-title">
+        <div class="pin-sheet-handle"></div>
+
+        <header class="pin-sheet-header">
+          <h2 id="pin-sheet-title">결제 비밀번호 입력</h2>
+          <button type="button" class="pin-sheet-close" aria-label="닫기" @click="closePinSheet">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </header>
+
+        <div class="pin-sheet-body">
+          <p class="pin-guide">간편 비밀번호 6자리 입력</p>
+
+          <div class="pin-dots" :class="{ shake: pinError }">
+            <span v-for="i in 6" :key="i" class="pin-dot" :class="{ filled: i <= pin.length }"></span>
+          </div>
+
+          <p v-if="pinError" class="pin-error">비밀번호가 올바르지 않습니다. 다시 입력해주세요.</p>
         </div>
-        <h3>간편 결제</h3>
-        <p>간편 비밀번호 인증 후 바코드가 표시됩니다</p>
-      </div>
-    </div>
 
-    <div v-else-if="isIssuingToken" class="display-box surface-card">
-      <div class="auth-prompt">
-        <p class="muted-text">바코드 발급 중...</p>
-      </div>
-    </div>
-
-    <div v-else class="display-box surface-card">
-      <div class="barcode-display">
-        <p class="card-name">{{ selectedMethod?.cardName }}</p>
-        <canvas ref="barcodeCanvasRef" class="barcode-canvas"></canvas>
-
-        <div class="token-expiry" :class="{ 'token-expiry--expired': isTokenExpired }">
-          <span v-if="!isTokenExpired">바코드 유효시간 {{ remainingLabel }}</span>
-          <span v-else>바코드가 만료됐어요</span>
-          <button
-            type="button"
-            class="reissue-btn"
-            :disabled="isReissuing"
-            @click="reissueToken"
-          >
-            {{ isReissuing ? '재발급 중...' : '다시 발급' }}
+        <div class="keypad">
+          <button v-for="(key, index) in keypadKeys" :key="`${key.type}-${index}`" type="button" class="keypad-key" :class="{ 'keypad-key--action': key.type !== 'digit' }" :disabled="key.type === 'blank'" @click="handleKeypadPress(key)">
+            <svg v-if="key.type === 'backspace'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
+              <line x1="18" y1="9" x2="12" y2="15"></line>
+              <line x1="12" y1="9" x2="18" y2="15"></line>
+            </svg>
+            <template v-else>{{ key.label }}</template>
           </button>
         </div>
-      </div>
-      <button class="main-action-btn" :disabled="isCompleting" @click="completePayment">
-        {{ isCompleting ? '처리 중...' : '결제 완료하기' }}
-      </button>
+      </section>
     </div>
-
-    <div class="payment-methods">
-      <h3 class="section-title">결제 수단</h3>
-
-      <div v-if="cardsStore.isLoading && paymentRows.length === 0" class="loading-text muted-text">
-        불러오는 중...
-      </div>
-
-      <button
-        v-for="row in paymentRows"
-        :key="row.card.userCardId"
-        class="method-item"
-        :class="{ selected: selectedMethodId === row.card.userCardId }"
-        @click="selectedMethodId = row.card.userCardId"
-      >
-        <span class="method-icon" :style="{ background: row.card.color || '#24211d' }"></span>
-
-        <span class="method-info">
-          <span class="method-name-row">
-            <strong>{{ row.card.cardName }}</strong>
-            <span v-if="row.card.isPrimary" class="method-badge">대표</span>
-          </span>
-          <span class="method-number">•••• {{ row.card.panLast4 }}</span>
-        </span>
-
-        <span class="method-right">
-          <span class="method-reward">{{ row.rewardLabel }}</span>
-          <span class="method-check" :class="{ active: selectedMethodId === row.card.userCardId }">
-            <svg
-              v-if="selectedMethodId === row.card.userCardId"
-              width="12" height="12" viewBox="0 0 24 24"
-              fill="none" stroke="white" stroke-width="3"
-            >
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          </span>
-        </span>
-      </button>
-
-      <div class="info-strip">
-        <span class="info-icon">ⓘ</span>
-        <span>결제 완료 후 적립 한도가 업데이트됩니다.</span>
-      </div>
-    </div>
-
-    <div v-if="!isAuthenticated" class="sticky-action">
-      <button class="main-action-btn" @click="isEnteringPin = true">
-        간편 비밀번호 인증 후 결제하기
-      </button>
-    </div>
-  </div>
+  </Transition>
 </template>
 
 <script setup>
@@ -150,70 +101,35 @@ import { verifyPin } from '@/services/paymentAuthService';
 import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
 import { usePaymentStore } from '@/stores/payment';
-import { findBenefitForCategory, formatBenefit } from '@/services/cardService';
+import { findBenefitForCategory } from '@/services/cardService';
 import { useToast } from '@/composables/useToast';
+import { getCardImage } from '@/utils/cardImages';
 
 const route = useRoute();
 const cardsStore = useCardsStore();
 const paymentStore = usePaymentStore();
-const toast = useToast();
 const merchantsStore = useMerchantsStore();
+const toast = useToast();
 
 const isAuthenticated = ref(false);
 const isEnteringPin = ref(false);
 const isIssuingToken = ref(false);
 const isCompleting = ref(false);
+const isReissuing = ref(false);
 const pin = ref('');
 const pinError = ref(false);
 const barcodeCanvasRef = ref(null);
+const cardSliderRef = ref(null);
 
-// tokenValue가 새로 생기거나(발급) 바뀔 때마다(재발급) 캔버스에 실제 바코드를 그린다.
-// watch source를 tokenValue 하나만 보면, currentToken이 세팅되는 시점이 isIssuingToken이
-// false로 바뀌는 시점보다 미묘하게 먼저 와서 - nextTick 이후에도 아직 "발급 중..." 문구
-// (v-else-if="isIssuingToken")가 그려진 상태라 canvas가 DOM에 없고, 그 뒤로 tokenValue가
-// 다시 안 바뀌니 재시도도 안 되는 경쟁 상태가 있었다. isIssuingToken까지 같이 조건에
-// 넣어서, "캔버스가 실제로 그려지는(v-else) 시점"에만 트리거되게 한다.
-watch(
-  () => (isAuthenticated.value && !isIssuingToken.value ? paymentStore.currentToken?.tokenValue : null),
-  async (tokenValue) => {
-    if (!tokenValue) return;
-    await nextTick();
-    if (!barcodeCanvasRef.value) return;
-    try {
-      JsBarcode(barcodeCanvasRef.value, tokenValue, {
-        format: 'CODE128',
-        width: 2,
-        height: 60,
-        displayValue: false, // 바코드 아래 값 텍스트는 노출하지 않는다(스캔용 바코드만 표시)
-        margin: 0,
-      });
-    } catch {
-      // tokenValue가 바코드로 인코딩 불가능한 문자를 담고 있으면(이론상 없어야 함) 조용히
-      // 무시한다 - 캔버스에 아무것도 안 그려질 뿐 결제 자체엔 지장 없다.
-    }
-  }
-);
+let expiryTimer = null;
+let cardSlideTimer = null;
 
-// StoreDetail.vue에서 "결제하기"를 누르면 /pay?merchantId=1 형태로 넘어옵니다.
 const merchant = computed(() => merchantsStore.getByIdWithCategory(route.query.merchantId) ?? null);
 
-function rewardLabelFor(benefit) {
-  if (!merchant.value) return '';
-  return benefit ? formatBenefit(benefit) : '혜택 없음';
-}
-
 const paymentRows = computed(() => {
-  const activeCards = cardsStore.cards.filter((c) => c.status === 'ACTIVE');
-
-  const rows = activeCards.map((card) => {
-    const benefit = merchant.value
-      ? findBenefitForCategory(card.benefitsInfo, merchant.value.categoryCode, card.previousMonthAmount ?? 0)
-      : null;
-    return {
-      card,
-      benefit,
-      rewardLabel: rewardLabelFor(benefit),
-    };
+  const rows = cardsStore.cards.filter((card) => card.status === 'ACTIVE').map((card) => {
+    const benefit = merchant.value ? findBenefitForCategory(card.benefitsInfo, merchant.value.categoryCode, card.previousMonthAmount ?? 0) : null;
+    return { card, benefit };
   });
 
   if (!merchant.value) return rows;
@@ -227,23 +143,23 @@ const paymentRows = computed(() => {
 
 const queriedUserCardId = route.query.userCardId ? Number(route.query.userCardId) : null;
 const selectedMethodId = ref(null);
+const selectedMethod = computed(() => cardsStore.getById(selectedMethodId.value) ?? cardsStore.cards[0]);
 
-watch(
-  () => cardsStore.cards,
-  (cards) => {
-    if (!cards.length || selectedMethodId.value !== null) return;
-    if (queriedUserCardId && cardsStore.getById(queriedUserCardId)) {
-      selectedMethodId.value = queriedUserCardId;
-      return;
-    }
-    selectedMethodId.value = cardsStore.primaryCard?.userCardId ?? cards[0]?.userCardId;
-  },
-  { immediate: true }
-);
+watch(() => cardsStore.cards, async (cards) => {
+  if (!cards.length || selectedMethodId.value !== null) return;
 
-const selectedMethod = computed(
-  () => cardsStore.getById(selectedMethodId.value) ?? cardsStore.cards[0]
-);
+  if (queriedUserCardId && cardsStore.getById(queriedUserCardId)) selectedMethodId.value = queriedUserCardId;
+  else selectedMethodId.value = cardsStore.primaryCard?.userCardId ?? cards[0]?.userCardId;
+
+  await nextTick();
+  centerSelectedCard('auto');
+}, { immediate: true });
+
+watch(isAuthenticated, async (authenticated) => {
+  if (authenticated) return;
+  await nextTick();
+  centerSelectedCard('auto');
+});
 
 const keypadKeys = [
   { label: '1', type: 'digit' }, { label: '2', type: 'digit' }, { label: '3', type: 'digit' },
@@ -252,61 +168,59 @@ const keypadKeys = [
   { label: '', type: 'blank' }, { label: '0', type: 'digit' }, { label: '', type: 'backspace' },
 ];
 
-// ---------------------------------------------------------------------
-// 바코드 만료 카운트다운 / 재발급
-// ---------------------------------------------------------------------
-// expiresAt과 "지금"을 비교해서 남은 초를 계산한다. 1초마다 nowMs만 갱신되는 ref를
-// tick 삼아 만료까지 남은 시간을 다시 계산하는 방식 - setInterval 안에서 직접 DOM 텍스트를
-// 만지지 않고 반응형 상태로만 흘려보내서, 컴포넌트가 언마운트되면 interval도 같이 정리된다.
-const nowMs = ref(Date.now());
-let expiryTimer = null;
-
-onMounted(() => {
-  expiryTimer = setInterval(() => {
-    nowMs.value = Date.now();
-  }, 1000);
-});
-
-onUnmounted(() => {
-  if (expiryTimer) clearInterval(expiryTimer);
-});
-
-const remainingSeconds = computed(() => {
-  const expiresAt = paymentStore.currentToken?.expiresAt;
-  if (!expiresAt) return 0;
-  const diffMs = new Date(expiresAt).getTime() - nowMs.value;
-  return Math.max(0, Math.floor(diffMs / 1000));
-});
-
-const isTokenExpired = computed(
-  () => !!paymentStore.currentToken?.expiresAt && remainingSeconds.value <= 0
-);
-
-const remainingLabel = computed(() => {
-  const m = Math.floor(remainingSeconds.value / 60);
-  const s = remainingSeconds.value % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-});
-
-const isReissuing = ref(false);
-
-// 재발급: 기존 토큰이 아직 서버에 살아있을 수 있으니(만료 전 수동 재발급 포함) 먼저
-// cancel을 시도하고, 실패해도(이미 만료 등) 무시하고 새 토큰 발급으로 넘어간다.
-async function reissueToken() {
-  if (isReissuing.value) return;
-  isReissuing.value = true;
-  try {
-    const staleTokenId = paymentStore.currentToken?.paymentTokenId;
-    if (staleTokenId) {
-      await paymentStore.cancelPaymentToken(staleTokenId).catch(() => {});
-    }
-    await issuePaymentToken();
-  } finally {
-    isReissuing.value = false;
-  }
+function centerSelectedCard(behavior = 'smooth') {
+  const index = paymentRows.value.findIndex((row) => row.card.userCardId === selectedMethodId.value);
+  if (index < 0) return;
+  cardSliderRef.value?.children[index]?.scrollIntoView?.({ behavior, block: 'nearest', inline: 'center' });
 }
 
-const handleKeypadPress = (key) => {
+function selectSlide(row, index) {
+  if (isAuthenticated.value || isIssuingToken.value) return;
+  selectedMethodId.value = row.card.userCardId;
+  cardSliderRef.value?.children[index]?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+}
+
+function handleCardSlide() {
+  if (isAuthenticated.value || isIssuingToken.value) return;
+  clearTimeout(cardSlideTimer);
+
+  cardSlideTimer = setTimeout(() => {
+    const slider = cardSliderRef.value;
+    if (!slider) return;
+
+    const sliderRect = slider.getBoundingClientRect();
+    const center = sliderRect.left + sliderRect.width / 2;
+    const slides = [...slider.children];
+
+    const closestIndex = slides.reduce((closest, slide, index) => {
+      const rect = slide.getBoundingClientRect();
+      const distance = Math.abs(rect.left + rect.width / 2 - center);
+      return distance < closest.distance ? { index, distance } : closest;
+    }, { index: 0, distance: Infinity }).index;
+
+    selectedMethodId.value = paymentRows.value[closestIndex]?.card.userCardId ?? selectedMethodId.value;
+  }, 80);
+}
+
+function handlePaymentBoxClick(event) {
+  if (isAuthenticated.value || isIssuingToken.value || event.target.closest('.card-slider')) return;
+  openPinSheet();
+}
+
+function openPinSheet() {
+  if (!selectedMethodId.value || isAuthenticated.value || isIssuingToken.value) return;
+  pin.value = '';
+  pinError.value = false;
+  isEnteringPin.value = true;
+}
+
+function closePinSheet() {
+  isEnteringPin.value = false;
+  pin.value = '';
+  pinError.value = false;
+}
+
+function handleKeypadPress(key) {
   if (key.type === 'digit') {
     if (pin.value.length >= 6) return;
     pinError.value = false;
@@ -314,48 +228,82 @@ const handleKeypadPress = (key) => {
     if (pin.value.length === 6) checkPin();
   } else if (key.type === 'backspace') {
     pin.value = pin.value.slice(0, -1);
+    pinError.value = false;
   }
-};
+}
 
-const checkPin = async () => {
+async function checkPin() {
   try {
     await verifyPin(pin.value);
     isAuthenticated.value = true;
-    isEnteringPin.value = false;
-    pinError.value = false;
+    closePinSheet();
   } catch {
-    // 백엔드가 5회 실패 시 잠그는 등 구체적인 사유가 있지만, 결제 인증 화면은 자리를 좁게
-    // 쓰는 키패드뿐이라 나머지 화면들처럼 서버 메시지를 그대로 노출하지 않고 짧게 통일한다.
-    pinError.value = true;
-  } finally {
     pin.value = '';
+    pinError.value = true;
+    return;
   }
 
-  // PIN 인증에 성공했을 때만 바코드용 결제 토큰을 발급한다.
-  if (isAuthenticated.value) {
-    await issuePaymentToken();
-  }
-};
+  await issuePaymentToken();
+}
 
-// PIN 인증 직후 실제 바코드 값(paymentStore.currentToken.tokenValue)을 받아온다.
-// 이게 없으면 화면엔 카드 이름만 뜨고 바코드 아래 실제로 스캔될 값이 비어있게 된다.
 async function issuePaymentToken() {
   isIssuingToken.value = true;
+
   try {
-    await paymentStore.createPaymentToken(
-      selectedMethodId.value,
-      route.query.merchantId ? Number(route.query.merchantId) : undefined
-    );
+    await paymentStore.createPaymentToken(selectedMethodId.value, route.query.merchantId ? Number(route.query.merchantId) : undefined);
   } catch {
     toast.error('바코드를 발급하지 못했어요. 다시 시도해주세요.');
-    isAuthenticated.value = false; // 토큰 없이는 결제 화면을 보여줘봤자 의미가 없어서 인증 전 화면으로 되돌림
+    isAuthenticated.value = false;
   } finally {
     isIssuingToken.value = false;
   }
 }
 
-const completePayment = async () => {
+watch(
+    () => isAuthenticated.value && !isIssuingToken.value ? paymentStore.currentToken?.tokenValue : null,
+    async (tokenValue) => {
+      if (!tokenValue) return;
+      await nextTick();
+      if (!barcodeCanvasRef.value) return;
+
+      try {
+        JsBarcode(barcodeCanvasRef.value, tokenValue, { format: 'CODE128', width: 1.5, height: 44, displayValue: false, margin: 0 });
+      } catch {}
+    },
+);
+
+const nowMs = ref(Date.now());
+
+const remainingSeconds = computed(() => {
+  const expiresAt = paymentStore.currentToken?.expiresAt;
+  if (!expiresAt) return 0;
+  return Math.max(0, Math.floor((new Date(expiresAt).getTime() - nowMs.value) / 1000));
+});
+
+const isTokenExpired = computed(() => !!paymentStore.currentToken?.expiresAt && remainingSeconds.value <= 0);
+
+const remainingLabel = computed(() => {
+  const minutes = Math.floor(remainingSeconds.value / 60);
+  const seconds = remainingSeconds.value % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+});
+
+async function reissueToken() {
+  if (isReissuing.value) return;
+  isReissuing.value = true;
+
+  try {
+    const staleTokenId = paymentStore.currentToken?.paymentTokenId;
+    if (staleTokenId) await paymentStore.cancelPaymentToken(staleTokenId).catch(() => {});
+    await issuePaymentToken();
+  } finally {
+    isReissuing.value = false;
+  }
+}
+
+async function completePayment() {
   const paymentTokenId = paymentStore.currentToken?.paymentTokenId;
+
   if (!paymentTokenId) {
     toast.error('결제 토큰 정보가 없어요. 다시 인증해주세요.');
     isAuthenticated.value = false;
@@ -363,6 +311,7 @@ const completePayment = async () => {
   }
 
   isCompleting.value = true;
+
   try {
     const payment = await paymentStore.completePaymentToken(paymentTokenId);
     toast.success(`${payment.merchantName}에서 ${Number(payment.finalAmount).toLocaleString()}원 결제 완료!`);
@@ -372,128 +321,96 @@ const completePayment = async () => {
     isCompleting.value = false;
     isAuthenticated.value = false;
   }
-};
+}
 
 onMounted(async () => {
+  expiryTimer = setInterval(() => { nowMs.value = Date.now(); }, 1000);
+
   if (cardsStore.cards.length === 0) await cardsStore.fetchCards();
-  // fetchCards()는 실적만 받아오고 benefitsInfo는 안 채운다 - paymentRows가 그걸로
-  // 매칭하니, 이 페이지가 뜨는 시점에 필요한 만큼만 받아온다.
+
   cardsStore.ensureBenefitsLoaded(
-    cardsStore.cards.filter((c) => c.status === 'ACTIVE').map((c) => c.userCardId)
+      cardsStore.cards.filter((card) => card.status === 'ACTIVE').map((card) => card.userCardId),
   );
 
-  // merchantsStore.merchants는 전체 매장(2만 건+)을 명시적으로 fetchMerchants() 해야만
-  // 채워지는데, 이 페이지는 그걸 호출한 적이 없어서 route.query.merchantId가 있어도
-  // getByIdWithCategory가 항상 null을 반환하고 있었다(북마크 매장 → 간편결제 연결 시
-  // 카드별 혜택이 하나도 안 뜨던 원인). 홈/매장상세에서 특정 매장 하나만 들고 넘어오는
-  // 흐름이라, 전체 목록 대신 fetchMerchantDetail로 그 매장 하나만 가볍게 받아온다.
   if (route.query.merchantId) {
     if (merchantsStore.categories.length === 0) await merchantsStore.fetchCategories();
     await merchantsStore.fetchMerchantDetail(route.query.merchantId);
   }
+
+  await nextTick();
+  centerSelectedCard('auto');
 });
 
-// 발급된 토큰(바코드)을 아직 결제 완료도 취소도 안 한 채로 페이지를 벗어나면, 서버에
-// 떠 있는 토큰을 정리한다. 실패해도(네트워크 등) 네비게이션은 막지 않는다 - 토큰은
-// 어차피 TTL이 지나면 서버에서 알아서 만료되니, 여기 취소는 "되면 좋고" 수준의 정리다.
+onUnmounted(() => {
+  if (expiryTimer) clearInterval(expiryTimer);
+  if (cardSlideTimer) clearTimeout(cardSlideTimer);
+});
+
 onBeforeRouteLeave(() => {
   const paymentTokenId = paymentStore.currentToken?.paymentTokenId;
-  if (paymentTokenId) {
-    paymentStore.cancelPaymentToken(paymentTokenId).catch(() => {});
-  }
+  if (paymentTokenId) paymentStore.cancelPaymentToken(paymentTokenId).catch(() => {});
   return true;
 });
 </script>
 
 <style scoped>
-.layout-container { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: 8px 18px 0; box-sizing: border-box; background: var(--page, #f2f4f6); }
+.layout-container { position:absolute; inset:0; display:flex; min-height:0; padding:8px 18px 12px; box-sizing:border-box; background:var(--page,#f2f4f6); }
+.payment-box { flex:none; width:100%; height:calc(100% - 32px); margin:8px 0 24px; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; padding:0 0 18px; border-radius:22px; }
+.payment-content { flex:1; min-height:0; display:flex; flex-direction:column; }
+.payment-box--ready { cursor:pointer; }
+.payment-ready,.barcode-payment { flex:1; min-height:0; display:flex; flex-direction:column; }
+.card-stage,.barcode-stage,.payment-state { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; }
+.loading-text { padding:20px; text-align:center; font-size:.9rem; }
 
-.display-box { flex: 0 0 auto; padding: 32px 20px; text-align: center; margin-bottom: 16px; }
-.barcode-canvas { max-width: 100%; height: 60px; }
+.card-slider { --slide-width:min(66vw,250px); width:100%; display:flex; align-items:center; gap:18px; overflow-x:auto; padding:4px calc((100% - var(--slide-width))/2) 16px; box-sizing:border-box; scroll-padding-inline:calc((100% - var(--slide-width))/2); scroll-snap-type:x mandatory; scrollbar-width:none; overscroll-behavior-x:contain; }
+.card-slider::-webkit-scrollbar { display:none; }
+.card-slider.is-locked { overflow-x:hidden; }
+.card-slide { flex:0 0 var(--slide-width); padding:0; border:0; scroll-snap-align:center; background:transparent; opacity:.28; transform:scale(.88); transition:opacity .2s,transform .2s; cursor:pointer; }
+.card-slide.selected { opacity:1; transform:scale(1); }
+.card-slide:disabled { cursor:default; }
+.slide-card-image { display:block; width:100%; aspect-ratio:1.586/1; margin:auto; object-fit:contain; border-radius:10px; filter:drop-shadow(0 7px 11px rgba(0,0,0,.14)); }
+.slide-card-fallback { background:var(--dark,#24211d); }
+.selected-card-name { display:block; max-width:85%; margin-top:6px; overflow:hidden; color:var(--charcoal,#24211d); font-size:17px; text-align:center; text-overflow:ellipsis; white-space:nowrap; }
 
-.token-expiry {
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-  margin-top: 14px; font-size: 12px; color: var(--muted, #8f897f);
-}
-.token-expiry--expired { color: var(--danger, #d94343); font-weight: 700; }
-.reissue-btn {
-  border: 1px solid var(--line, #e7e4de); background: var(--surface, #ffffff);
-  color: var(--charcoal, #24211d); font-size: 11px; font-weight: 700;
-  padding: 5px 10px; border-radius: 20px; cursor: pointer;
-}
-.reissue-btn:disabled { opacity: .6; cursor: not-allowed; }
-.auth-prompt .lock-icon { width: 64px; height: 64px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 50%; background: var(--inactive, #f5f5f5); color: var(--charcoal, #24211d); }
-.auth-prompt h3 { margin: 0 0 6px; font-size: 16px; }
-.auth-prompt p { margin: 0; color: var(--muted, #8f897f); font-size: 12px; }
+.auth-prompt { flex:0 0 auto; padding:50px 20px 12px; text-align:center; }
+.auth-prompt .lock-icon { width:52px; height:52px; margin:0 auto 12px; display:grid; place-items:center; border-radius:50%; background:var(--inactive,#f5f5f5); color:var(--charcoal,#24211d); }
+.auth-prompt h3 { margin:0 0 6px; color:var(--charcoal,#24211d); font-size:16px; }
+.auth-prompt p { margin:0; color:var(--muted,#8f897f); font-size:12px; }
 
-.pin-page { min-height: 100vh; padding-bottom: 20px; box-sizing: border-box; display: flex; flex-direction: column; }
-.pin-header { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 18px; }
-.pin-header h2 { margin: 0; font-size: 16px; color: var(--charcoal, #24211d); }
-.pin-header .back-btn {
-  width: 30px; height: 30px; display: grid; place-items: center;
-  border: none; background: none; color: var(--charcoal, #24211d); cursor: pointer; padding: 0;
-}
-.pin-body { padding: 20px 18px 10px; }
-.pin-title { margin: 0 0 8px; font-size: 19px; letter-spacing: -.3px; color: var(--charcoal, #24211d); }
-.pin-subtitle { margin: 0 0 22px; font-size: 13px; color: var(--muted, #8f897f); }
-.pin-card-row {
-  display: flex; justify-content: space-between; align-items: center;
-  background: var(--inactive, #f0efec); border-radius: 14px; padding: 16px 18px; margin-bottom: 34px;
-}
-.pin-card-row span { font-size: 13px; color: var(--muted, #8f897f); }
-.pin-card-row strong { font-size: 14px; color: var(--charcoal, #24211d); }
-.pin-dots { display: flex; justify-content: center; gap: 14px; }
-.pin-dot { width: 40px; height: 40px; border-radius: 50%; background: var(--inactive, #f0efec); }
-.pin-dot.filled { background: var(--dark, #545045); }
-.pin-dots.shake { animation: pin-shake 0.4s ease; }
-@keyframes pin-shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-8px); }
-  40%, 80% { transform: translateX(8px); }
-}
-.pin-error { margin: 14px 0 0; text-align: center; color: var(--danger, #d94343); font-size: 12px; }
+.main-action-btn { width:100%; height:52px; border-radius:14px; background:var(--orange,#ffbc00); color:var(--charcoal,#24211d); font-size:15px; font-weight:900; }
+.main-action-btn:disabled { opacity:.6; cursor:not-allowed; }
+.payment-start-btn,.payment-complete-btn { width:calc(100% - 40px); margin:16px 20px 0; flex:0 0 auto; }
+.card-name { margin:0 0 14px; color:var(--charcoal,#24211d); font-size:17px; }
+.barcode-canvas { display:block; width:82%; max-width:300px; height:44px; margin:0 auto; }
+.token-expiry { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px; color:var(--muted,#8f897f); font-size:12px; }
+.token-expiry--expired { color:var(--danger,#d94343); font-weight:700; }
+.reissue-btn { padding:5px 10px; border:1px solid var(--line,#e7e4de); border-radius:20px; background:#fff; color:var(--charcoal,#24211d); font-size:11px; font-weight:700; cursor:pointer; }
+.reissue-btn:disabled { opacity:.6; cursor:not-allowed; }
 
-.keypad { margin-top: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 20px 18px 0; }
-.keypad-key {
-  height: 62px; border-radius: 14px; border: 1px solid var(--line, #e7e4de);
-  background: var(--surface, #ffffff); font-size: 20px; font-weight: 600;
-  color: var(--charcoal, #24211d); display: grid; place-items: center; cursor: pointer;
-}
-.keypad-key:disabled { visibility: hidden; }
-.keypad-key--action { background: var(--inactive, #f0efec); color: var(--muted, #8f897f); }
+.pin-sheet-overlay { position:fixed; inset:0; z-index:3000; display:flex; align-items:flex-end; justify-content:center; background:rgba(0,0,0,.42); }
+.pin-sheet { width:min(100%,440px); height:min(74dvh,620px); max-height:calc(100dvh - 64px); padding:10px 20px 24px; box-sizing:border-box; display:flex; flex-direction:column; overflow-y:auto; border-radius:24px 24px 0 0; background:#fff; box-shadow:0 -8px 30px rgba(0,0,0,.14); }
+.pin-sheet-handle { width:38px; height:4px; margin:0 auto 12px; border-radius:99px; background:#d9d9d9; }
+.pin-sheet-header { display:flex; align-items:center; justify-content:space-between; }
+.pin-sheet-header h2 { margin:0; color:var(--charcoal,#24211d); font-size:19px; }
+.pin-sheet-close { width:36px; height:36px; padding:0; border:0; display:grid; place-items:center; background:transparent; color:var(--charcoal,#24211d); cursor:pointer; }
+.pin-sheet-body { padding-top:48px; text-align:center; }
+.pin-guide { margin:0 0 24px; color:var(--charcoal,#24211d); font-size:16px; }
+.pin-dots { display:flex; justify-content:center; gap:16px; }
+.pin-dot { width:16px; height:16px; box-sizing:border-box; border:1.5px solid var(--charcoal,#24211d); border-radius:50%; background:#fff; }
+.pin-dot.filled { background:var(--charcoal,#24211d); }
+.pin-dots.shake { animation:pin-shake .4s ease; }
+.pin-error { margin:14px 0 0; color:var(--danger,#d94343); font-size:12px; text-align:center; }
+.keypad { flex:0 0 auto; margin-top:auto; padding:24px 8px 0; display:grid; grid-template-columns:repeat(3,1fr); gap:8px 16px; }
+.keypad-key { height:58px; padding:0; border:0; border-radius:12px; display:grid; place-items:center; background:transparent; color:var(--charcoal,#24211d); font-size:24px; font-weight:500; cursor:pointer; }
+.keypad-key:active { background:#f3f3f3; }
+.keypad-key:disabled { visibility:hidden; }
+.keypad-key--action { color:var(--muted,#8f897f); }
 
-.main-action-btn {
-  width: 100%; height: 54px; border-radius: 14px;
-  background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900;
-}
-.main-action-btn:disabled { opacity: .6; cursor: not-allowed; }
+.barcode-prompt { flex:0 0 auto; padding:70px 20px 8px; text-align:center; }
 
-.payment-methods { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 18px; }
-.loading-text { text-align: center; padding: 20px 0; font-size: 0.9rem; }
-
-.method-item {
-  display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px;
-  border-radius: 16px; background: var(--surface, #ffffff); border: 1px solid var(--line, #e7e4de);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, .05); text-align: left; cursor: pointer;
-}
-.method-item.selected { border: 2px solid var(--orange, #ffbc00); padding: 13px; }
-
-.method-icon { width: 46px; height: 29px; border-radius: 6px; flex: 0 0 auto; }
-.method-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.method-name-row { display: flex; align-items: center; gap: 6px; }
-.method-name-row strong { font-size: 14px; }
-.method-badge {
-  font-size: 10px; font-weight: 800; color: var(--green, #00a878);
-  background: #ebf7f3; border-radius: 6px; padding: 3px 6px;
-}
-.method-number { font-size: 11px; color: var(--muted, #8f897f); }
-.method-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
-.method-reward { font-size: 12px; font-weight: 800; color: var(--charcoal, #24211d); white-space: nowrap; }
-.method-check {
-  width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line, #e7e4de);
-  display: grid; place-items: center;
-}
-.method-check.active { background: var(--orange, #ffbc00); border-color: var(--orange, #ffbc00); }
-
-.sticky-action { position: static; flex: 0 0 auto; width: auto; margin: 0 -18px; padding: 12px 18px 14px; background: #ffffff; border-top: 1px solid rgba(36, 33, 29, .06); box-shadow: 0 -4px 16px rgba(36, 33, 29, .05); box-sizing: border-box; }
+@keyframes pin-shake { 0%,100% { transform:translateX(0); } 20%,60% { transform:translateX(-8px); } 40%,80% { transform:translateX(8px); } }
+.pin-bottom-sheet-enter-active,.pin-bottom-sheet-leave-active { transition:opacity .2s ease; }
+.pin-bottom-sheet-enter-active .pin-sheet,.pin-bottom-sheet-leave-active .pin-sheet { transition:transform .25s ease; }
+.pin-bottom-sheet-enter-from,.pin-bottom-sheet-leave-to { opacity:0; }
+.pin-bottom-sheet-enter-from .pin-sheet,.pin-bottom-sheet-leave-to .pin-sheet { transform:translateY(100%); }
 </style>
