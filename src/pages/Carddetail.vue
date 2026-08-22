@@ -252,7 +252,7 @@ const handleDeleteCard = async () => {
 </script>
 
 <style scoped>
-.layout-container { padding: 18px 18px 40px; }
+.layout-container { padding: 18px 16px 40px; }
 .page-header { margin-bottom: 18px; }
 .loading-text { padding-top: 60px; text-align: center; }
 

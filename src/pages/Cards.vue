@@ -159,7 +159,7 @@ const getCardLast4 = (value) => String(value ?? '').replace(/\D/g, '').slice(-4)
 
 <style scoped>
 .layout-container {
-  padding: 8px 18px 24px;
+  padding: 8px 16px 24px;
 }
 
 .loading-text,
@@ -200,20 +200,19 @@ const getCardLast4 = (value) => String(value ?? '').replace(/\D/g, '').slice(-4)
   font-size: 12px;
 }
 
-.card-list {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
+.card-list { display: flex; flex-direction: column; gap: 12px; }
 
 .card-item {
   text-align: left;
 }
 
 :deep(.card-item.btn--box-outline) {
+  min-height: auto;
+  padding: 16px !important;
+  gap: 4px;
   border: none;
-  border-radius: 20px;
-  box-shadow: 0 2px 16px rgba(46, 42, 36, 0.06);
+  border-radius: 18px;
+  box-shadow: 0 4px 14px rgba(46, 42, 36, 0.1);
 }
 
 .card-top-row {
@@ -260,7 +259,7 @@ const getCardLast4 = (value) => String(value ?? '').replace(/\D/g, '').slice(-4)
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  margin: 13px 0 8px;
+  margin: 8px 0 5px;
   font-size: 12px;
   font-weight: 700;
 }
@@ -268,7 +267,7 @@ const getCardLast4 = (value) => String(value ?? '').replace(/\D/g, '').slice(-4)
 .progress-target {
   width: 100%;
   text-align: right;
-  margin: 7px 0 0;
+  margin: 4px 0 0;
   color: var(--muted, #8f897f);
   font-size: 11px;
 }

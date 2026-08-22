@@ -6,6 +6,7 @@ const imageModules = import.meta.glob('../assets/images/Cards/*.png', {
 const normalizeName = (name) =>
     String(name ?? '')
         .normalize('NFC')
+        .replace(/[:：]/g, '')
         .replace(/\s+/g, ' ')
         .trim()
         .toLowerCase();

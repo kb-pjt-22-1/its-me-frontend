@@ -1076,6 +1076,122 @@ describe('카테고리 칩 드래그 스크롤 (마우스도 손가락처럼 슬
   })
 })
 
+describe('주변 제휴 매장 바텀시트 3단계 drag/snap', () => {
+  beforeEach(() => {
+    Element.prototype.setPointerCapture = vi.fn()
+    Element.prototype.releasePointerCapture = vi.fn()
+    Element.prototype.hasPointerCapture = vi.fn(() => true)
+  })
+
+  function setSheetSize(wrapper, pageHeight = 500) {
+    Object.defineProperty(wrapper.find('.map-page').element, 'clientHeight', { value: pageHeight, configurable: true })
+    Object.defineProperty(wrapper.find('.store-sheet').element, 'clientHeight', { value: pageHeight * 0.82, configurable: true })
+    window.dispatchEvent(new Event('resize'))
+  }
+
+  async function mountSizedSheet(merchants = []) {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue(merchants)
+    const wrapper = mountMapPage()
+    await flushPromises()
+    setSheetSize(wrapper)
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('초기 상태는 collapsed이고, 일반 클릭으로 middle과 collapsed를 오간다', async () => {
+    const wrapper = await mountSizedSheet()
+    const sheet = wrapper.find('.store-sheet')
+    const handle = wrapper.find('.sheet-handle-area')
+
+    expect(sheet.attributes('data-position')).toBe('collapsed')
+    expect(sheet.attributes('style')).toContain('translateY(330px)')
+
+    await handle.trigger('click')
+    expect(sheet.attributes('data-position')).toBe('middle')
+    expect(sheet.attributes('style')).toContain('translateY(160px)')
+
+    await handle.trigger('click')
+    expect(sheet.attributes('data-position')).toBe('collapsed')
+  })
+
+  it('위로 drag하면 실시간 translate 후 expanded로 snap하고, drag 직후 click은 toggle하지 않는다', async () => {
+    const wrapper = await mountSizedSheet()
+    const sheet = wrapper.find('.store-sheet')
+    const handle = wrapper.find('.sheet-handle-area')
+
+    await handle.trigger('pointerdown', { clientY: 400, pointerId: 1 })
+    await handle.trigger('pointermove', { clientY: 80, pointerId: 1 })
+    expect(sheet.classes()).toContain('dragging')
+    expect(sheet.attributes('style')).toContain('translateY(10px)')
+
+    await handle.trigger('pointerup', { clientY: 80, pointerId: 1 })
+    expect(sheet.attributes('data-position')).toBe('expanded')
+    expect(sheet.attributes('style')).toContain('translateY(0px)')
+
+    await handle.trigger('click')
+    expect(sheet.attributes('data-position')).toBe('expanded')
+  })
+
+  it('middle에서 아래로 drag하면 collapsed로 snap한다', async () => {
+    const wrapper = await mountSizedSheet()
+    const sheet = wrapper.find('.store-sheet')
+    const handle = wrapper.find('.sheet-handle-area')
+    await handle.trigger('click')
+
+    await handle.trigger('pointerdown', { clientY: 200, pointerId: 2 })
+    await handle.trigger('pointermove', { clientY: 400, pointerId: 2 })
+    await handle.trigger('pointerup', { clientY: 400, pointerId: 2 })
+
+    expect(sheet.attributes('data-position')).toBe('collapsed')
+    expect(sheet.attributes('style')).toContain('translateY(330px)')
+  })
+
+  it('sheet-body는 drag 대상이 아니고 스크롤 가능 상태를 유지한다', async () => {
+    const wrapper = await mountSizedSheet()
+    const body = wrapper.find('.sheet-body')
+    body.element.scrollTop = 120
+
+    await body.trigger('pointerdown', { clientY: 300, pointerId: 3 })
+    await body.trigger('pointermove', { clientY: 100, pointerId: 3 })
+    await body.trigger('pointerup', { clientY: 100, pointerId: 3 })
+
+    expect(wrapper.find('.store-sheet').attributes('data-position')).toBe('collapsed')
+    expect(body.element.scrollTop).toBe(120)
+  })
+
+  it('정렬 버튼에서 시작한 포인터는 sheet drag로 처리되지 않고 기존 클릭이 동작한다', async () => {
+    const wrapper = await mountSizedSheet([CAFE_MERCHANT, { ...MART_MERCHANT, recommended: true }])
+    const benefitButton = wrapper.findAll('.sort-btn').find((button) => button.text() === '혜택순')
+
+    await benefitButton.trigger('pointerdown', { clientY: 300, pointerId: 4 })
+    await benefitButton.trigger('pointermove', { clientY: 100, pointerId: 4 })
+    await benefitButton.trigger('pointerup', { clientY: 100, pointerId: 4 })
+    await benefitButton.trigger('click')
+
+    expect(benefitButton.classes()).toContain('active')
+    expect(wrapper.find('.store-sheet').attributes('data-position')).toBe('collapsed')
+  })
+
+  it('매장을 선택하면 collapsed에서 최소 middle로 열리고, 이미 expanded면 높이를 유지한다', async () => {
+    const wrapper = await mountSizedSheet([CAFE_MERCHANT])
+    const sheet = wrapper.find('.store-sheet')
+    const handle = wrapper.find('.sheet-handle-area')
+
+    await wrapper.find('.sheet-item').trigger('click')
+    expect(sheet.attributes('data-position')).toBe('middle')
+
+    await handle.trigger('pointerdown', { clientY: 400, pointerId: 5 })
+    await handle.trigger('pointermove', { clientY: 200, pointerId: 5 })
+    await handle.trigger('pointerup', { clientY: 200, pointerId: 5 })
+    expect(sheet.attributes('data-position')).toBe('expanded')
+
+    await wrapper.find('.detail-back-btn').trigger('click')
+    await wrapper.find('.sheet-item').trigger('click')
+    expect(sheet.attributes('data-position')).toBe('expanded')
+  })
+})
+
 describe('카카오맵 컨테이너 리사이즈 대응 (ResizeObserver -> relayout)', () => {
   it('지도 컨테이너 크기가 바뀌면 relayout()을 호출한다', async () => {
     const observeMock = vi.fn()

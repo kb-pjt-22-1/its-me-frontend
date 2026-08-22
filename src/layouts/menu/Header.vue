@@ -1,5 +1,5 @@
 <template>
-  <header class="app-header">
+  <header class="app-header" :class="{ 'app-header--map': isMapPage }">
     <span class="page-title">{{ pageTitle }}</span>
     <div class="header-right">
       <button type="button" class="icon-btn" aria-label="알림" @click="goToNotification">
@@ -42,6 +42,7 @@ const PAGE_TITLES = {
   bookmarks: '저장한 매장',
 };
 const pageTitle = computed(() => PAGE_TITLES[route.name] ?? '');
+const isMapPage = computed(() => route.name === 'map');
 
 const toast = useToast();
 const goToNotification = () => toast.info('알림 페이지로 이동');
@@ -72,6 +73,24 @@ const goToMenu = () => {
   padding: 0 20px;
   z-index: 1000;
   box-sizing: border-box;
+}
+
+.app-header--map {
+  background-color: transparent;
+}
+
+.app-header--map .page-title {
+  display: none;
+}
+
+.app-header--map .header-right {
+  margin-left: auto;
+  padding: 2px 4px;
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 999px;
+  box-shadow:
+      0 5px 14px rgba(0, 0, 0, 0.12),
+      0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .page-title {

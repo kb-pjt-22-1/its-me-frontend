@@ -2,7 +2,7 @@
 <template>
   <div class="layout-container">
     <Header />
-    <main class="main-content">
+    <main class="main-content" :class="{ 'main-content--map': isMapPage }">
       <!-- 홈/지도/결제/혜택/카드 등 탭 사이를 이동할 때, 헤더/하단바는 그대로 두고
            이 안의 내용만 페이드됩니다 (main.css의 .page-fade-* 참고). -->
       <router-view v-slot="{ Component, route }">
@@ -18,8 +18,13 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import Header from './Header.vue'
 import Footer from './Footer.vue'
+
+const route = useRoute()
+const isMapPage = computed(() => route.name === 'map')
 </script>
 
 <style scoped>
@@ -48,5 +53,9 @@ import Footer from './Footer.vue'
   overflow-y: auto;
   overflow-x: hidden; /* 탭 전환 슬라이드 애니메이션이 440px 밖으로 새어나가지 않도록 */
   color: var(--foreground);
+}
+
+.main-content--map {
+  top: 0;
 }
 </style>
