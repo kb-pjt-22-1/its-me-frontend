@@ -7,6 +7,21 @@ vi.mock('vue-router', () => ({
   useRouter: () => routerMock,
 }))
 
+const { confirmMock, toastSuccess, toastError } = vi.hoisted(() => ({
+  confirmMock: vi.fn(),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
+}))
+vi.mock('@/composables/useConfirmDialog', () => ({
+  useConfirmDialog: () => ({ confirm: confirmMock }),
+}))
+vi.mock('@/composables/useToast', () => ({
+  useToast: () => ({ success: toastSuccess, error: toastError }),
+}))
+
+const { withdrawMock } = vi.hoisted(() => ({ withdrawMock: vi.fn() }))
+vi.mock('@/services/memberService', () => ({ withdraw: withdrawMock }))
+
 import Menu from '@/pages/Menu.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -64,5 +79,52 @@ describe('Menu.vue (라우팅되는 메뉴 페이지)', () => {
 
     expect(authStore.logout).toHaveBeenCalledTimes(1)
     expect(routerMock.push).toHaveBeenCalledWith('/login')
+  })
+})
+
+describe('회원 탈퇴', () => {
+  it('확인 다이얼로그에서 예를 누르면 탈퇴 API를 호출하고 세션을 정리한 뒤 로그인 화면으로 이동한다', async () => {
+    confirmMock.mockResolvedValue(true)
+    withdrawMock.mockResolvedValue()
+    const wrapper = mountMenu()
+    const authStore = useAuthStore()
+    authStore.clearSession = vi.fn()
+
+    await wrapper.find('.withdraw-btn').trigger('click')
+    await flushPromises()
+
+    expect(confirmMock).toHaveBeenCalledWith('정말로 탈퇴 하시겠습니까?', {
+      confirmText: '예',
+      cancelText: '아니오',
+      danger: true,
+    })
+    expect(withdrawMock).toHaveBeenCalledTimes(1)
+    expect(authStore.clearSession).toHaveBeenCalledTimes(1)
+    expect(toastSuccess).toHaveBeenCalledWith('탈퇴가 완료됐어요.')
+    expect(routerMock.push).toHaveBeenCalledWith('/login')
+  })
+
+  it('확인 다이얼로그에서 아니오를 누르면 아무 일도 일어나지 않는다', async () => {
+    confirmMock.mockResolvedValue(false)
+    const wrapper = mountMenu()
+
+    await wrapper.find('.withdraw-btn').trigger('click')
+    await flushPromises()
+
+    expect(withdrawMock).not.toHaveBeenCalled()
+    expect(routerMock.push).not.toHaveBeenCalledWith('/login')
+  })
+
+  it('탈퇴 API가 실패하면 에러 토스트만 띄우고 이동하지 않는다', async () => {
+    confirmMock.mockResolvedValue(true)
+    withdrawMock.mockRejectedValue(new Error('network error'))
+    window.console.error = vi.fn()
+    const wrapper = mountMenu()
+
+    await wrapper.find('.withdraw-btn').trigger('click')
+    await flushPromises()
+
+    expect(toastError).toHaveBeenCalledWith('회원 탈퇴에 실패했어요. 다시 시도해주세요.')
+    expect(routerMock.push).not.toHaveBeenCalledWith('/login')
   })
 })
