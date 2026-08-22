@@ -14,7 +14,7 @@ import {
   setStoredUser,
   clearAuthStorage,
 } from '@/utils/tokenStorage'
-import { getFcmToken } from '@/services/pushNotificationService'
+import { getFcmToken, listenForegroundMessages } from '@/services/pushNotificationService'
 import { updateFcmToken } from '@/services/memberService'
 
 // 자동 로그인 판정은 앱 실행당 한 번이면 충분하다. 라우터 가드가 라우팅마다 부르므로
@@ -149,18 +149,19 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
-     * 로그인 성공 직후 호출: 알림 권한을 확인/요청해 FCM 등록 토큰을 받아 백엔드에 저장한다
-     * [PATCH /users/me/fcm-token]. 웹 SDK엔 네이티브 onNewToken 같은 갱신 콜백이 없어서,
-     * "갱신될 때마다"의 웹 대응은 로그인/세션 복원마다 다시 조회하는 것이다(App.vue에서도
-     * 세션 복원 시 호출 - main 참고). 권한 거부·미지원 브라우저·설정값 없음 등은 전부
-     * getFcmToken()이 null로 돌려주므로 여기서는 있을 때만 등록한다. 실패해도 로그인
-     * 흐름에 영향을 주면 안 되므로 예외를 던지지 않는다.
+     * 로그인 성공 직후 호출: 알림 권한을 확인/요청해 FCM 등록 토큰을 받아 백엔드에 저장하고
+     * [PATCH /users/me/fcm-token], 포그라운드 메시지 리스너를 붙인다. 웹 SDK엔 네이티브
+     * onNewToken 같은 갱신 콜백이 없어서, "갱신될 때마다"의 웹 대응은 로그인/세션 복원마다
+     * 다시 조회하는 것이다(App.vue에서도 세션 복원 시 호출 - main 참고). 권한 거부·미지원
+     * 브라우저·설정값 없음 등은 전부 getFcmToken()이 null로 돌려주므로 여기서는 있을 때만
+     * 등록한다. 실패해도 로그인 흐름에 영향을 주면 안 되므로 예외를 던지지 않는다.
      */
     async registerFcmToken() {
       try {
         const token = await getFcmToken()
         if (!token) return
         await updateFcmToken(token)
+        listenForegroundMessages()
       } catch (err) {
         console.error('[auth store] FCM 토큰 등록 실패', err.message)
       }

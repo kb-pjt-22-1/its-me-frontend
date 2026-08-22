@@ -20,6 +20,7 @@ vi.mock('@/utils/tokenStorage', () => ({
 
 vi.mock('@/services/pushNotificationService', () => ({
   getFcmToken: vi.fn(),
+  listenForegroundMessages: vi.fn(),
 }))
 
 vi.mock('@/services/memberService', () => ({
