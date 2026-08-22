@@ -86,14 +86,27 @@ describe('1단계: 본인인증', () => {
     expect(wrapper.find('#signup-code').exists()).toBe(true)
   })
 
-  it('devVerificationCode가 오면 개발 환경 힌트를 보여주고 코드 입력란을 미리 채워준다', async () => {
+  it('휴대폰 번호를 11자리 넘게 입력해도(붙여넣기 등) 11자리까지만 반영된다', async () => {
+    const wrapper = mountPage()
+    const phoneInput = wrapper.find('#signup-phone')
+
+    await phoneInput.setValue('01011112222999') // 14자리
+
+    expect(phoneInput.element.value).toBe('010-1111-2222')
+    // onPhoneInput이 잘라낸 값이 직전 값과 같으면(이미 11자리를 채운 채로 더 입력한
+    // 경우) phoneNumber ref가 안 바뀌어서 :value 바인딩만으로는 DOM이 안 돌아온다 -
+    // 브라우저가 아예 못 치게 막는 maxlength가 실제 방어선이라 이것도 같이 확인한다.
+    expect(phoneInput.attributes('maxlength')).toBe('13')
+  })
+
+  it('devVerificationCode가 오면 화면에 노출하지 않고 코드 입력란만 미리 채워준다', async () => {
     requestSignupIdentityCode.mockResolvedValueOnce('654321')
     const wrapper = mountPage()
 
     await goToStep1CodeEntry(wrapper)
 
-    expect(wrapper.text()).toContain('654321')
     expect(wrapper.find('#signup-code').element.value).toBe('654321')
+    expect(wrapper.text()).not.toContain('654321')
   })
 
   it('인증번호 발송이 422로 실패하면 KB 미등록 회원 안내를 보여준다', async () => {

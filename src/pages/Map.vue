@@ -604,6 +604,11 @@ let kakaoInstance = null
 let mapInstance = null
 let clusterer = null
 let markers = []
+let centerMarker = null
+// watchPosition 구독 id. 다른 페이지로 갔다가 돌아오면 Map.vue가 언마운트/재마운트되므로
+// (keep-alive 없음), 페이지를 떠날 때 반드시 clearWatch로 끊어줘야 백그라운드에서
+// GPS를 계속 붙잡고 있지 않는다.
+let geoWatchId = null
 
 function loadKakaoMapScript() {
   return new Promise((resolve, reject) => {
@@ -674,7 +679,9 @@ function initMap(kakao, center, level) {
   // 따로 그린다 - buildCurrentLocationMarkerImage 참고.
   // center는 저장된 마지막 위치일 수 있어(mapViewStore) 지도 중심으로만 쓰고, 이 마커는
   // 실제 GPS 위치(myLocation)가 있으면 그 자리에 찍는다 - 없으면 지도 중심을 그대로 쓴다.
-  const centerMarker = new kakao.maps.Marker({
+  // watchPosition이 myLocation을 갱신할 때마다 이 마커도 실시간으로 따라 움직인다(아래
+  // watch(myLocation, ...) 참고).
+  centerMarker = new kakao.maps.Marker({
     map,
     position: new kakao.maps.LatLng(
       myLocation.value?.lat ?? center.lat,
@@ -1074,6 +1081,27 @@ function renderMerchantMarkers() {
 
 watch(merchants, renderMerchantMarkers)
 
+// GPS가 새 위치를 보고할 때마다 "내 위치" 마커만 그 자리로 옮긴다 - 지도 중심은 건드리지
+// 않는다(사용자가 지도를 다른 곳으로 보고 있을 수도 있으니, 재중심은 "내 위치로 이동"
+// 버튼을 눌렀을 때만 한다).
+watch(myLocation, (location) => {
+  if (!location || !centerMarker || !kakaoInstance) return
+  centerMarker.setPosition(new kakaoInstance.maps.LatLng(location.lat, location.lng))
+})
+
+// 위치가 바뀔 때마다(도보 이동 등) myLocation을 계속 갱신한다 - getCurrentPosition은
+// 한 번만 조회하고 끝나서 마커가 실시간으로 안 움직였다.
+function startWatchingMyLocation() {
+  if (!navigator.geolocation) return
+  geoWatchId = navigator.geolocation.watchPosition(
+    (position) => {
+      myLocation.value = { lat: position.coords.latitude, lng: position.coords.longitude }
+    },
+    () => {}, // 갱신 실패는 조용히 무시한다 - 마지막으로 받았던 위치를 그대로 둔다.
+    { enableHighAccuracy: true, maximumAge: 5000 },
+  )
+}
+
 function recenterToMyLocation() {
   if (!mapInstance || !kakaoInstance) return
   if (navigator.geolocation) {
@@ -1191,11 +1219,16 @@ onMounted(async () => {
   } else {
     initMap(kakao, savedCenter ?? defaultCenter, savedCenter ? savedLevel : undefined)
   }
+
+  // 초기 위치는 위 getCurrentPosition으로 한 번만 받고, 그 이후로 계속 움직이는 건
+  // watchPosition이 이어서 담당한다.
+  startWatchingMyLocation()
 })
 
 onUnmounted(() => {
   mapResizeObserver?.disconnect()
   window.removeEventListener('resize', syncSheetPosition)
+  if (geoWatchId != null) navigator.geolocation.clearWatch(geoWatchId)
 })
 </script>
 

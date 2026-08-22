@@ -4,7 +4,6 @@ import { setActivePinia, createPinia } from 'pinia'
 vi.mock('@/services/authService', () => ({
   loginRequest: vi.fn(),
   logoutRequest: vi.fn(),
-  devLoginRequest: vi.fn(),
   signUpRequest: vi.fn(),
   refreshTokenRequest: vi.fn(),
   fetchProfile: vi.fn(),
@@ -22,7 +21,6 @@ import { useAuthStore } from '@/stores/auth'
 import {
   loginRequest,
   logoutRequest,
-  devLoginRequest,
   signUpRequest,
   refreshTokenRequest,
   fetchProfile,
@@ -197,29 +195,6 @@ describe('login', () => {
     await store.login('tester01', 'wrong')
 
     expect(store.errorMessage).toBe('로그인에 실패했습니다.')
-  })
-})
-
-describe('devLogin', () => {
-  it('성공하면 세션을 적용하고 true를 반환한다', async () => {
-    devLoginRequest.mockResolvedValueOnce(SESSION)
-    const store = useAuthStore()
-
-    const result = await store.devLogin(3)
-
-    expect(devLoginRequest).toHaveBeenCalledWith(3)
-    expect(result).toBe(true)
-    expect(store.isAuthenticated).toBe(true)
-  })
-
-  it('실패하면 errorMessage를 채우고 false를 반환한다', async () => {
-    devLoginRequest.mockRejectedValueOnce({ response: { data: { message: 'dev login disabled' } } })
-    const store = useAuthStore()
-
-    const result = await store.devLogin(3)
-
-    expect(result).toBe(false)
-    expect(store.errorMessage).toBe('dev login disabled')
   })
 })
 

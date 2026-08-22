@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import api from '@/api'
 import {
   loginRequest,
-  devLoginRequest,
   refreshTokenRequest,
   fetchProfile,
   requestSignupIdentityCode,
@@ -67,27 +66,6 @@ describe('loginRequest', () => {
 
     await expect(loginRequest('tester', 'wrong')).rejects.toBe(error)
     expect(api.get).not.toHaveBeenCalled()
-  })
-})
-
-describe('devLoginRequest', () => {
-  it('slot으로 개발자 로그인을 요청하고 프로필을 채운다', async () => {
-    api.post.mockResolvedValue({
-      data: { accessToken: 'dev-access', refreshToken: 'dev-refresh', userId: 3, loginId: 'dev1' },
-    })
-    api.get.mockResolvedValue({ data: { userId: 3, loginId: 'dev1', name: '개발자1' } })
-
-    const result = await devLoginRequest(1)
-
-    expect(api.post).toHaveBeenCalledWith('/auth/dev-login', { slot: 1 })
-    expect(result.user).toEqual({ userId: 3, loginId: 'dev1', name: '개발자1' })
-  })
-
-  it('dev-login이 비활성화면(404) 예외를 그대로 던진다', async () => {
-    const error = { response: { status: 404 } }
-    api.post.mockRejectedValue(error)
-
-    await expect(devLoginRequest(1)).rejects.toBe(error)
   })
 })
 

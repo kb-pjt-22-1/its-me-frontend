@@ -9,6 +9,7 @@ import { useCardsStore } from '@/stores/cards'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { usePaymentStore } from '@/stores/payment'
+import { useNotificationsStore } from '@/stores/notifications'
 
 function setupStores() {
   setActivePinia(createPinia())
@@ -17,14 +18,16 @@ function setupStores() {
   const merchantsStore = useMerchantsStore()
   const bookmarksStore = useBookmarksStore()
   const paymentStore = usePaymentStore()
+  const notificationsStore = useNotificationsStore()
 
   cardsStore.fetchCards = vi.fn()
   merchantsStore.fetchMerchants = vi.fn()
   bookmarksStore.fetchBookmarks = vi.fn()
   paymentStore.fetchHistory = vi.fn()
+  notificationsStore.fetchNotifications = vi.fn()
   authStore.registerFcmToken = vi.fn()
 
-  return { authStore, cardsStore, merchantsStore, bookmarksStore, paymentStore }
+  return { authStore, cardsStore, merchantsStore, bookmarksStore, paymentStore, notificationsStore }
 }
 
 function mountApp() {
@@ -62,6 +65,7 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
     expect(stores.merchantsStore.fetchMerchants).not.toHaveBeenCalled()
     expect(stores.bookmarksStore.fetchBookmarks).not.toHaveBeenCalled()
     expect(stores.paymentStore.fetchHistory).not.toHaveBeenCalled()
+    expect(stores.notificationsStore.fetchNotifications).not.toHaveBeenCalled()
     expect(stores.authStore.registerFcmToken).not.toHaveBeenCalled()
   })
 
@@ -77,7 +81,8 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
     expect(stores.merchantsStore.fetchMerchants).toHaveBeenCalledTimes(1)
     expect(stores.bookmarksStore.fetchBookmarks).toHaveBeenCalledTimes(1)
     expect(stores.paymentStore.fetchHistory).toHaveBeenCalledTimes(1)
-    // 세션 복원(자동 로그인)은 store의 login/devLogin/signUp을 안 거쳐서 자체적으로
+    expect(stores.notificationsStore.fetchNotifications).toHaveBeenCalledTimes(1)
+    // 세션 복원(자동 로그인)은 store의 login/signUp을 안 거쳐서 자체적으로
     // registerFcmToken을 안 부르므로, 이미 인증된 채로 마운트될 때 여기서 한 번 불러야 한다.
     expect(stores.authStore.registerFcmToken).toHaveBeenCalledTimes(1)
   })
@@ -97,6 +102,7 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
     expect(stores.merchantsStore.fetchMerchants).toHaveBeenCalledTimes(1)
     expect(stores.bookmarksStore.fetchBookmarks).toHaveBeenCalledTimes(1)
     expect(stores.paymentStore.fetchHistory).toHaveBeenCalledTimes(1)
+    expect(stores.notificationsStore.fetchNotifications).toHaveBeenCalledTimes(1)
   })
 
   it('isAuthenticated에 영향 없는 상태 변화는 사용자 데이터를 불러오지 않는다', async () => {
