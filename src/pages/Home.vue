@@ -82,35 +82,25 @@
               </Button>
             </div>
 
-            <div
-                v-if="!recommendation.nearbyMerchants?.length"
-                class="empty-text muted-text"
-            >
+            <div v-if="!recommendation.nearbyMerchants?.length" class="empty-text muted-text">
               근처에 추천할 매장이 없어요.
             </div>
 
             <div v-else class="reco-merchant-list">
               <button
-                  v-for="merchant in recommendation.nearbyMerchants"
+                  v-for="merchant in nearbyMerchantsWithImages"
                   :key="merchant.merchantId"
                   type="button"
                   class="reco-merchant-item"
                   @click="goToMerchantOnMap(merchant.merchantId)"
               >
-          <span class="reco-merchant-icon">
-            <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-            >
-              <path d="M3 9h18" />
-              <path d="M5 9v11h14V9" />
-              <path d="M4 9l2-5h12l2 5" />
-              <path d="M9 20v-6h6v6" />
-            </svg>
+          <span class="reco-merchant-icon" :class="{ 'reco-merchant-icon--image': merchant.displayImage }">
+            <img
+              v-if="merchant.displayImage"
+              :src="merchant.displayImage"
+              :alt="`${merchant.name} 이미지`"
+              class="reco-merchant-image"
+            />
           </span>
 
                 <span class="reco-merchant-info">
@@ -148,8 +138,16 @@
             <line x1="14" y1="20" x2="17" y2="20"></line>
             <line x1="20" y1="20" x2="20" y2="20.01"></line>
           </svg>
-          <span class="pay-link-text">지금 결제 →</span>
-          <span v-if="latestBookmarkMerchantName" class="quick-pay-merchant">{{ latestBookmarkMerchantName }}</span>
+          <span v-if="latestBookmarkMerchantName" class="quick-pay-merchant">
+            <span class="quick-pay-merchant-name">
+              {{ latestBookmarkMerchantName }}
+            </span>
+            <span class="quick-pay-suffix">에서 결제</span>
+            </span>
+
+            <span v-else class="quick-pay-fallback">
+              바로 결제하기
+            </span>
         </Button>
         <Button variant="box-outline" class="bottom-box bottom-box--compact monthly-benefit-box" @click="router.push('/benefits')">
           <h3>이번 달 혜택</h3>
@@ -273,7 +271,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import Button from '@/components/common/Button.vue';
@@ -283,6 +281,7 @@ import { useBookmarksStore } from '@/stores/bookmarks';
 import { useMerchantsStore } from '@/stores/merchants';
 import { useHomeStore } from '@/stores/home';
 import { getCardImage } from '@/utils/cardImages';
+import { getBrandImage } from '@/utils/brandImages';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -295,6 +294,37 @@ const { recommendation, recommendationLoading, recommendationError, expiring, ex
   storeToRefs(homeStore);
 
 const userName = computed(() => authStore.userName);
+
+const nearbyMerchantsWithImages = computed(() =>
+  (recommendation.value?.nearbyMerchants ?? []).map((merchant) => {
+    const detail = merchantsStore.getById(merchant.merchantId);
+    const brandId = detail?.brandId ?? merchant.brandId;
+    const categoryCode = detail?.categoryCode ?? merchant.categoryCode;
+    const category = merchantsStore.getCategoryByCode(categoryCode);
+    const brandImage = getBrandImage(
+      merchantsStore.getBrandById(brandId)?.brandLogo
+    );
+
+    return {
+      ...merchant,
+      displayImage: brandImage ?? category?.categoryIcon ?? null,
+    };
+  })
+);
+
+watch(
+  () => (recommendation.value?.nearbyMerchants ?? []).slice(0, 2).map((merchant) => merchant.merchantId),
+  async (merchantIds) => {
+    if (merchantIds.length === 0) return;
+
+    await Promise.allSettled([
+      merchantsStore.fetchCategories(),
+      merchantsStore.fetchBrands(),
+      ...merchantIds.map((merchantId) => merchantsStore.fetchMerchantDetail(merchantId)),
+    ]);
+  },
+  { immediate: true }
+);
 
 // "추천 카드로 결제" - Payments.vue가 route.query.userCardId를 보고 그 카드를
 // 기본 선택하도록 되어 있어서, 추천된 카드 ID를 쿼리로 넘겨서 이어줌.
@@ -408,7 +438,7 @@ onMounted(() => {
 
 <style scoped>
 .layout-container {
-  padding: 5px 18px 24px;
+  padding: 5px 16px 24px;
 }
 
 .home-header {
@@ -459,7 +489,7 @@ onMounted(() => {
 .reco-sub { margin: 0; font-size: 12.5px; }
 
 .reco-card-media {
-  --reco-card-x: -3px;
+  --reco-card-x: -8px;
   --reco-card-y: 22px;
   position: relative;
   width: 160px;
@@ -552,7 +582,9 @@ onMounted(() => {
 .reco-merchant-list { display:flex; flex-direction:column; gap:9px; }
 .reco-merchant-item { width:100%; min-height:52px; display:grid; grid-template-columns:34px minmax(0,1fr) auto 12px; align-items:center; gap:9px; padding:8px 11px; border:1px solid rgba(218,211,200,.65); border-radius:14px; background:#fff; box-shadow:0 2px 8px rgba(48,43,35,.07); text-align:left; transition:transform 120ms ease,box-shadow 120ms ease; }
 .reco-merchant-item:active { transform:scale(.985); box-shadow:0 2px 8px rgba(48,43,35,.08); }
-.reco-merchant-icon { width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:#f3f0ea; color:#625b50; }
+.reco-merchant-icon { position:relative; width:34px; height:34px; display:grid; place-items:center; overflow:hidden; border-radius:10px; background:#f3f0ea; color:#625b50; }
+.reco-merchant-icon--image { background:#ffffff; }
+.reco-merchant-icon--image .reco-merchant-image { position:absolute; inset:0; display:block; width:100%; height:100%; max-width:none; object-fit:cover; transform: scale(1.1);}
 .reco-merchant-info { min-width:0; display:flex; align-items:baseline; gap:5px; }
 .reco-merchant-info strong { overflow:hidden; color:var(--charcoal,#24211d); font-size:13px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
 .reco-merchant-info small { flex:0 0 auto; color:var(--muted,#8f897f); font-size:11px; }
@@ -583,26 +615,42 @@ onMounted(() => {
   font-size: 14px;
   line-height: 1.25;
 }
-.bottom-container .bottom-box--compact .pay-link-text {
-  display: block;
-  margin-top: 3px;
-  color: var(--orange, #ffbc00);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.3;
-}
+
 .bottom-container .bottom-box--compact .quick-pay-merchant {
-  display: block;
-  max-width: calc(100% - 30px);
-  margin-top: 4px;
+  display: flex;
+  align-items: baseline;
+  max-width: calc(100% - 15px);
+  margin: 0 0 5px;
+  color: var(--orange, #ffbc00);
+  line-height: 1.25;
+}
+
+.quick-pay-merchant-name {
+  min-width: 0;
   overflow: hidden;
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-size: 13px;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.quick-pay-suffix {
+  flex-shrink: 0;
+  margin-left: 2px;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.quick-pay-fallback {
+  display: block;
+  margin: 0 0 5px;
+  color: var(--orange, #ffbc00);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
 .bottom-container .bottom-box--compact .gift-icon,
 .bottom-container .bottom-box--compact .barcode-icon {
   position: absolute;
@@ -652,7 +700,7 @@ onMounted(() => {
   flex: 0 0 24px;
   display: grid;
   place-items: center;
-  margin-top: 0;
+  margin-top: 2px;
 }
 
 .expiring-icon svg {

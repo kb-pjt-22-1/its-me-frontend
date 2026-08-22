@@ -47,6 +47,15 @@ describe('라우터 가드 (requiresAuth)', () => {
 
     expect(router.currentRoute.value.name).toBe('cards')
   })
+
+  it('기존 카드 상세 주소와 card-detail 이름을 canonical query 주소로 연결한다', async () => {
+    authState.isAuthenticated = true
+
+    await router.push({ name: 'card-detail', params: { userCardId: 123 } })
+
+    expect(router.currentRoute.value.name).toBe('cards')
+    expect(router.currentRoute.value.fullPath).toBe('/cards?userCardId=123')
+  })
 })
 
 describe('라우터 가드 (guestOnly)', () => {

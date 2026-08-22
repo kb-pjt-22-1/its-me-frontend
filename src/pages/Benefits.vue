@@ -77,7 +77,7 @@
 
           <p class="report-total">{{ totalBenefit.toLocaleString() }}원</p>
 
-          <div v-if="categoryBreakdown.length === 0" class="benefit-usage-empty muted-text">
+          <div v-if="reportCategories.length === 0" class="benefit-usage-empty muted-text">
             받은 혜택이 아직 없어요.
           </div>
 
@@ -105,7 +105,7 @@
                     {{ activeSegment.name }}
                   </text>
                   <text x="60" y="72" text-anchor="middle" class="donut-center-label">
-                    {{ activeSegment.amount.toLocaleString() }}원 · {{ activeSegment.percent }}%
+                    {{ activeSegment.amount.toLocaleString() }}원 · {{ activeSegment.percentLabel }}
                   </text>
                 </template>
                 <template v-else>
@@ -116,7 +116,7 @@
 
               <ul class="donut-legend">
                 <li
-                    v-for="cat in categoryBreakdown"
+                    v-for="cat in reportCategories"
                     :key="cat.categoryCode"
                     :class="{ active: activeSegment === cat }"
                     @mouseenter="activeSegment = cat"
@@ -124,11 +124,20 @@
                 >
                   <span class="legend-dot" :style="{ background: cat.color }"></span>
                   <span class="legend-name">{{ cat.name }}</span>
-                  <span class="legend-percent">{{ cat.percent }}%</span>
+                  <span class="legend-percent">{{ cat.percentLabel }}</span>
                   <span class="legend-amount muted-text">{{ cat.amount.toLocaleString() }}원</span>
                 </li>
               </ul>
             </div>
+
+            <button
+                v-if="positiveCategoryBreakdown.length > 5"
+                type="button"
+                class="report-expand-btn"
+                @click="toggleReportExpanded"
+            >
+              {{ reportExpanded ? '간단히 보기' : '전체 구성 보기' }}
+            </button>
           </template>
         </template>
       </div>
@@ -136,13 +145,18 @@
 
     <!-- 이번 달 받을 수 있는 혜택 [GET /api/v1/benefits/limits] -->
     <section id="available" class="available-section">
-      <div class="section-header">
-        <h3 class="section-title">이번 달 받을 수 있는 혜택</h3>
-        <button type="button" class="link-btn">전체 카드</button>
+      <div class="available-heading">
+        <div class="section-header">
+          <h3 class="section-title">이번 달 받을 수 있는 혜택</h3>
+          <button type="button" class="link-btn">전체 카드</button>
+        </div>
+
+        <p class="section-sub muted-text">
+          보유한 전체 카드의 카테고리별 혜택 현황이에요.
+        </p>
       </div>
 
       <div class="surface-card available-card">
-        <p class="section-sub muted-text">보유한 전체 카드의 카테고리별 혜택 현황이에요.</p>
 
         <div v-if="limitsLoading" class="benefit-usage-loading muted-text">불러오는 중...</div>
 
@@ -158,18 +172,32 @@
         <template v-else>
           <div class="benefit-usage-list">
             <div v-for="item in visibleAvailableBenefits" :key="item.key" class="benefit-usage-item">
-              <span class="usage-icon">{{ item.icon }}</span>
+              <span class="usage-icon">
+                <img
+                    v-if="getBenefitCategoryIcon(item.categoryCode)"
+                    :src="getBenefitCategoryIcon(item.categoryCode)"
+                    :alt="`${item.category} 아이콘`"
+                    class="usage-category-icon"
+                />
+              </span>
               <div class="usage-main">
                 <div class="usage-top-row">
                   <strong>{{ item.category }}</strong>
                   <button type="button" class="usage-link" @click="goToBenefitMap(item.categoryCode)">이 혜택 사용하기 &gt;</button>
                 </div>
-                <p class="usage-sub muted-text">{{ item.cardName }} · {{ item.serviceName }}</p>
-                <p class="usage-desc muted-text">{{ item.used.toLocaleString() }}원 사용 / {{ limitLabel(item) }}</p>
+                <div class="usage-summary-row">
+                  <p class="usage-desc muted-text">
+                    {{ item.used.toLocaleString() }}원 사용 / {{ limitLabel(item) }}
+                  </p>
+
+                  <p class="usage-remaining muted-text">
+                    {{ remainingLabel(item) }}
+                  </p>
+                </div>
+
                 <div class="progress-track">
                   <div class="progress-fill" :style="{ width: usagePercent(item) + '%' }"></div>
                 </div>
-                <p class="usage-remaining muted-text">{{ remainingLabel(item) }}</p>
                 <p v-if="item.countLimit != null" class="usage-count muted-text">{{ item.usedCount }}/{{ item.countLimit }}회 사용</p>
               </div>
             </div>
@@ -203,7 +231,7 @@
       </div>
 
       <template v-else>
-        <div class="breakeven-slider">
+        <div class="breakeven-slider" :class="{ 'breakeven-slider--single': breakevenCards.length === 1 }">
           <div v-for="card in breakevenCards" :key="card.userCardId" class="surface-card breakeven-card breakeven-slide">
             <div class="be-card-header">
               <div class="be-card-thumb">
@@ -356,12 +384,14 @@ import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
 import { useBenefitsStore } from '@/stores/benefits';
 import { getCardImage } from '@/utils/cardImages';
+import { useMerchantsStore } from '@/stores/merchants';
 
 const route = useRoute();
 const router = useRouter();
 const benefitsStore = useBenefitsStore();
 const {
   reportMonthLabel,
+  selectedYearMonth,
   totalBenefit,
   deltaVsLastMonth,
   categoryBreakdown,
@@ -403,6 +433,52 @@ function loadLimits() {
 }
 
 const activeSegment = ref(null); // 마우스 오버/탭 중인 카테고리 (categoryBreakdown의 항목 그 자체)
+const reportExpanded = ref(false);
+
+const positiveCategoryBreakdown = computed(() =>
+  categoryBreakdown.value
+    .filter((cat) => Number(cat.amount) > 0)
+    .sort((a, b) => Number(b.amount) - Number(a.amount))
+);
+
+const groupedCategoryBreakdown = computed(() => {
+  if (reportExpanded.value || positiveCategoryBreakdown.value.length <= 5) {
+    return positiveCategoryBreakdown.value;
+  }
+
+  const topCategories = positiveCategoryBreakdown.value.slice(0, 4);
+  const remainingCategories = positiveCategoryBreakdown.value.slice(4);
+  return [
+    ...topCategories,
+    {
+      categoryCode: 'OTHER',
+      name: '기타',
+      amount: remainingCategories.reduce((sum, cat) => sum + Number(cat.amount), 0),
+      color: remainingCategories[0].color,
+    },
+  ];
+});
+
+const reportCategories = computed(() =>
+  groupedCategoryBreakdown.value.map((cat) => {
+    const percent = totalBenefit.value > 0 ? (Number(cat.amount) / totalBenefit.value) * 100 : 0;
+    return {
+      ...cat,
+      percent,
+      percentLabel: percent > 0 && percent < 1 ? '1%' : `${Math.round(percent)}%`,
+    };
+  })
+);
+
+function toggleReportExpanded() {
+  activeSegment.value = null;
+  reportExpanded.value = !reportExpanded.value;
+}
+
+watch(selectedYearMonth, () => {
+  activeSegment.value = null;
+  reportExpanded.value = false;
+});
 
 // 도넛 차트: SVG stroke-dasharray를 이용한 방식. r=45 기준 원둘레 계산.
 // 각 세그먼트에 원본 카테고리 객체(cat)를 같이 담아둬서, 클릭/호버 시
@@ -410,7 +486,7 @@ const activeSegment = ref(null); // 마우스 오버/탭 중인 카테고리 (ca
 const circumference = 2 * Math.PI * 45;
 const donutSegments = computed(() => {
   let cursor = 0;
-  return categoryBreakdown.value.map((cat) => {
+  return reportCategories.value.map((cat) => {
     const length = (cat.percent / 100) * circumference;
     const seg = { color: cat.color, length, offset: -cursor, cat };
     cursor += length;
@@ -422,9 +498,28 @@ const donutSegments = computed(() => {
 // 이번 달 받을 수 있는 혜택 (카테고리별 사용/한도) [GET /api/v1/benefits/limits]
 // ---------------------------------------------------------
 const showAllAvailable = ref(false);
-const visibleAvailableBenefits = computed(() =>
-    showAllAvailable.value ? benefitLimits.value : benefitLimits.value.slice(0, 3)
+const sortedAvailableBenefits = computed(() =>
+    [...benefitLimits.value].sort((a, b) => {
+      const remainingRatio = (item) => {
+        if (item.limit == null) return 1;
+        if (item.limit <= 0) return 0;
+        return Math.max(0, (item.remaining ?? 0) / item.limit);
+      };
+
+      return (
+          remainingRatio(b) - remainingRatio(a) ||
+          (b.remaining ?? 0) - (a.remaining ?? 0)
+      );
+    })
 );
+
+const visibleAvailableBenefits = computed(() =>
+    showAllAvailable.value
+        ? sortedAvailableBenefits.value
+        : sortedAvailableBenefits.value.slice(0, 3)
+);
+const merchantsStore = useMerchantsStore();
+const getBenefitCategoryIcon = (categoryCode) => merchantsStore.getCategoryByCode(categoryCode)?.categoryIcon;
 function usagePercent(item) {
   if (!item.limit) return 0; // 한도 없음(null) - 진행률 바는 항상 0%로 둔다
   return Math.min((item.used / item.limit) * 100, 100);
@@ -434,7 +529,9 @@ function limitLabel(item) {
 }
 function remainingLabel(item) {
   if (item.limit == null) return '한도 없이 계속 받을 수 있어요';
-  return `남은 혜택 ${(item.remaining ?? 0).toLocaleString()}원`;
+  const remaining = item.remaining ?? 0;
+  if (remaining <= 0) return '사용 완료';
+  return `남은 혜택 ${remaining.toLocaleString()}원`;
 }
 
 function goToBenefitMap(categoryCode) {
@@ -539,6 +636,7 @@ onMounted(() => {
   loadBreakEven();
   loadAiCoaching();
   loadLimits();
+  merchantsStore.fetchCategories();
 
   // 홈 화면 "이번 달에 사라지는 혜택" 카드에서 /benefits#available로 들어온 경우 스크롤한다.
   // #available 섹션 자체는 로딩 상태와 무관하게 항상 렌더링돼 있어서(내부 리스트만
@@ -577,22 +675,34 @@ onMounted(() => {
 .danger-text { color: var(--danger, #d94343); }
 
 .page {
-  padding: 8px 18px 40px;
+  padding: 8px 16px 24px;
 }
 
 /* AI 혜택 코치 */
-.ai-card { padding: 20px; margin-bottom: 16px; }
-.ai-badge {
-  display: inline-flex; align-items: center; gap: 5px;
-  margin-bottom: 10px;
-}
-.ai-title { margin: 0 0 8px; font-size: 17px; color: var(--charcoal, #24211d); }
-.ai-intro { margin: 0 0 16px; font-size: 12.5px; line-height: 1.6; }
+.ai-card {position: relative; padding: 20px; margin-bottom: 16px;}
 
-.ai-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.ai-badge {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+}
+.ai-title {
+  margin: 0 0 8px;
+  color: var(--charcoal, #24211d);
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 700;
+}
+.ai-intro { margin: 0 0 12px; font-size: 12.5px; line-height: 1.6; }
+
+.ai-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
 .ai-tips li { display: flex; gap: 10px; align-items: flex-start; }
 .ai-tip-num {
-  width: 20px; height: 20px; border-radius: 50%; background: var(--orange, #ffbc00);
+  width: 20px; height: 20px; border-radius: 50%; background: #F4B942;
   color: #171717; font-size: 11px; font-weight: 800; display: grid; place-items: center;
   flex: 0 0 auto; margin-top: 1px;
 }
@@ -603,13 +713,13 @@ onMounted(() => {
    flex + gap:14px를 줘서 "제목 -> 카드" 간격을 카드별 연회비 본전과 동일하게 맞춤.
    전에는 이 바깥 section이 없어서 .section-header의 margin-bottom(4px, 다른 섹션과 공유)을
    그대로 썼던 게 간격이 달랐던 원인이었음. */
-.report-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px; }
+.report-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px; }
 .report-card {
   height: auto;
   min-height: 0;
-  padding: 16px 22px;
+  padding: 13px 22px;
 }
-.report-card .report-top { margin-bottom: 4px; }
+.report-card .report-top { margin-bottom: 0; }
 .report-month-nav { display: flex; align-items: center; gap: 8px; }
 .report-label { margin: 0; font-size: 13px; font-weight: 700; color: var(--charcoal, #24211d); }
 .report-month-nav .month-nav-btn {
@@ -627,6 +737,7 @@ onMounted(() => {
   flex-direction: column;
   align-items: flex-end;
   gap: 1px;
+  transform: translateY(6px);
 }
 
 .report-delta {margin-left: 0;font-size: 12px;font-weight: 700;white-space: nowrap;}
@@ -634,7 +745,7 @@ onMounted(() => {
 .report-card .report-sub { margin: 0; font-size: 11px; }
 
 .report-card .report-total {
-  margin: 0 0 6px;
+  margin: 0 0 1px;
   font-size: 26px;
   font-weight: 800;
   color: var(--charcoal, #24211d);
@@ -659,6 +770,11 @@ onMounted(() => {
 .legend-percent { color: var(--charcoal, #24211d); font-weight: 700; flex: 0 0 auto; }
 .legend-amount { margin-left: auto; font-size: 11px; }
 
+.report-expand-btn {
+  width: 100%; margin-top: 12px; padding: 11px 0 1px; border: none; border-top: 1px solid rgba(231, 228, 222, .7);
+  background: none; box-shadow: none; color: var(--muted, #8f897f); font-size: 12px; font-weight: 700; cursor: pointer;
+}
+
 .expand-btn {
   width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px;
   border: none; background: none; color: var(--muted, #8f897f); font-size: 12px; font-weight: 700;
@@ -668,11 +784,23 @@ onMounted(() => {
 /* 이번 달 받을 수 있는 혜택 */
 /* 이번 달 받을 수 있는 혜택 - report-section/breakeven-section이랑 같은 구조:
    제목은 흰 박스 밖에, gap:14px로 박스랑 간격 통일 */
-.available-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 26px; }
+.available-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; }
+.section-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .available-card { padding: 20px; }
-.section-header { display: flex; justify-content: space-between; align-items: center; }
-.section-header h3 { margin: 0; font-size: 15px; color: var(--charcoal, #24211d); }
-.section-sub { margin: 0 0 14px; font-size: 11.5px; }
+.section-header h3,
+.section-title {
+  color: var(--charcoal, #24211d);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+}
+.available-heading { display: flex; flex-direction: column; gap: 2px; }
+.section-sub { margin: 0; font-size: 11.5px; }
 .link-btn { border: none; background: none; color: var(--muted, #8f897f); font-size: 12px; font-weight: 700; cursor: pointer; }
 
 .benefit-usage-loading,
@@ -684,13 +812,19 @@ onMounted(() => {
   width: 38px; height: 38px; border-radius: 10px; background: var(--page, #f7f7f5);
   display: grid; place-items: center; font-size: 1.1rem; flex: 0 0 auto;
 }
+.usage-category-icon { width: 32px; height: 32px; object-fit: contain; }
 .usage-main { flex: 1; min-width: 0; }
 .usage-top-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
 .usage-top-row strong { font-size: 13.5px; color: var(--charcoal, #24211d); }
-.usage-link { border: none; background: none; color: var(--orange-deep, #e6aa00); font-size: 11px; font-weight: 700; cursor: pointer; padding: 0; }
-.usage-sub { margin: 0 0 4px; font-size: 10.5px; }
-.usage-desc { margin: 0 0 6px; font-size: 11.5px; }
-.usage-remaining { margin: 6px 0 0; font-size: 11px; }
+.usage-link { border: none; background: none; color: #625b50; font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; }.usage-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.usage-desc, .usage-remaining { margin: 0; font-size: 11px; white-space: nowrap; }
+.usage-remaining.muted-text {
+  color: #55bea0;
+  font-weight: 600;
+}
+.available-card .progress-fill {
+  background: linear-gradient(90deg, #f4b942 0%, #ffd66b 100%);
+}
 .usage-count { margin: 2px 0 0; font-size: 11px; }
 
 /* 카드별 연회비 본전 */
@@ -704,14 +838,12 @@ onMounted(() => {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-
   margin: 0;
   padding: 0;
 }
+.breakeven-slider--single .breakeven-slide { flex-basis: 100%;}
 
-.breakeven-slider::-webkit-scrollbar {
-  display: none;
-}
+.breakeven-slider::-webkit-scrollbar { display: none;}
 
 .breakeven-slide {
   /* 카드 폭을 줄여 오른쪽 다음 카드가 보이게 함 */

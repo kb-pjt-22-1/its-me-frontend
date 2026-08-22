@@ -17,7 +17,11 @@ export const useCardsStore = defineStore('cards', {
   state: () => ({
     cards: [],
     isLoading: false,
+    hasLoadedCards: false,
     error: null,
+    detailLoadingById: {},
+    detailErrorById: {},
+    detailLoadedById: {},
   }),
 
   getters: {
@@ -33,9 +37,13 @@ export const useCardsStore = defineStore('cards', {
       const authStore = useAuthStore()
       if (!authStore.isAuthenticated) return
 
+      if (this.hasLoadedCards) return this.cards
+      if (this._fetchCardsPromise) return this._fetchCardsPromise
+
       this.isLoading = true
       this.error = null
-      try {
+      this._fetchCardsPromise = (async () => {
+       try {
         const list = await fetchMyCards()
 
         const currentYearMonth = getCurrentYearMonth()
@@ -92,20 +100,38 @@ export const useCardsStore = defineStore('cards', {
                 card.targetAmount,
           }
         })
+        this.hasLoadedCards = true
+        return this.cards
       } catch (err) {
         this.error =
             err.response?.data?.message ??
             '카드 목록을 불러오지 못했습니다.'
+        return null
       } finally {
         this.isLoading = false
+        this._fetchCardsPromise = null
       }
+      })()
+
+      return this._fetchCardsPromise
     },
 
     // 카드 상세 화면 진입 시: 실적 + 혜택(benefits_info)을 추가로 받아서 합칩니다.
     async fetchCardFullDetail(userCardId) {
-      this.isLoading = true
-      this.error = null
-      try {
+      const id = Number(userCardId)
+      const existing = this.getById(id)
+      if (!existing || (existing.status && existing.status !== 'ACTIVE')) return existing ?? null
+      if (existing.benefitsInfo != null) {
+        this.detailLoadedById[id] = true
+        return existing
+      }
+      if (this._detailPromises?.[id]) return this._detailPromises[id]
+
+      this._detailPromises ??= {}
+      this.detailLoadingById[id] = true
+      this.detailErrorById[id] = null
+      this._detailPromises[id] = (async () => {
+       try {
         const currentYearMonth = getCurrentYearMonth()
         const [performance, benefitsInfo] = await Promise.all([
           fetchCardPerformance(userCardId, currentYearMonth),
@@ -113,7 +139,7 @@ export const useCardsStore = defineStore('cards', {
         ])
 
         const index = this.cards.findIndex(
-            (card) => card.userCardId === Number(userCardId)
+            (card) => card.userCardId === id
         )
 
         const merged = {
@@ -133,13 +159,18 @@ export const useCardsStore = defineStore('cards', {
           this.cards[index] = merged
         }
 
+        this.detailLoadedById[id] = true
         return merged
       } catch (err) {
-        this.error = err.response?.data?.message ?? '카드 상세 정보를 불러오지 못했습니다.'
+        this.detailErrorById[id] = err.response?.data?.message ?? '카드 상세 정보를 불러오지 못했습니다.'
         return null
       } finally {
-        this.isLoading = false
+        this.detailLoadingById[id] = false
+        delete this._detailPromises[id]
       }
+      })()
+
+      return this._detailPromises[id]
     },
 
     // fetchCards()로 받은 카드 목록엔 benefitsInfo가 없다(실적만 옴) - 매장 카테고리별
@@ -171,12 +202,16 @@ export const useCardsStore = defineStore('cards', {
 
     async syncCards() {
       await syncCards()
+      this.hasLoadedCards = false
       await this.fetchCards()
     },
 
     async deleteCard(userCardId) {
       await deleteCard(userCardId)
       this.cards = this.cards.filter((c) => c.userCardId !== Number(userCardId))
+      delete this.detailLoadingById[userCardId]
+      delete this.detailErrorById[userCardId]
+      delete this.detailLoadedById[userCardId]
     },
 
     // 낙관적 업데이트: 먼저 화면에 반영, 실패하면 되돌립니다.

@@ -3,14 +3,14 @@ import api from '@/api'
 // Benefits.vue의 도넛/범례 색상 팔레트. 백엔드 응답에는 색상이 없어서
 // categoryBreakdown 순서(금액 내림차순)대로 순환 배정합니다.
 const CATEGORY_COLORS = [
-  'var(--orange, #ffb800)',
-  'var(--green, #00a97b)',
-  '#4a7fd4',
-  'var(--danger, #f05e58)',
-  'var(--muted, #c7c2b8)',
-  '#9b6bd1',
-  '#e07a5f',
-  '#3ac1c9',
+  '#F4B942',
+  '#55BEA0',
+  '#79A5E3',
+  '#EA7C7C',
+  '#A9A39A',
+  '#A88BD8',
+  '#E99576',
+  '#68BEC7',
 ]
 
 // 연회비 본전 카드의 비주얼(be-card-visual) 배경. 백엔드에 색상 필드가 없어서
@@ -157,13 +157,16 @@ function normalizeReport(dto) {
     yearMonth: dto.yearMonth,
     totalBenefit: dto.totalBenefitAmount ?? 0,
     deltaVsLastMonth: dto.deltaVsLastMonth ?? 0,
-    categoryBreakdown: (dto.categoryBreakdown ?? []).map((cat, i) => ({
+    categoryBreakdown: (dto.categoryBreakdown ?? [])
+      .filter((cat) => Number(cat.amount) > 0)
+      .sort((a, b) => Number(b.amount) - Number(a.amount))
+      .map((cat, i) => ({
       categoryCode: cat.categoryCode,
       name: cat.categoryName,
-      amount: cat.amount,
+      amount: Number(cat.amount),
       percent: cat.percent,
       color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
-    })),
+      })),
   }
 }
 

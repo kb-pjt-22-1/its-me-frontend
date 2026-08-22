@@ -69,11 +69,11 @@ const router = createRouter({
             component: () => import('@/pages/Paymentdetail.vue'),
             meta: {requiresAuth: true},
         },
-        // 카드 목록(/cards)에서 카드를 눌렀을 때 들어가는 상세 화면
+        // 예전 카드 상세 주소와 이름은 홈 등 기존 진입 코드의 하위 호환을 위해 유지한다.
         {
             path: '/cards/:userCardId',
             name: 'card-detail',
-            component: () => import('@/pages/Carddetail.vue'),
+            redirect: (to) => ({path: '/cards', query: {userCardId: String(to.params.userCardId)}}),
             meta: {requiresAuth: true},
         },
         // 매장 목록/지도에서 매장을 눌렀을 때 들어가는 상세 화면

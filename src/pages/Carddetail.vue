@@ -1,374 +1,41 @@
 <template>
-  <div class="layout-container" v-if="isLoading && !card">
-    <p class="loading-text muted-text">카드 정보를 불러오는 중...</p>
-  </div>
-
-  <div class="layout-container" v-else-if="card">
-    <header class="page-header">
-      <button class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-      </button>
-      <h2 class="detail-header-title">
-        <span>{{ card.cardName }}</span>
-        <span v-if="cardLast4" class="detail-card-number">{{ cardLast4 }}</span>
-      </h2>
+  <main class="layout-container">
+    <header v-if="card" class="page-header">
+      <button class="icon-btn-outline" aria-label="뒤로가기" @click="router.back()">‹</button>
+      <h2 class="detail-header-title"><span>{{ card.cardName }}</span><span v-if="cardLast4" class="detail-card-number">{{ cardLast4 }}</span></h2>
       <div class="right-placeholder"></div>
     </header>
-
-    <!-- 카드 실물 이미지 대신 CSS로 그린 카드. panLast4 외에는 노출하지 않습니다 (보안) -->
-    <div class="card-image-wrap">
-      <img
-          v-if="getCardImage(card)"
-          :src="getCardImage(card)"
-          :alt="`${card.cardName} 이미지`"
-          class="card-detail-image"
-      />
-      <div v-else class="card-image-fallback">
-        {{ card.cardName }}
-      </div>
+    <div v-if="card" class="card-image-wrap">
+      <img v-if="getCardImage(card)" :src="getCardImage(card)" :alt="`${card.cardName} 이미지`" class="card-detail-image" />
+      <div v-else class="card-image-fallback">{{ card.cardName }}</div>
     </div>
-
-    <!-- 카드 기본 정보 -->
-    <section v-if="card.description || typeof card.annualFee === 'number'" class="surface-card info-section">
-      <p v-if="card.description" class="card-description muted-text">{{ card.description }}</p>
-      <p v-if="typeof card.annualFee === 'number'" class="annual-fee">
-        연회비 <strong>{{ card.annualFee > 0 ? `${card.annualFee.toLocaleString()}원` : '없음' }}</strong>
-      </p>
-      <p v-if="card.supported === false" class="danger-text unsupported-notice">
-        더 이상 신규 발급/연동이 지원되지 않는 카드예요.
-      </p>
-    </section>
-
-    <!-- 이번 달 이용실적 -->
-    <section class="surface-card status-section">
-      <p class="section-label">이번 달 이용실적</p>
-      <template v-if="typeof card.currentAmount === 'number'">
-        <h3 class="tier-label">{{ tierLabel }}</h3>
-        <div class="progress-track">
-          <div
-              class="progress-fill"
-              :style="{ width: tierPercent + '%' }"
-          ></div>
-        </div>
-        <p class="recognized-amount muted-text">
-          실적인정금액
-          <strong>{{ card.currentAmount.toLocaleString() }}원</strong>
-          <template v-if="nextTargetAmount !== null">
-            / 목표 {{ nextTargetAmount.toLocaleString() }}원
-          </template>
-          <span v-else class="success-text">
-        · 최고 구간 달성
-      </span>
-        </p>
-      </template>
-      <p v-else class="muted-text">
-        실적 정보를 불러오지 못했어요.
-      </p>
-    </section>
-
-    <!-- 카드 혜택 (이번 달 현재 실적 구간 기준) -->
-    <section class="surface-card benefits-section">
-      <p class="section-label">카드 혜택 - {{ tierLabel }} 기준</p>
-      <template v-if="currentTierBenefits.length">
-        <div v-for="(b, i) in currentTierBenefits" :key="i" class="benefit-row">
-          <span class="benefit-cat">{{ b.categoryName }}</span>
-          <span class="benefit-rate">{{ formatBenefit(b) }}</span>
-        </div>
-      </template>
-      <p v-else class="muted-text">현재 실적 구간의 혜택이 없어요.</p>
-    </section>
-
-    <!-- 추천 카드에 포함 -->
-    <section class="surface-card recommendation-section">
-      <div class="recommendation-row">
-        <div>
-          <p class="recommendation-title">추천 카드에 포함</p>
-          <p class="recommendation-desc muted-text">
-            카드 추천 시 이 카드를 추천 대상에 포함합니다.
-          </p>
-        </div>
-        <button
-            class="recommendation-toggle"
-            :class="{ 'recommendation-toggle--on': isRecommendationEnabled }"
-            role="switch"
-            :aria-checked="isRecommendationEnabled"
-            aria-label="추천 카드 포함 여부"
-            @click="handleToggleRecommendation"
-        >
-          <span class="recommendation-toggle-knob"></span>
-        </button>
-      </div>
-    </section>
-
-    <div v-if="card.isPrimary" class="primary-badge-row">
-      <span class="primary-badge muted-text">대표 카드</span>
-    </div>
-    <button v-else class="set-primary-btn" @click="handleSetPrimary">
-      대표 카드로 설정
-    </button>
-
-    <button class="delete-card-btn danger-text" @click="handleDeleteCard">
-      이 카드 삭제
-    </button>
-  </div>
-
-  <div v-else class="layout-container">
-    <p class="not-found muted-text">카드를 찾을 수 없습니다.</p>
-  </div>
+    <CardDetailsPanel :card="card" :loading="loading" :error="error" @retry="loadDetail(true)" @deleted="router.replace?.({ name: 'cards' })" />
+    <p v-if="!loading && !card" class="not-found muted-text">카드를 찾을 수 없습니다.</p>
+  </main>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { useCardsStore } from '@/stores/cards';
-import { getCurrentTier, formatBenefit } from '@/services/cardService';
-import { useToast } from '@/composables/useToast';
-import { useConfirmDialog } from '@/composables/useConfirmDialog';
-import { getCardImage } from '@/utils/cardImages';
+import { computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import CardDetailsPanel from '@/components/cards/CardDetailsPanel.vue'
+import { useCardsStore } from '@/stores/cards'
+import { getCardImage } from '@/utils/cardImages'
+import { useToast } from '@/composables/useToast'
 
-const route = useRoute();
-const router = useRouter();
-const cardsStore = useCardsStore();
-const toast = useToast();
-const confirmDialog = useConfirmDialog();
-
-const isLoading = ref(false);
-
-const card = computed(() => cardsStore.getById(route.params.userCardId));
-
-const displayLast4 = computed(() => {
-  const value = card.value?.panLast4;
-  if (!value) return '';
-
-  return String(value).replace(/\D/g, '').slice(-4);
-});
-
-const performanceTiers = computed(() =>
-    [...(card.value?.benefitsInfo?.performanceTiers ?? [])]
-        .sort((a, b) =>
-            (a.minimumSpending ?? 0) - (b.minimumSpending ?? 0)
-        )
-);
-
-const cardLast4 = computed(() =>
-    String(card.value?.panLast4 ?? '').replace(/\D/g, '').slice(-4)
-);
-
-// 지금 적용 중인 할인 구간은 전월 실적 기준이다(performanceTiers[].minimumSpending이
-// 전월 실적 기준 - cardService.js의 getCurrentTier 주석 참고). 이번 달 사용액(currentAmount)은
-// 아직 진행 중이라 구간을 정하는 데 못 쓴다 - 아래 tierPercent/nextTier처럼 "다음 구간까지
-// 얼마 남았는지" 진행률을 보여줄 때만 쓴다.
-// 카드 목록(Cards.vue)을 거쳐 들어온 경우에만 previousMonthAmount가 있다 - 카드 상세로
-// 바로 딥링크된 경우엔 아직 없을 수 있음(별도 이슈, fetchCardFullDetail이 전월 실적을
-// 안 받아옴).
-const currentTier = computed(() =>
-    card.value?.benefitsInfo
-        ? getCurrentTier(
-            card.value.benefitsInfo,
-            card.value.previousMonthAmount ?? 0
-        )
-        : null
-);
-
-const tierLabel = computed(() =>
-    currentTier.value?.tierName ?? '0구간'
-);
-
-// 현재 사용액보다 기준 금액이 높은 첫 번째 구간을 다음 목표로 정합니다.
-const nextTier = computed(() => {
-  const currentAmount = card.value?.currentAmount ?? 0;
-
-  return performanceTiers.value.find((tier) => (tier.minimumSpending ?? 0) > currentAmount) ?? null;
-});
-
-// 다음 구간의 최소 실적 금액입니다.
-const nextTargetAmount = computed(() =>
-    nextTier.value?.minimumSpending ?? null
-);
-
-// 현재 사용액을 다음 구간 목표 금액과 비교해 진행률을 계산합니다.
-const tierPercent = computed(() => {
-  const currentAmount = card.value?.currentAmount ?? 0;
-  const targetAmount = nextTargetAmount.value;
-
-  // 다음 구간이 없으면 이미 최고 구간입니다.
-  if (targetAmount === null) return 100;
-
-  if (targetAmount === 0) return 100;
-
-  return Math.min((currentAmount / targetAmount) * 100, 100
-  );
-});
-
-const currentTierBenefits = computed(() => currentTier.value?.benefits ?? []);
-
-const isRecommendationEnabled = computed(() => card.value?.recommendationEnabled === true);
-
-onMounted(async () => {
-  isLoading.value = true;
-  try {
-    await cardsStore.fetchCardFullDetail(route.params.userCardId);
-  } catch (err) {
-    console.error('카드 상세 조회 실패', err);
-    toast.error('카드 정보를 불러오지 못했습니다.');
-  } finally {
-    isLoading.value = false;
-  }
-});
-
-const handleToggleRecommendation = async () => {
-  if (!card.value) return;
-  try {
-    await cardsStore.toggleRecommendation(card.value.userCardId);
-  } catch (err) {
-    console.error('추천 카드 설정 변경 실패', err.message);
-    toast.error('설정 변경에 실패했습니다. 다시 시도해주세요.');
-  }
-};
-
-const handleSetPrimary = async () => {
-  if (!card.value) return;
-  try {
-    await cardsStore.setPrimary(card.value.userCardId);
-  } catch (err) {
-    console.error('대표 카드 설정 실패', err.message);
-    toast.error('대표 카드 설정에 실패했습니다. 다시 시도해주세요.');
-  }
-};
-
-const handleDeleteCard = async () => {
-  if (!card.value) return;
-  if (!(await confirmDialog.confirm('이 카드를 삭제할까요? 되돌릴 수 없습니다.', { danger: true }))) return;
-  try {
-    await cardsStore.deleteCard(card.value.userCardId);
-    router.push('/cards');
-  } catch (err) {
-    console.error('카드 삭제 실패', err.message);
-    toast.error('카드 삭제에 실패했습니다. 다시 시도해주세요.');
-  }
-};
+const route = useRoute(), router = useRouter(), cardsStore = useCardsStore(), toast = useToast()
+const id = computed(() => Number(route.params.userCardId))
+const card = computed(() => cardsStore.getById(id.value))
+const loading = computed(() => Boolean(cardsStore.detailLoadingById[id.value]))
+const error = computed(() => cardsStore.detailErrorById[id.value] ?? '')
+const cardLast4 = computed(() => String(card.value?.panLast4 ?? '').replace(/\D/g, '').slice(-4))
+async function loadDetail(force = false) {
+  if (force && card.value) card.value.benefitsInfo = undefined
+  const result = await cardsStore.fetchCardFullDetail(id.value)
+  if (result === null) toast.error('카드 정보를 불러오지 못했습니다.')
+}
+onMounted(loadDetail)
 </script>
 
 <style scoped>
-.layout-container { padding: 18px 18px 40px; }
-.page-header { margin-bottom: 18px; }
-.loading-text { padding-top: 60px; text-align: center; }
-
-.card-image-wrap { width: min(100%, 360px); aspect-ratio: 1.586 / 1; margin: 0 auto 18px; display: flex; justify-content: center; align-items: center; }
-.card-detail-image { width: 100%; height: 100%; display: block; object-fit: contain; filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .14)); }
-.card-image-fallback { width: 100%; height: 170px; border-radius: 18px; display: grid; place-items: center; background: var(--dark, #545045); color: #ffffff; font-size: 17px; font-weight: 700; }
-
-.surface-card { padding: 20px; margin-bottom: 14px; }
-
-.info-section { padding: 16px 20px; }
-.card-description {
-  margin: 0 0 10px;
-  font-size: 12.5px;
-  line-height: 1.6;
-}
-.annual-fee {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted, #8f897f);
-}
-.annual-fee strong {
-  color: var(--charcoal, #24211d);
-  font-weight: 800;
-  margin-left: 4px;
-}
-.unsupported-notice {
-  margin: 10px 0 0;
-  font-size: 12px;
-}
-.section-label { margin: 0 0 8px; font-size: 12px; color: var(--muted, #8f897f); }
-.tier-label { margin: 0 0 14px; font-size: 18px; color: var(--charcoal, #24211d); }
-.progress-track { margin-bottom: 10px; }
-
-.recognized-amount { margin: 0; font-size: 13px; }
-.recognized-amount strong { color: var(--charcoal, #24211d); font-weight: 800; margin-left: 4px; }
-
-.benefit-row {
-  display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px;
-  padding: 8px 0; color: var(--charcoal, #24211d);
-}
-.benefit-row + .benefit-row { border-top: 1px solid var(--line, #e7e4de); }
-.benefit-cat { font-weight: 700; flex: 0 0 auto; }
-.benefit-rate { color: var(--dark, #545045); font-weight: 700; }
-
-.recommendation-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-
-.recommendation-title {
-  margin: 0 0 4px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--charcoal, #24211d);
-}
-
-.recommendation-desc {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-/* 추천 카드 ON/OFF 토글 */
-.recommendation-toggle {
-  position: relative;
-  width: 52px;
-  height: 30px;
-  padding: 0;
-  border: none;
-  border-radius: 999px;
-  background: #e8e6e2;
-  cursor: pointer;
-  flex: 0 0 auto;
-  transition: background 0.2s ease;
-}
-
-/* 토글 안의 흰색 원 */
-.recommendation-toggle-knob {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
-  transition: transform 0.2s ease;
-}
-
-/* ON 상태 background: var(--dark, #545045);*/
-.recommendation-toggle--on {
-  background: var(--dark, #545045);
-}
-
-/* ON이면 원을 오른쪽으로 이동 */
-.recommendation-toggle--on .recommendation-toggle-knob {
-  transform: translateX(22px);
-}
-
-.primary-badge-row { display: flex; justify-content: center; padding: 10px 0 4px; }
-.primary-badge { font-size: 13px; font-weight: 700; }
-
-.set-primary-btn {
-  width: 100%; height: 54px; border-radius: 14px; border: none;
-  background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900;
-  font-size: 15px; cursor: pointer; margin-top: 6px;
-}
-.delete-card-btn {
-  width: 100%; height: 44px; border-radius: 14px; border: none; background: transparent;
-  font-weight: 700; font-size: 13px; cursor: pointer; margin-top: 10px;
-}
-.not-found { padding-top: 60px; text-align: center; }
-
-.detail-header-title { display: flex; align-items: baseline; justify-content: center; gap: 7px; min-width: 0; }
-.detail-header-title > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.detail-card-number { flex: 0 0 auto; color: var(--muted, #8f897f); font-size: 11px; font-weight: 500; white-space: nowrap; }
+.layout-container { padding: 18px 16px 80px; }.page-header { margin-bottom: 18px; }.detail-header-title { display: flex; align-items: baseline; justify-content: center; gap: 7px; min-width: 0; }.detail-card-number { color: var(--muted, #8f897f); font-size: 11px; font-weight: 500; }.card-image-wrap { width: min(100%, 360px); aspect-ratio: 1.586 / 1; margin: 0 auto 18px; display: grid; place-items: center; }.card-detail-image { width: 100%; height: 100%; object-fit: contain; }.card-image-fallback { width: 100%; height: 100%; border-radius: 18px; display: grid; place-items: center; background: var(--dark, #545045); color: #fff; font-weight: 700; }.not-found { padding-top: 60px; text-align: center; }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div class="map-page">
+  <div ref="mapPage" class="map-page">
     <div ref="mapContainer" class="map-container"></div>
     <div v-if="loadError" class="map-error">
       지도를 불러오지 못했습니다: {{ loadError }}
@@ -37,68 +37,81 @@
       </div>
     </div>
 
+    <!-- 재검색: 카테고리 미선택이면 현재 중심점 기준 최대 500곳, 선택 중이면 그 카테고리 전체. -->
+    <button
+      class="research-btn"
+      :disabled="merchantsLoading"
+      :aria-label="selectedCategory ? `${selectedCategory} 전체 재검색` : '현재 화면에서 재검색'"
+      @click="onResearchClick"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <polyline points="1 20 1 14 7 14"></polyline>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+      </svg>
+    </button>
+
+    <button class="locate-btn" @click="recenterToMyLocation" aria-label="내 위치로 이동">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+      </svg>
+    </button>
+
     <!-- 제휴 매장 바텀시트 (매장 선택 시 같은 자리에서 상세로 전환) -->
-    <div class="store-sheet" :class="{ expanded: sheetExpanded }">
-      <!-- store-sheet의 자식으로 둬서, 시트가 펼쳐지든 접히든(transform) 시트와 함께
-           같은 좌표계로 움직입니다 - 시트 높이가 내용에 따라 달라져도(매장이 적으면 50%보다
-           작게 렌더링됨) 항상 시트 맨 위 12px 위에 붙어있습니다. -->
-
-      <!-- 재검색: 카테고리 미선택이면 현재 중심점 기준 최대 500곳, 선택 중이면 그 카테고리 전체.
-           locate-btn 바로 위에 두어 같은 우측 버튼 묶음으로 보이게 한다. -->
-      <button
-        class="research-btn"
-        :disabled="merchantsLoading"
-        :aria-label="selectedCategory ? `${selectedCategory} 전체 재검색` : '현재 화면에서 재검색'"
-        @click="onResearchClick"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="23 4 23 10 17 10"></polyline>
-          <polyline points="1 20 1 14 7 14"></polyline>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-        </svg>
-      </button>
-
-      <button class="locate-btn" @click="recenterToMyLocation" aria-label="내 위치로 이동">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-        </svg>
-      </button>
+    <div
+      ref="storeSheet"
+      class="store-sheet"
+      :class="{ dragging: isDraggingSheet }"
+      :style="{ transform: `translateY(${sheetTranslateY}px)` }"
+      :data-position="sheetPosition"
+    >
 
       <div
         class="sheet-handle-area"
         role="button"
         tabindex="0"
-        aria-label="매장 목록 펼치기/접기"
-        @click="sheetExpanded = !sheetExpanded"
-        @keydown.enter="sheetExpanded = !sheetExpanded"
-        @keydown.space.prevent="sheetExpanded = !sheetExpanded"
+        :aria-label="sheetPosition === 'collapsed' ? '매장 목록 펼치기' : '매장 목록 접기'"
+        @pointerdown="onSheetPointerDown"
+        @pointermove="onSheetPointerMove"
+        @pointerup="onSheetPointerUp"
+        @pointercancel="onSheetPointerUp"
+        @click="onSheetHandleClick"
+        @keydown.enter="toggleSheet"
+        @keydown.space.prevent="toggleSheet"
       >
         <span class="sheet-handle"></span>
-        <div class="sheet-peek-row">
+        <div class="sheet-peek-row" :class="{ 'sheet-peek-row--detail': selectedMerchant }">
           <div class="sheet-summary">
-            <button v-if="selectedMerchant" class="detail-back-btn" aria-label="목록으로" @click.stop="closeMerchantDetail">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15 18 9 12 15 6"></polyline>
-              </svg>
-            </button>
-            <p v-else class="sheet-meta muted-text">현재 위치 기준 · {{ nearbyMerchants.length }}곳</p>
+            <p v-if="!selectedMerchant" class="sheet-meta muted-text">현재 위치 기준 · {{ nearbyMerchants.length }}곳</p>
 
             <div v-if="selectedMerchant" class="sheet-title-row">
               <div class="sheet-title-main">
                 <p class="sheet-title sheet-title--detail">{{ selectedMerchant.name }}</p>
                 <span class="pill pill--gold">{{ selectedMerchant.categoryName }}</span>
               </div>
-              <button
-                class="pay-btn-header"
-                :disabled="!selectedCardId"
-                @click.stop="goToPay"
-              >
-                결제하기
-              </button>
+              <div class="detail-actions">
+                <button
+                  class="detail-action-btn"
+                  :class="{ active: bookmarksStore.isBookmarked(selectedMerchant.id) }"
+                  aria-label="북마크"
+                  @click.stop="toggleBookmark(selectedMerchant)"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" :fill="bookmarksStore.isBookmarked(selectedMerchant.id) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path>
+                  </svg>
+                </button>
+                <button class="detail-action-btn" aria-label="닫기" @click.stop="closeMerchantDetail">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div v-if="selectedMerchant" class="sheet-detail-sub-row">
+              <p v-if="selectedMerchant.address" class="store-address muted-text">{{ selectedMerchant.address }}</p>
             </div>
             <p v-else class="sheet-title">주변 제휴 매장</p>
-
-            <p v-if="selectedMerchant && selectedMerchant.address" class="store-address muted-text">{{ selectedMerchant.address }}</p>
           </div>
           <div v-if="!selectedMerchant" class="sort-toggle" @click.stop>
             <button
@@ -133,7 +146,16 @@
           </div>
 
           <section class="recommend-section">
-            <h3 class="section-title">이 매장 추천 카드</h3>
+            <div class="recommend-header">
+              <h3 class="section-title">이 매장 추천 카드</h3>
+              <button
+                class="pay-btn-header"
+                :disabled="!selectedCardId"
+                @click.stop="goToPay"
+              >
+                결제하기
+              </button>
+            </div>
 
             <p v-if="cardComparisonsLoading" class="muted-text">불러오는 중...</p>
             <p v-else-if="cardComparisonsError" class="muted-text">
@@ -240,8 +262,98 @@ const bookmarksStore = useBookmarksStore()
 const mapViewStore = useMapViewStore()
 const toast = useToast()
 
-// 바텀시트 상태
-const sheetExpanded = ref(false)
+// 바텀시트 상태 - 최대 높이의 시트는 그대로 두고 translateY만 바꿔 세 단계로 노출합니다.
+const SHEET_COLLAPSED_HEIGHT = 80
+const SHEET_MIDDLE_RATIO = 0.5
+const SHEET_EXPANDED_RATIO = 0.82
+const SHEET_DRAG_THRESHOLD = 6
+const mapPage = ref(null)
+const storeSheet = ref(null)
+const sheetPosition = ref('collapsed')
+const sheetTranslateY = ref(0)
+const isDraggingSheet = ref(false)
+let sheetPointerId = null
+let sheetDragStartY = 0
+let sheetDragStartTranslateY = 0
+let sheetDragMoved = false
+let suppressSheetClick = false
+
+function getSheetSnapPoints() {
+  const pageHeight = mapPage.value?.clientHeight || mapPage.value?.getBoundingClientRect().height || window.innerHeight
+  const sheetHeight = storeSheet.value?.clientHeight || pageHeight * SHEET_EXPANDED_RATIO
+  const visibleExpanded = Math.min(sheetHeight, pageHeight * SHEET_EXPANDED_RATIO)
+  const visibleMiddle = Math.min(visibleExpanded, Math.max(SHEET_COLLAPSED_HEIGHT, pageHeight * SHEET_MIDDLE_RATIO))
+  const visibleCollapsed = Math.min(SHEET_COLLAPSED_HEIGHT, sheetHeight)
+  return {
+    collapsed: Math.max(0, sheetHeight - visibleCollapsed),
+    middle: Math.max(0, sheetHeight - visibleMiddle),
+    expanded: Math.max(0, sheetHeight - visibleExpanded),
+  }
+}
+
+function snapSheetTo(position) {
+  const snapPoints = getSheetSnapPoints()
+  sheetPosition.value = position
+  sheetTranslateY.value = snapPoints[position]
+}
+
+function syncSheetPosition() {
+  if (!isDraggingSheet.value) snapSheetTo(sheetPosition.value)
+}
+
+function toggleSheet(event) {
+  if (event?.target?.closest?.('button')) return
+  snapSheetTo(sheetPosition.value === 'collapsed' ? 'middle' : 'collapsed')
+}
+
+function onSheetPointerDown(event) {
+  if (isDraggingSheet.value || event.target.closest?.('button') || (event.pointerType === 'mouse' && event.button !== 0)) return
+  sheetPointerId = event.pointerId
+  sheetDragStartY = event.clientY
+  sheetDragStartTranslateY = sheetTranslateY.value
+  sheetDragMoved = false
+  isDraggingSheet.value = true
+}
+
+function onSheetPointerMove(event) {
+  if (!isDraggingSheet.value || event.pointerId !== sheetPointerId) return
+  const deltaY = event.clientY - sheetDragStartY
+  if (!sheetDragMoved && Math.abs(deltaY) >= SHEET_DRAG_THRESHOLD) {
+    sheetDragMoved = true
+    event.currentTarget.setPointerCapture?.(sheetPointerId)
+  }
+  if (!sheetDragMoved) return
+  const snapPoints = getSheetSnapPoints()
+  sheetTranslateY.value = Math.min(snapPoints.collapsed, Math.max(snapPoints.expanded, sheetDragStartTranslateY + deltaY))
+}
+
+function onSheetPointerUp(event) {
+  if (!isDraggingSheet.value || event.pointerId !== sheetPointerId) return
+  isDraggingSheet.value = false
+  if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+    event.currentTarget.releasePointerCapture(event.pointerId)
+  }
+  if (sheetDragMoved) {
+    const snapPoints = getSheetSnapPoints()
+    const nearestPosition = Object.keys(snapPoints).reduce((nearest, position) =>
+      Math.abs(snapPoints[position] - sheetTranslateY.value) < Math.abs(snapPoints[nearest] - sheetTranslateY.value)
+        ? position
+        : nearest,
+    'collapsed')
+    suppressSheetClick = event.type !== 'pointercancel'
+    snapSheetTo(nearestPosition)
+  }
+  sheetPointerId = null
+}
+
+function onSheetHandleClick(event) {
+  if (event.target.closest?.('button')) return
+  if (suppressSheetClick) {
+    suppressSheetClick = false
+    return
+  }
+  toggleSheet(event)
+}
 // 'distance' | 'benefit' - '실적순'은 아직 매장 응답에 실적 관련 숫자 데이터가 없어 보류.
 const sortMode = ref('distance')
 const myLocation = ref(null) // { lat, lng }
@@ -399,7 +511,7 @@ watch(selectedMerchantId, () => {
 
 function selectMerchant(merchantId) {
   selectedMerchantId.value = merchantId
-  sheetExpanded.value = true
+  if (sheetPosition.value === 'collapsed') snapSheetTo('middle')
   loadCardComparisons()
 }
 
@@ -551,6 +663,7 @@ function observeMapContainerResize() {
   if (mapResizeObserver || !mapContainer.value || typeof ResizeObserver === 'undefined') return
   mapResizeObserver = new ResizeObserver(() => {
     mapInstance?.relayout()
+    syncSheetPosition()
   })
   mapResizeObserver.observe(mapContainer.value)
 }
@@ -701,7 +814,7 @@ function onClusterClick(cluster) {
   // selectedMerchantId가 남아있어 목록 대신 그 매장 상세가 계속 떠 있었다 - 여기서 닫아준다.
   selectedMerchantId.value = null
   clusterFilterMerchantIds.value = new Set(clusterMerchantIds)
-  sheetExpanded.value = true
+  if (sheetPosition.value === 'collapsed') snapSheetTo('middle')
 }
 
 // 매 클러스터링 결과마다(줌/이동으로 다시 뭉칠 때도) 클러스터별로 혜택 매장 포함 여부를
@@ -825,7 +938,6 @@ function onResearchClick() {
 // 원래 물방울 핀은 테두리가 옅은 회갈색(#8f897f)이라 카카오맵의 복잡한 배경 위에서 묻혀
 // 보이던 문제가 있어서, 클러스터 배지와 같은 원형으로 바꾸고 진한 charcoal 테두리 +
 // 그림자로 대비를 올렸습니다 - 뾰족한 꼬리가 없는 대신 아이콘이 더 크게 보입니다.
-const PIN_SIZE = 36
 // iconDataUri는 base64로 인코딩된 data URI만 받습니다(외부/절대 URL이 아님) - 브라우저가
 // <img src="data:image/svg+xml,...">로 쓰이는 SVG 안에서는 <image href="외부 URL">가
 // 가리키는 이미지를 보안상 아예 안 불러오기 때문에(같은 오리진이어도), 미리 fetch해서
@@ -833,33 +945,87 @@ const PIN_SIZE = 36
 // 핀 강조 등급(benefitTier, merchants computed에서 계산)별 색상 - top(혜택 매장 중 상위
 // 10곳)은 --green(#00a878), benefit(나머지 혜택 매장)은 --orange(#ffbc00, 기존 색 유지),
 // none(혜택 없음)은 강조 없이 기본 charcoal 테두리만.
-const PIN_TIER_COLORS = { top: '#00a878', benefit: '#ffbc00' }
+const PIN_WIDTH = 30
+const PIN_HEIGHT = 36
+
+// 추천 매장 = 노랑 / 혜택 가능 매장 = 초록 / 일반 매장 = 회색
+const PIN_TIER_COLORS = {
+  top: '#ffbc00',
+  benefit: '#16b88a',
+  none: '#999999',
+}
 
 function buildMerchantMarkerImage(kakao, merchant, iconDataUri) {
-  const tierColor = PIN_TIER_COLORS[merchant.benefitTier]
-  const borderColor = tierColor ?? '#24211d'
-  const glow = tierColor ? `<circle cx="18" cy="18" r="17" fill="${tierColor}" fill-opacity="0.22"/>` : ''
-  // 브랜드 로고/카테고리 아이콘 원본이 정사각형이 아니거나 배경이 꽉 찬 사진이어도, 핀
-  // 밖으로 삐져나오지 않도록 원형 clipPath로 잘라서 넣습니다(정사각형 통짜 이미지가 원형
-  // 배지 위에 그대로 얹히는 문제 방지) - preserveAspectRatio="slice"로 비율은 유지한 채
-  // 원 안을 꽉 채우도록 크롭합니다.
+  const pinColor =
+      PIN_TIER_COLORS[merchant.benefitTier] ?? PIN_TIER_COLORS.none
+
   const iconTag = iconDataUri
-    ? `<image href="${iconDataUri}" x="6" y="6" width="24" height="24" ` +
-      'preserveAspectRatio="xMidYMid slice" clip-path="url(#pinIconClip)"/>'
-    : ''
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_SIZE}" height="${PIN_SIZE}" viewBox="0 0 36 36">` +
-    '<defs><filter id="pinShadow" x="-50%" y="-50%" width="200%" height="200%">' +
-    '<feDropShadow dx="0" dy="1.5" stdDeviation="1.3" flood-color="#000000" flood-opacity="0.35"/>' +
-    '</filter><clipPath id="pinIconClip"><circle cx="18" cy="18" r="12"/></clipPath></defs>' +
-    glow +
-    `<circle filter="url(#pinShadow)" cx="18" cy="18" r="14" fill="#ffffff" stroke="${borderColor}" stroke-width="3"/>` +
-    iconTag +
-    '</svg>'
+      ? `<image
+       href="${iconDataUri}"
+       x="7"
+       y="6"
+       width="16"
+       height="16"
+       preserveAspectRatio="xMidYMid meet"
+     />`
+      : ''
+
+  const svg = `
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="${PIN_WIDTH}"
+    height="${PIN_HEIGHT}"
+    viewBox="0 0 30 36"
+  >
+    <defs>
+      <filter id="shadow" x="-40%" y="-40%" width="180%" height="200%">
+        <feDropShadow
+          dx="0"
+          dy="1.5"
+          stdDeviation="1.2"
+          flood-color="#000000"
+          flood-opacity="0.18"
+        />
+      </filter>
+    </defs>
+
+    <g filter="url(#shadow)">
+      <!-- 꼬리 -->
+      <path
+        d="M7.5 22.5 L15 30.5 L22.5 22.5 Z"
+        fill="${pinColor}"
+      />
+
+      <!-- 컬러 바깥 원 -->
+      <circle
+        cx="15"
+        cy="14"
+        r="13"
+        fill="${pinColor}"
+      />
+
+      <!-- 흰 안쪽 원 -->
+      <circle
+        cx="15"
+        cy="14"
+        r="10.5"
+        fill="#ffffff"
+      />
+
+      ${iconTag}
+    </g>
+  </svg>
+`
+
   const src = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
-  return new kakao.maps.MarkerImage(src, new kakao.maps.Size(PIN_SIZE, PIN_SIZE), {
-    offset: new kakao.maps.Point(PIN_SIZE / 2, PIN_SIZE / 2),
-  })
+
+  return new kakao.maps.MarkerImage(
+      src,
+      new kakao.maps.Size(PIN_WIDTH, PIN_HEIGHT),
+      {
+        offset: new kakao.maps.Point(PIN_WIDTH / 2, PIN_HEIGHT - 2),
+      },
+  )
 }
 
 // 현재 위치 표시용 점+링 아이콘. 카카오 기본 마커(검은 물방울)를 대신해서 매장 핀과
@@ -1010,6 +1176,8 @@ function onChipClick(cat) {
 }
 
 onMounted(async () => {
+  syncSheetPosition()
+  window.addEventListener('resize', syncSheetPosition)
   const categoriesPromise = merchantsStore.fetchCategories()
   merchantsStore.fetchBrands()
 
@@ -1059,14 +1227,15 @@ onMounted(async () => {
 
 onUnmounted(() => {
   mapResizeObserver?.disconnect()
+  window.removeEventListener('resize', syncSheetPosition)
   if (geoWatchId != null) navigator.geolocation.clearWatch(geoWatchId)
 })
 </script>
 
 <style scoped>
 .map-page {
-  /* store-sheet가 펼쳐졌을 때 최대 높이. */
-  --sheet-expanded-height: 50%;
+  /* store-sheet 최대 높이. 중간 단계는 JS에서 실제 높이의 50%로 계산합니다. */
+  --sheet-expanded-height: 82%;
   position: relative;
   width: 100%;
   height: 100%;
@@ -1080,13 +1249,12 @@ onUnmounted(() => {
 }
 
 .map-overlay-top {
-  position: absolute; top: 0; left: 0; right: 0; z-index: 10; padding: 18px 18px 0;
-  background: linear-gradient(180deg, rgba(250, 249, 246, .96) 60%, rgba(250, 249, 246, 0));
+  position: absolute; top: 60px; left: 0; right: 0; z-index: 10; padding: 0 18px;
 }
 
 .search-bar {
   height: 48px; background: var(--surface, #ffffff); border-radius: 14px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .08); display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12), 0 2px 5px rgba(0, 0, 0, 0.06); display: flex; align-items: center; gap: 10px;
   padding: 0 16px; color: var(--muted, #8f897f); margin-bottom: 12px;
 }
 .search-bar input { flex: 1; border: none; background: transparent; font-size: 14px; color: var(--charcoal, #24211d); }
@@ -1105,28 +1273,24 @@ onUnmounted(() => {
 .chip {
   flex: 0 0 auto; height: 34px; padding: 0 16px; border-radius: 999px; border: none;
   background: var(--surface, #ffffff); color: var(--charcoal, #24211d); font-size: 13px;
-  font-weight: 700; box-shadow: 0 2px 8px rgba(0, 0, 0, .06); cursor: pointer;
+  font-weight: 700; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.10), 0 1px 3px rgba(0, 0, 0, 0.05); cursor: pointer;
 }
 .chip.active { background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); }
 
-/* 둘 다 store-sheet의 자식이라 top이 store-sheet 자신의 (변환 전) 박스 기준입니다 - 시트에
-   걸린 transform(펼침/접힘)이 부모-자식을 함께 움직여서 시트 실제 높이(내용에 따라 50%보다
-   작을 수도 있음)와 무관하게 항상 시트 바로 위에 있습니다. locate-btn(46px)과 같은 크기로
-   맞추고, 그 위에 12px 간격을 두고 쌓았습니다: -58(locate-btn top) - 12(간격) - 46(자기 높이) = -116px. */
 .research-btn {
-  position: absolute; right: 18px; top: -116px; width: 46px; height: 46px; border-radius: 50%;
+  position: absolute; right: 18px; bottom: 150px; width: 46px; height: 46px; border-radius: 50%;
   border: none; background: var(--surface, #ffffff); box-shadow: 0 6px 16px rgba(0, 0, 0, .15);
-  display: grid; place-items: center; color: var(--charcoal, #24211d); z-index: 20; cursor: pointer;
+  display: grid; place-items: center; color: var(--charcoal, #24211d); z-index: 14; cursor: pointer;
 }
 .research-btn:disabled { opacity: .6; cursor: default; }
 
 .locate-btn {
-  position: absolute; right: 18px; top: -58px; width: 46px; height: 46px; border-radius: 50%;
+  position: absolute; right: 18px; bottom: 92px; width: 46px; height: 46px; border-radius: 50%;
   border: none; background: var(--surface, #ffffff); box-shadow: 0 6px 16px rgba(0, 0, 0, .15);
-  display: grid; place-items: center; color: var(--charcoal, #24211d); z-index: 20; cursor: pointer;
+  display: grid; place-items: center; color: var(--charcoal, #24211d); z-index: 14; cursor: pointer;
 }
 
-/* 제휴 매장 바텀시트 - 평소엔 손잡이+제목 한 줄만 보이다가, 누르면 위로 올라옵니다 */
+/* 제휴 매장 바텀시트 - 최대 높이는 고정하고 transform만 바꿔 드래그/snap 합니다. */
 .store-sheet {
   position: absolute;
   left: 0;
@@ -1145,13 +1309,10 @@ onUnmounted(() => {
   /* 80px = 접힌 상태에서 보이는 handle-area 실측 높이. 정렬 토글을 제목 옆으로
      옮기면서 기존 92px 하드코딩값과 어긋나 접혔을 때 아래쪽에 빈 여백이 살짝
      보이던 걸 같이 맞췄다. will-change로 트랜지션 중 리페인트를 컴포지터에 맡긴다. */
-  transform: translateY(calc(100% - 80px));
   transition: transform 280ms cubic-bezier(.2, .8, .2, 1);
   will-change: transform;
 }
-.store-sheet.expanded {
-  transform: translateY(0);
-}
+.store-sheet.dragging { transition: none; }
 
 .sheet-handle-area {
   width: 100%;
@@ -1164,6 +1325,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
+  touch-action: none;
 }
 .sheet-handle {
   width: 40px;
@@ -1178,6 +1340,7 @@ onUnmounted(() => {
   align-items: flex-end;
   gap: 12px;
 }
+.sheet-peek-row--detail { margin-top: 8px; }
 .sheet-summary {
   flex: 1 1 auto;
   min-width: 0;
@@ -1188,6 +1351,7 @@ onUnmounted(() => {
 
 .sheet-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 0; }
 .sheet-title-main { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+.sheet-title-main .pill { flex: 0 0 auto; }
 .sheet-title-row .sheet-title { margin: 0; }
 .sheet-title--detail {
   font-size: 20px;
@@ -1306,22 +1470,29 @@ onUnmounted(() => {
 .page-btn:disabled { opacity: .4; cursor: not-allowed; }
 .page-indicator { font-size: 12px; }
 
-/* 매장 상세 - 바텀시트 안에서 목록 대신 뜨는 영역 (Storedetail.vue와 같은 구성).
-   detail-back-btn은 sheet-meta 자리(펼침 손잡이 바로 아래)에 들어가므로 그 자리에 맞춘다 -
-   매장 상세일 때 "매장 상세"라는 무의미한 라벨 대신 뒤로가기 역할을 그 자리에서 바로 한다. */
-.detail-back-btn {
+/* 매장 상세 - 바텀시트 안에서 목록 대신 뜨는 영역 (Storedetail.vue와 같은 구성). */
+.detail-actions {
   display: flex;
-  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+.detail-action-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
   border: none;
-  background: none;
+  background: #f3f4f5;
   padding: 0;
-  margin: 0;
+  display: grid;
+  place-items: center;
   color: var(--muted, #8f897f);
   cursor: pointer;
 }
+.detail-action-btn.active { color: var(--orange, #ffbc00); }
 
 .store-info { margin-bottom: 20px; }
-.store-address { margin: 4px 0 0; font-size: 13px; }
+.sheet-detail-sub-row { display: flex; align-items: center; margin-top: 5.4px; }
+.store-address { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .benefit-strip {
   background: #fff6dd; border-radius: 12px; padding: 12px 14px; font-size: 12.5px;
@@ -1333,6 +1504,8 @@ onUnmounted(() => {
 
 .recommend-section { margin-bottom: 24px; }
 .section-title { font-size: 14px; margin: 0 0 12px; color: var(--charcoal, #24211d); }
+.recommend-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.recommend-header .section-title { margin: 0; }
 
 .reco-card {
   position: relative;

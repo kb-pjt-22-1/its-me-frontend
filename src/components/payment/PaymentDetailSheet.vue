@@ -147,7 +147,7 @@ watch(
 .info-row > span { color: var(--muted, #8a8a8a); font-size: 13px; }
 .info-row > strong { text-align: right; color: var(--charcoal, #24211d); font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
 .info-row .benefit, .status-approved { color: var(--green, #00a878); font-weight: 700; }
-.status-pending { color: var(--orange-deep, #e6aa00); }
+.status-pending { color: #f8b63f; }
 .status-cancelled { color: var(--danger, #d94343); }
 .bottom-sheet-enter-active, .bottom-sheet-leave-active { transition: opacity 0.2s ease; }
 .bottom-sheet-enter-active .payment-sheet, .bottom-sheet-leave-active .payment-sheet { transition: transform 0.25s ease; }

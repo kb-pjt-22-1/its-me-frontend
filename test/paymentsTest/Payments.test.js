@@ -98,6 +98,40 @@ beforeEach(() => {
   capturedLeaveGuard = null
   routeMock.query = {}
   merchantsStoreMock.categories = []
+  cardsStoreMock.cards = [
+    { userCardId: 1, cardName: '청춘대로 톡톡카드', panLast4: '1234', status: 'ACTIVE', color: '#1f3a5f', isPrimary: true, benefitsInfo: null, currentAmount: 0 },
+  ]
+  cardsStoreMock.primaryCard = cardsStoreMock.cards[0]
+})
+
+describe('선택 카드 표시', () => {
+  it('선택 카드명 옆에 panLast4의 숫자 마지막 4자리를 표시한다', () => {
+    cardsStoreMock.cards[0].panLast4 = '****-56 7890'
+    const { wrapper } = mountPage()
+
+    expect(wrapper.find('.selected-card-name').text()).toBe('청춘대로 톡톡카드')
+    expect(wrapper.find('.selected-card-last4').text()).toBe('7890')
+  })
+
+  it('카드를 선택하면 카드명과 뒷번호가 함께 변경된다', async () => {
+    cardsStoreMock.cards.push({
+      userCardId: 2, cardName: '두 번째 카드', panLast4: 'card-9876', status: 'ACTIVE',
+      color: '#24211d', isPrimary: false, benefitsInfo: null, currentAmount: 0,
+    })
+    const { wrapper } = mountPage()
+
+    await wrapper.findAll('.card-slide')[1].trigger('click')
+
+    expect(wrapper.find('.selected-card-name').text()).toBe('두 번째 카드')
+    expect(wrapper.find('.selected-card-last4').text()).toBe('9876')
+  })
+
+  it('panLast4가 없으면 번호 영역을 표시하지 않는다', () => {
+    cardsStoreMock.cards[0].panLast4 = null
+    const { wrapper } = mountPage()
+
+    expect(wrapper.find('.selected-card-last4').exists()).toBe(false)
+  })
 })
 
 describe('바코드 발급/렌더링', () => {
