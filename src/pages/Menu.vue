@@ -7,34 +7,40 @@
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </button>
-        <h2>메뉴</h2>
+        <h2>마이페이지</h2>
         <div class="right-placeholder"></div>
       </header>
 
       <div class="profile-card">
         <h3>{{ userName }}님, 반가워요</h3>
-        <p>이번 달 혜택 {{ monthlyBenefit.toLocaleString() }}원</p>
+        <p>이번 달 받은 혜택 {{ monthlyBenefit.toLocaleString() }}원</p>
+      </div>
+
+      <div class="menu-section">
+        <p class="section-title">이용 내역</p>
+
+        <router-link to="/payments" class="menu-item">
+          결제 내역 &gt;
+        </router-link>
       </div>
 
       <div class="menu-section">
         <p class="section-title">계정 및 보안</p>
-        <router-link to="/payments" class="menu-item">
-          결제 내역 &gt;
-        </router-link>
+
         <router-link to="/pin-setting" class="menu-item">
           간편 비밀번호(PIN) 설정 &gt;
         </router-link>
+
         <router-link to="/member-profile" class="menu-item">
           개인정보 및 보안 &gt;
         </router-link>
       </div>
 
       <div class="menu-section">
-        <p class="menu-section-title">서비스</p>
-        <div class="menu-item">고객센터 &gt;</div>
-        <div class="menu-item">공지사항 &gt;</div>
-        <div class="menu-item">이용약관 &gt;</div>
-        <div class="menu-item">개인정보처리방침 &gt;</div>
+        <p class="section-title">고객지원</p>
+          <div class="menu-item">고객센터 &gt;</div>
+          <div class="menu-item">공지사항 &gt;</div>
+          <div class="menu-item">약관 및 정책 &gt;</div>
       </div>
 
       <div class="footer-actions">
@@ -117,7 +123,7 @@ const handleLogout = async () => {
 .profile-card {
   background: var(--dark, #545045);
   color: #ffffff;
-  padding: 20px;
+  padding: 17px 20px;
   border-radius: 17px;
   margin: 6px 0 20px;
 }
@@ -143,7 +149,7 @@ const handleLogout = async () => {
 }
 
 .footer-actions {
-  margin-top: 40px;
+  margin-top: 30px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -155,6 +161,7 @@ const handleLogout = async () => {
   padding: 15px;
   border: 1px solid var(--line, #e7e4de);
   background: var(--surface, #ffffff);
+  box-shadow: 0 3px 12px rgba(46, 42, 36, 0.08);
   border-radius: 12px;
   color: var(--charcoal, #24211d);
 }

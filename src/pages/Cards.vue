@@ -1,274 +1,165 @@
 <template>
-  <div class="layout-container">
-
-    <div v-if="cardsStore.isLoading && myCards.length === 0" class="loading-text muted-text">
-      카드 목록을 불러오는 중...
-    </div>
-    <div v-else-if="myCards.length === 0" class="empty-state">
+  <main class="layout-container">
+    <div v-if="cardsStore.isLoading && cards.length === 0" class="loading-text muted-text">카드 목록을 불러오는 중...</div>
+    <div v-else-if="cards.length === 0" class="empty-state">
       <p class="empty-text muted-text">등록된 카드가 없어요.</p>
-      <button class="sync-btn" :disabled="syncing" @click="handleSync">
-        {{ syncing ? '연동 중...' : '보유 카드 자동 연동' }}
-      </button>
+      <button class="sync-btn" :disabled="syncing" @click="handleSync">{{ syncing ? '연동 중...' : '보유 카드 자동 연동' }}</button>
       <p v-if="syncError" class="sync-error danger-text">{{ syncError }}</p>
     </div>
-
-    <div v-else class="card-list">
-      <Button
-        v-for="card in myCards"
-        :key="card.userCardId"
-        variant="box-outline"
-        class="card-item"
-        :disabled="card.status !== 'ACTIVE'"
-        @click="goToCardDetail(card.userCardId)"
-      >
-        <div v-if="card.isPrimary || card.status !== 'ACTIVE'" class="card-top-row card-badge-row">
-          <span v-if="card.isPrimary" class="pill pill--mint">주 사용 카드</span>
-          <span v-else class="pill pill--danger">{{ card.statusText }}</span>
-        </div>
-
-        <div class="card-top-row">
-          <div class="card-title-group">
-            <h3>{{ card.cardName }} </h3>
-            <p v-if="getCardLast4(card.panLast4)" class="card-last4">
-              {{ getCardLast4(card.panLast4) }}
-            </p>
-          </div>
-          <div class="card-image-frame">
-            <img
-                v-if="getCardImage(card)"
-                :src="getCardImage(card)"
-                :alt="`${card.cardName} 이미지`"
-                class="card-thumbnail"
-            />
-            <span
-                v-else
-                class="card-glyph"
-                :class="{ 'glyph-primary': card.isPrimary, 'glyph-disabled': card.status !== 'ACTIVE' }"
-            >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <rect x="2" y="5" width="20" height="14" rx="3"></rect>
-                  <line x1="2" y1="10" x2="22" y2="10"></line>
-                </svg>
-              </span>
-          </div>
-        </div>
-
-        <template v-if="card.status === 'ACTIVE'">
-          <template v-if="card.hasPreviousPerformance">
-            <div class="status-row">
-              <span :class="card.isMet ? 'success-text' : 'danger-text'">
-                {{ card.isMet ? '전월 실적 충족' : '전월 실적 미달' }}
-              </span>
-              <span class="muted-text">
-                {{ card.isMet ? '혜택 적용 중' : `실적 충족까지 ${card.remaining.toLocaleString()}원` }}
-              </span>
-            </div>
-            <div class="progress-track">
-              <div
-                class="progress-fill"
-                :class="{ 'progress-fill--met': card.isMet }"
-                :style="{ width: card.percentage + '%' }"
-              ></div>
-            </div>
-            <p class="progress-target">목표 {{ card.targetAmount.toLocaleString() }}원</p>
-          </template>
-          <p v-else class="muted-text loading-inline">실적 정보를 불러오는 중...</p>
-        </template>
-
-        <template v-else>
-          <div class="status-row">
-            <span class="danger-text">사용 불가</span>
-            <span class="muted-text">카드사 문의 필요</span>
-          </div>
-        </template>
-      </Button>
-    </div>
-  </div>
+    <template v-else>
+      <header class="selected-heading" aria-live="polite"><h2>{{ selectedCard?.cardName }}</h2><span v-if="selectedLast4" class="card-last4">{{ selectedLast4 }}</span></header>
+      <div ref="slider" class="card-slider" :class="{ 'card-slider--single': cards.length === 1 }" tabindex="0" aria-label="보유 카드 선택 슬라이더" @scroll="handleScroll" @keydown.left.prevent="selectRelative(-1)" @keydown.right.prevent="selectRelative(1)">
+        <article v-for="(card, index) in cards" :key="card.userCardId" :ref="(el) => setSlideRef(el, index)" class="card-slide" :class="{ 'card-slide--selected': card.userCardId === selectedCardId }" :aria-current="card.userCardId === selectedCardId ? 'true' : undefined" :aria-label="`${card.cardName}, ${index + 1}/${cards.length}`">
+          <div class="slide-badges"><span v-if="card.isPrimary" class="pill pill--mint">대표 카드</span><span v-if="card.status !== 'ACTIVE'" class="pill pill--danger">{{ statusText(card.status) }}</span></div>
+          <img v-if="getCardImage(card)" :src="getCardImage(card)" :alt="`${card.cardName} 이미지`" class="card-image" draggable="false" />
+          <div v-else class="card-image-fallback">{{ card.cardName }}</div>
+        </article>
+      </div>
+      <nav v-if="cards.length > 1" class="indicators" aria-label="카드 페이지 선택">
+        <button v-for="(card, index) in cards" :key="card.userCardId" class="indicator" :class="{ 'indicator--active': card.userCardId === selectedCardId }" :aria-label="`${index + 1}번째 카드 선택`" :aria-current="card.userCardId === selectedCardId ? 'true' : undefined" @click="selectCard(card.userCardId)"></button>
+      </nav>
+      <CardDetailsPanel :key="selectedCardId" :card="selectedCard" :loading="detailLoading" :error="detailError" @retry="loadSelectedDetail(true)" @deleted="handleDeleted" @primary-changed="handlePrimaryChanged" />
+    </template>
+  </main>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import Button from '@/components/common/Button.vue';
-import { useCardsStore } from '@/stores/cards';
-import { getCardImage } from '@/utils/cardImages';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import CardDetailsPanel from '@/components/cards/CardDetailsPanel.vue'
+import { useCardsStore } from '@/stores/cards'
+import { getCardImage } from '@/utils/cardImages'
+import { useToast } from '@/composables/useToast'
 
-const router = useRouter();
-const cardsStore = useCardsStore();
+const route = useRoute(), router = useRouter(), cardsStore = useCardsStore(), toast = useToast()
+const cards = computed(() =>
+  [...cardsStore.cards].sort(
+    (a, b) => Number(b.isPrimary) - Number(a.isPrimary),
+  ),
+)
+const selectedCardId = ref(null), slider = ref(null), syncing = ref(false), syncError = ref('')
+const cardOrderIds = ref([])
+const slideRefs = []
+let scrollTimer
+const selectedCard = computed(() => cards.value.find((card) => card.userCardId === selectedCardId.value) ?? null)
+const selectedLast4 = computed(() => String(selectedCard.value?.panLast4 ?? '').replace(/\D/g, '').slice(-4))
+const detailLoading = computed(() => Boolean(cardsStore.detailLoadingById[selectedCardId.value]))
+const detailError = computed(() => cardsStore.detailErrorById[selectedCardId.value] ?? '')
+const statusLabels = { SUSPENDED: '정지됨', EXPIRED: '만료', UNLINKED: '연동 해제' }
+const statusText = (status) => statusLabels[status] ?? status
+const setSlideRef = (el, index) => { if (el) slideRefs[index] = el }
 
-const syncing = ref(false);
-const syncError = ref('');
-
-onMounted(() => {
-  cardsStore.fetchCards();
-});
-
-const handleSync = async () => {
-  syncing.value = true;
-  syncError.value = '';
+function initialCardId() {
+  const queryId = Number(route.query.userCardId)
+  if (cards.value.some((card) => card.userCardId === queryId)) return queryId
+  return cards.value.find((card) => card.isPrimary)?.userCardId ?? cards.value[0]?.userCardId ?? null
+}
+async function replaceUrl(id) {
+  if (!id || String(route.query.userCardId ?? '') === String(id)) return
+  await router.replace({ name: 'cards', query: { ...route.query, userCardId: String(id) } })
+}
+async function loadSelectedDetail(force = false) {
+  const card = selectedCard.value
+  if (!card || card.status !== 'ACTIVE') return
+  if (force) { cardsStore.detailLoadedById[card.userCardId] = false; card.benefitsInfo = undefined }
+  const result = await cardsStore.fetchCardFullDetail(card.userCardId)
+  if (result === null && selectedCardId.value === card.userCardId) toast.error('카드 정보를 불러오지 못했습니다.')
+}
+async function selectCard(id, { scroll = true, updateUrl = true } = {}) {
+  const index = cards.value.findIndex((card) => card.userCardId === Number(id))
+  if (index < 0) return
+  selectedCardId.value = cards.value[index].userCardId
+  if (updateUrl) await replaceUrl(selectedCardId.value)
+  if (scroll) await nextTick(() => slideRefs[index]?.scrollIntoView?.({ behavior: 'smooth', inline: 'center', block: 'nearest' }))
+}
+function selectRelative(offset) {
+  const index = cards.value.findIndex((card) => card.userCardId === selectedCardId.value)
+  const nextIndex = Math.max(0, Math.min(cards.value.length - 1, index + offset))
+  if (nextIndex !== index) selectCard(cards.value[nextIndex].userCardId)
+}
+function handleScroll() {
+  window.clearTimeout(scrollTimer)
+  scrollTimer = window.setTimeout(() => {
+    if (!slider.value) return
+    const center = slider.value.getBoundingClientRect().left + slider.value.clientWidth / 2
+    let closestIndex = 0, closestDistance = Infinity
+    slideRefs.forEach((slide, index) => {
+      if (!slide) return
+      const rect = slide.getBoundingClientRect(), distance = Math.abs(rect.left + rect.width / 2 - center)
+      if (distance < closestDistance) { closestDistance = distance; closestIndex = index }
+    })
+    const card = cards.value[closestIndex]
+    if (card && card.userCardId !== selectedCardId.value) selectCard(card.userCardId, { scroll: false })
+  }, 120)
+}
+async function handleDeleted(deletedId) {
+  const oldIndex = cardOrderIds.value.indexOf(Number(deletedId))
+  cardOrderIds.value = cardOrderIds.value.filter((id) => id !== Number(deletedId))
+  slideRefs.splice(Math.max(oldIndex, 0), 1)
+  const replacement = cards.value[Math.min(Math.max(oldIndex, 0), cards.value.length - 1)]
+  if (replacement) await selectCard(replacement.userCardId)
+  else { selectedCardId.value = null; await router.replace({ name: 'cards', query: {} }) }
+}
+async function handlePrimaryChanged(userCardId) {
+  await nextTick()
+  cardOrderIds.value = cards.value.map((card) => card.userCardId)
+  await selectCard(userCardId, { scroll: true, updateUrl: true })
+}
+async function handleSync() {
+  syncing.value = true; syncError.value = ''
   try {
-    await cardsStore.syncCards();
-    if (cardsStore.cards.length === 0) {
-      syncError.value = '연동 요청은 됐는데 카드가 안 들어왔어요. 백엔드에 카드 연동 기능이 아직 없을 수 있어요.';
-    }
+    await cardsStore.syncCards()
+    if (!cards.value.length) syncError.value = '연동 요청은 됐는데 카드가 안 들어왔어요. 백엔드에 카드 연동 기능이 아직 없을 수 있어요.'
+    else { cardOrderIds.value = cards.value.map((card) => card.userCardId); await selectCard(initialCardId(), { scroll: true }) }
   } catch (err) {
-    syncError.value = err.response?.status === 404
-      ? '백엔드에 카드 연동(/cards/sync) 기능이 아직 없어요.'
-      : (err.response?.data?.message ?? '카드 연동에 실패했어요.');
-  } finally {
-    syncing.value = false;
-  }
-};
-
-const CARD_STATUS_TEXT = {
-  SUSPENDED: '정지됨',
-  EXPIRED: '만료',
-  UNLINKED: '연동 해제',
-};
-
-// 목표가 0원이면 나눗셈이 무의미하다 - 채울 목표가 없으니 이미 다 채운 것으로 본다.
-function calcPercentage(card, hasTarget) {
-  if (!hasTarget) return 0;
-  if (card.targetAmount === 0) return 100;
-  return Math.min((card.currentAmount / card.targetAmount) * 100, 100);
+    syncError.value = err.response?.status === 404 ? '백엔드에 카드 연동(/cards/sync) 기능이 아직 없어요.' : (err.response?.data?.message ?? '카드 연동에 실패했어요.')
+  } finally { syncing.value = false }
 }
 
-const myCards = computed(() =>
-    cardsStore.cards.map((card) => {
-      const hasPreviousPerformance = typeof card.previousMonthAmount === 'number' && typeof card.targetAmount === 'number'
-
-      return {
-        ...card,
-        hasPreviousPerformance,
-        isMet: card.previousPerformanceMet ?? false,
-        remaining: card.previousRemainingAmount ?? 0,
-        percentage: card.previousAchievementRate ?? 0,
-        statusText: CARD_STATUS_TEXT[card.status] ?? card.status,
-      }
-    })
-);
-
-const goToCardDetail = (userCardId) => {
-  const card = myCards.value.find((c) => c.userCardId === userCardId);
-  if (card && card.status !== 'ACTIVE') return;
-  router.push(`/cards/${userCardId}`);
-};
-
-const getCardLast4 = (value) => String(value ?? '').replace(/\D/g, '').slice(-4);
+watch(selectedCardId, () => loadSelectedDetail())
+watch(() => route.query.userCardId, (value) => { const id = Number(value); if (cards.value.some((card) => card.userCardId === id) && id !== selectedCardId.value) selectCard(id) })
+onMounted(async () => { if (!cardsStore.hasLoadedCards && !cards.value.length) await cardsStore.fetchCards(); cardOrderIds.value = cards.value.map((card) => card.userCardId); if (cards.value.length) await selectCard(initialCardId(), { scroll: true }) })
+onBeforeUnmount(() => window.clearTimeout(scrollTimer))
 </script>
 
 <style scoped>
-.layout-container {
-  padding: 8px 16px 24px;
-}
-
-.loading-text,
-.empty-text {
-  text-align: center;
-  padding: 60px 0 12px;
-  font-size: 0.9rem;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 40px 0;
-}
-
-.sync-btn {
-  margin-top: 16px;
-  height: 48px;
-  padding: 0 24px;
-  border-radius: 14px;
-  border: none;
-  background: var(--orange, #ffbc00);
-  color: var(--charcoal, #24211d);
-  font-weight: 800;
-  cursor: pointer;
-}
-.sync-btn:disabled {
-  opacity: .6;
-  cursor: not-allowed;
-}
-
-.sync-error {
-  margin-top: 12px;
-  font-size: 12px;
-}
-
-.loading-inline {
-  margin: 13px 0 0;
-  font-size: 12px;
-}
-
-.card-list { display: flex; flex-direction: column; gap: 12px; }
-
-.card-item {
-  text-align: left;
-}
-
-:deep(.card-item.btn--box-outline) {
-  min-height: auto;
-  padding: 16px !important;
-  gap: 4px;
-  border: none;
-  border-radius: 18px;
-  box-shadow: 0 4px 14px rgba(46, 42, 36, 0.1);
-}
-
-.card-top-row {
+.layout-container { padding: 4px 16px 24px; }
+.loading-text, .empty-text { text-align: center; padding: 60px 0 12px; font-size: .9rem; }
+.empty-state { text-align: center; padding: 40px 0; }
+.sync-btn { margin-top: 16px; height: 48px; padding: 0 24px; border: 0; border-radius: 14px; background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 800; }
+.sync-btn:disabled { opacity: .6; }.sync-error { margin-top: 12px; font-size: 12px; }
+.selected-heading { display: flex; align-items: baseline; justify-content: center; gap: 7px; min-height: 28px; margin: 0 0 6px; }
+.selected-heading h2 { margin: 0; max-width: calc(100% - 60px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 600;color: #171512; line-height: 1.3; }.card-last4 { color: var(--muted, #8f897f); font-size: 11px; }
+.card-slider {
+  --slide-width: min(84vw, 360px);
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  width: 100%;
-}
-.card-badge-row { min-height: 20px; margin-bottom: 6px; }
-.card-title-group { min-width: 0; text-align: left; }
-.card-title-group h3 { margin-bottom: 3px; }
-.card-last4 { margin: 0; color: var(--muted, #8f897f); font-size: 11px; letter-spacing: .4px; }
-
-.card-top-row h3 {
-  margin: 0 0 4px;
-  font-size: 17px;
-  color: var(--charcoal, #24211d);
-}
-
-.card-top-row p {
-  margin: 0;
-  color: var(--muted, #8f897f);
-  font-size: 12px;
-}
-
-.card-glyph {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--dark, #545045);
-  color: #ffffff;
+  gap: 12px;
+  width: calc(100% + 32px);
+  margin-left: -16px;
+  padding: 4px calc((100% - var(--slide-width)) / 2) 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: calc((100% - var(--slide-width)) / 2);
+  scrollbar-width: none;
+  outline: none;
+}.card-slider::-webkit-scrollbar { display: none; }.card-slider--single { width: 100%; margin-left: 0; padding-inline: 0; }
+.card-slide {
+  position: relative;
+  flex: 0 0 var(--slide-width);
+  aspect-ratio: 1.586 / 1;
   display: grid;
   place-items: center;
-  flex: 0 0 auto;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  opacity: 0.78;
+  transition: opacity 0.2s;
 }
-.card-glyph.glyph-primary { background: var(--dark, #545045); }
-.card-glyph.glyph-disabled { background: #c7c7c7; }
-
-.card-image-frame { width: 88px; height: 56px; flex: 0 0 auto; display: flex; justify-content: center; align-items: center; }
-.card-thumbnail { width: 100%; height: 100%; display: block; object-fit: contain; }
-
-.status-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  margin: 8px 0 5px;
-  font-size: 12px;
-  font-weight: 700;
+.card-slider--single .card-slide { flex-basis: 100%; max-width: none; }.card-slide--selected { opacity: 1; }
+.card-image { width: 100%; height: 100%; display: block; object-fit: contain; filter: drop-shadow(0 8px 13px rgba(0,0,0,.14)); user-select: none; -webkit-user-drag: none; }
+.card-image-fallback { width: 100%; height: 100%; border-radius: 18px; display: grid; place-items: center; background: var(--dark, #545045); color: #fff; font-weight: 700; }
+.slide-badges { position: absolute; z-index: 1; top: 10px; left: 10px; display: flex; gap: 5px; }
+.slide-badges .pill--mint {
+  background: rgba(224, 248, 239, 0.92);
 }
-
-.progress-target {
-  width: 100%;
-  text-align: right;
-  margin: 4px 0 0;
-  color: var(--muted, #8f897f);
-  font-size: 11px;
-}
+.indicators { display: flex; justify-content: center; gap: 7px; margin: 0 0 14px; }.indicator { width: 7px; height: 7px; padding: 0; border: 0; border-radius: 50%; background: var(--line, #d7d2ca); }.indicator--active { width: 18px; border-radius: 5px; background: var(--dark, #545045); }
 </style>

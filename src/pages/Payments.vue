@@ -40,7 +40,14 @@
               </button>
             </div>
 
-            <strong class="selected-card-name">{{ selectedMethod?.cardName }}</strong>
+            <div class="selected-card-heading">
+              <strong class="selected-card-name">
+                {{ selectedMethod?.cardName }}
+              </strong>
+              <span v-if="selectedCardLast4" class="selected-card-last4">
+                {{ selectedCardLast4 }}
+              </span>
+            </div>
           </template>
         </div>
 
@@ -144,6 +151,11 @@ const paymentRows = computed(() => {
 const queriedUserCardId = route.query.userCardId ? Number(route.query.userCardId) : null;
 const selectedMethodId = ref(null);
 const selectedMethod = computed(() => cardsStore.getById(selectedMethodId.value) ?? cardsStore.cards[0]);
+const selectedCardLast4 = computed(() =>
+  String(selectedMethod.value?.panLast4 ?? '')
+    .replace(/\D/g, '')
+    .slice(-4),
+);
 
 watch(() => cardsStore.cards, async (cards) => {
   if (!cards.length || selectedMethodId.value !== null) return;
@@ -370,14 +382,16 @@ onBeforeRouteLeave(() => {
 .card-slide:disabled { cursor:default; }
 .slide-card-image { display:block; width:100%; aspect-ratio:1.586/1; margin:auto; object-fit:contain; border-radius:10px; filter:drop-shadow(0 7px 11px rgba(0,0,0,.14)); }
 .slide-card-fallback { background:var(--dark,#24211d); }
-.selected-card-name { display:block; max-width:85%; margin-top:6px; overflow:hidden; color:var(--charcoal,#24211d); font-size:17px; text-align:center; text-overflow:ellipsis; white-space:nowrap; }
+.selected-card-heading { display: flex; align-items: baseline; justify-content: center; gap: 7px; max-width: 85%; margin-top: 6px; }
+.selected-card-name { min-width: 0; overflow: hidden; color: var(--charcoal, #24211d); font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.selected-card-last4 { flex: 0 0 auto; color: var(--muted, #8f897f); font-size: 11px; font-weight: 500; }
 
 .auth-prompt { flex:0 0 auto; padding:50px 20px 12px; text-align:center; }
 .auth-prompt .lock-icon { width:52px; height:52px; margin:0 auto 12px; display:grid; place-items:center; border-radius:50%; background:var(--inactive,#f5f5f5); color:var(--charcoal,#24211d); }
 .auth-prompt h3 { margin:0 0 6px; color:var(--charcoal,#24211d); font-size:16px; }
 .auth-prompt p { margin:0; color:var(--muted,#8f897f); font-size:12px; }
 
-.main-action-btn { width:100%; height:52px; border-radius:14px; background:var(--orange,#ffbc00); color:var(--charcoal,#24211d); font-size:15px; font-weight:900; }
+.main-action-btn { width:100%; height:52px; border-radius:14px; background: #f8b63f; color:var(--charcoal,#24211d); font-size:15px; font-weight:900; }
 .main-action-btn:disabled { opacity:.6; cursor:not-allowed; }
 .payment-start-btn,.payment-complete-btn { width:calc(100% - 40px); margin:16px 20px 0; flex:0 0 auto; }
 .card-name { margin:0 0 14px; color:var(--charcoal,#24211d); font-size:17px; }
