@@ -27,9 +27,17 @@ vi.mock('@/composables/useToast', () => ({
   useToast: () => ({ info: toastInfoMock }),
 }))
 
-const { fetchNotificationsMock } = vi.hoisted(() => ({ fetchNotificationsMock: vi.fn() }))
+const { fetchNotificationsMock, notificationsState } = vi.hoisted(() => ({
+  fetchNotificationsMock: vi.fn(),
+  notificationsState: { sortedNotifications: [] },
+}))
 vi.mock('@/stores/notifications', () => ({
-  useNotificationsStore: () => ({ fetchNotifications: fetchNotificationsMock }),
+  useNotificationsStore: () => ({
+    fetchNotifications: fetchNotificationsMock,
+    get sortedNotifications() {
+      return notificationsState.sortedNotifications
+    },
+  }),
 }))
 
 // 실제 Firebase 설정값이 채워진 상태를 흉내낸다 - 하나라도 비면 isFirebaseConfigured()가
@@ -65,6 +73,8 @@ beforeEach(() => {
   isSupportedMock.mockResolvedValue(true)
   getTokenMock.mockResolvedValue('fcm-token-abc')
   registerMock.mockResolvedValue({ fake: 'registration' })
+  fetchNotificationsMock.mockResolvedValue()
+  notificationsState.sortedNotifications = []
   Object.defineProperty(globalThis.navigator, 'serviceWorker', {
     value: { register: registerMock },
     configurable: true,
@@ -181,6 +191,40 @@ describe('listenForegroundMessages', () => {
     // 포그라운드 push의 data에는 notificationId/type이 없어서(paymentId/merchantId만 있음)
     // 목록을 다시 조회해야 새 알림이 안읽음 상태로 배지에 반영된다.
     expect(fetchNotificationsMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('재조회한 목록의 최신 항목이 SESSION_DISPLACED면 강제 로그아웃 이벤트를 쏜다', async () => {
+    stubFullFirebaseConfig()
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+    notificationsState.sortedNotifications = [
+      { notificationId: '1', type: 'SESSION_DISPLACED', title: '다른 기기에서 로그인됐어요', body: '...' },
+    ]
+    const { listenForegroundMessages } = await import('@/services/pushNotificationService')
+
+    await listenForegroundMessages()
+    const onMessageHandler = onMessageMock.mock.calls[0][1]
+    onMessageHandler({ notification: { title: '다른 기기에서 로그인됐어요', body: '...' } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const dispatchedEvent = dispatchSpy.mock.calls.map(([e]) => e).find((e) => e.type === 'auth:session-expired')
+    expect(dispatchedEvent).toBeDefined()
+  })
+
+  it('재조회한 목록의 최신 항목이 SESSION_DISPLACED가 아니면 강제 로그아웃 이벤트를 쏘지 않는다', async () => {
+    stubFullFirebaseConfig()
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+    notificationsState.sortedNotifications = [
+      { notificationId: '1', type: 'PAYMENT_APPROVED', title: '결제가 완료됐어요', body: '...' },
+    ]
+    const { listenForegroundMessages } = await import('@/services/pushNotificationService')
+
+    await listenForegroundMessages()
+    const onMessageHandler = onMessageMock.mock.calls[0][1]
+    onMessageHandler({ notification: { title: '결제가 완료됐어요', body: '...' } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const dispatchedEvent = dispatchSpy.mock.calls.map(([e]) => e).find((e) => e.type === 'auth:session-expired')
+    expect(dispatchedEvent).toBeUndefined()
   })
 
   it('notification 페이로드가 없으면 토스트도, 목록 재조회도 하지 않는다', async () => {

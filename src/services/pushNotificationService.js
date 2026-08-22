@@ -117,6 +117,18 @@ export async function listenForegroundMessages() {
     const { title, body } = payload.notification ?? {}
     if (!title && !body) return
     toast.info(title && body ? `${title} · ${body}` : title ?? body)
-    notificationsStore.fetchNotifications()
+
+    notificationsStore.fetchNotifications().then(() => {
+      // SESSION_DISPLACED(다른 기기에서 로그인해 이 기기 세션이 강제로 해제됨)는 push
+      // data가 비어있어(SessionDisplacedPushHandler 참고) type을 여기서 바로 알 수 없다 -
+      // 방금 새로고침한 알림 목록의 최신 항목으로 확인한다. 다음 API 호출에서야 401로
+      // 튕기는 걸 기다리지 않고, 여기서 바로 로그인 화면으로 보낸다.
+      const latest = notificationsStore.sortedNotifications[0]
+      if (latest?.type === 'SESSION_DISPLACED') {
+        // 라우터/스토어를 여기서 직접 import하면 순환 참조가 생긴다 - main.js가 이미
+        // api 인터셉터의 세션 만료 처리와 같은 방식으로 듣고 있는 이벤트를 재사용한다.
+        window.dispatchEvent(new CustomEvent('auth:session-expired'))
+      }
+    })
   })
 }
