@@ -12,14 +12,14 @@
     <template v-else>
       <main class="page-container app-page has-bottom-nav">
         <!-- 최상위 라우트(예: 탭 화면들 <-> /menu, /member-profile, /payments 등)가
-             바뀔 때만 전체 화면이 슬라이드됩니다. 탭 사이 이동은 DefaultLayout.vue의
+             바뀔 때만 전체 화면이 방향에 맞춰 슬라이드됩니다. 탭 사이 이동은 DefaultLayout.vue의
              내부 router-view가 담당하므로 여기서는 안 움직입니다 -
              route.matched[0]가 탭 라우트끼리는 전부 '/'로 같기 때문입니다.
              Menu.vue/PaymentsList.vue가 더 이상 자기 루트를 position:fixed로 직접
              뷰포트에 붙이지 않고 이 래퍼를 꽉 채우는 방식으로 바뀌어서(각 페이지
              파일의 .layout-container 주석 참고), 이제 슬라이드가 제대로 그려진다. -->
         <router-view v-slot="{ Component, route }">
-          <transition name="page-slide">
+          <transition :name="pageTransitionName">
             <!-- app-route-scroll은 DefaultLayout('/') 라우트에는 안 붙인다 - 그 안의
                  .main-content가 이미 position:fixed + overflow-y:auto로 스크롤을
                  직접 담당하는데, 조상에 또 overflow-y:auto를 걸면 main.css 상단
@@ -48,7 +48,7 @@
 // Header/NavBar는 '/' 하위 라우트에서 DefaultLayout이 직접 렌더링합니다.
 // 세션 복원은 라우터 가드(router/index.js)가 첫 라우팅 전에 처리하므로 여기서 하지 않습니다.
 // 메뉴는 예전엔 여기서 SidebarMenu를 오버레이로 띄웠는데, /menu 라우트 페이지로 바뀌었습니다.
-import { onMounted, watch } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
@@ -57,6 +57,7 @@ import { usePaymentStore } from '@/stores/payment';
 import { useNotificationsStore } from '@/stores/notifications';
 import ToastHost from '@/components/common/ToastHost.vue';
 import ConfirmDialogHost from '@/components/common/ConfirmDialogHost.vue';
+import { getPageTransitionName } from '@/router';
 
 const authStore = useAuthStore();
 const cardsStore = useCardsStore();
@@ -64,6 +65,7 @@ const merchantsStore = useMerchantsStore();
 const bookmarksStore = useBookmarksStore();
 const paymentStore = usePaymentStore();
 const notificationsStore = useNotificationsStore();
+const pageTransitionName = computed(() => getPageTransitionName());
 
 function fetchAllUserData() {
   cardsStore.fetchCards();

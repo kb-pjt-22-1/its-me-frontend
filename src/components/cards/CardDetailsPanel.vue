@@ -179,7 +179,7 @@ async function handleDeleteCard() {
   height: 54px;
   border: 1px solid rgba(230, 159, 0, 0.12);
   border-radius: 14px;
-  background: #f8b63f;
+  background: #ffbe49;
   box-shadow: 0 3px 10px rgba(46, 42, 36, 0.08);
   color: var(--charcoal, #24211d);
   font-size: 15px;

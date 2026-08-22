@@ -7,6 +7,7 @@ export const useBookmarksStore = defineStore('bookmarks', {
     bookmarks: [],
     isLoading: false,
     error: null,
+    hasNewBookmark: false,
   }),
 
   getters: {
@@ -37,6 +38,7 @@ export const useBookmarksStore = defineStore('bookmarks', {
       this.bookmarks.push({ merchantId: id, ...merchant })
       try {
         await addBookmark(id)
+        this.hasNewBookmark = true
       } catch (err) {
         this.bookmarks = this.bookmarks.filter((b) => b.merchantId !== id)
         throw err
@@ -52,6 +54,10 @@ export const useBookmarksStore = defineStore('bookmarks', {
         this.bookmarks = snapshot
         throw err
       }
+    },
+
+    markBookmarksSeen() {
+      this.hasNewBookmark = false
     },
   },
 })

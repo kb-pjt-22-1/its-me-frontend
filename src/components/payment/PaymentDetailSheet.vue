@@ -139,14 +139,14 @@ watch(
 .payment-summary { display: flex; flex-direction: column; align-items: flex-end; padding: 6px 0 22px; }
 .payment-summary p { width: 100%; margin: 0 0 20px; font-size: 16px; color: var(--charcoal, #24211d); }
 .payment-summary strong { font-size: 27px; font-weight: 700; color: var(--charcoal, #24211d); }
-.payment-summary span { margin-top: 4px; font-size: 13px; font-weight: 700; color: var(--green, #00a878); }
+.payment-summary span { margin-top: 4px; font-size: 13px; font-weight: 700; color: #3a977c; }
 .sheet-divider { height: 1px; background: var(--line, #ececec); }
 .payment-info { padding-top: 20px; }
 .payment-info h3 { margin: 0 0 18px; font-size: 16px; font-weight: 700; color: var(--charcoal, #24211d); }
 .info-row { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 12px; padding: 11px 0; }
 .info-row > span { color: var(--muted, #8a8a8a); font-size: 13px; }
 .info-row > strong { text-align: right; color: var(--charcoal, #24211d); font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
-.info-row .benefit, .status-approved { color: var(--green, #00a878); font-weight: 700; }
+.info-row .benefit, .status-approved { color: #3a977c; font-weight: 700; }
 .status-pending { color: #f8b63f; }
 .status-cancelled { color: var(--danger, #d94343); }
 .bottom-sheet-enter-active, .bottom-sheet-leave-active { transition: opacity 0.2s ease; }

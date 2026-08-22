@@ -173,7 +173,7 @@ async function submitNewPin() {
 .pin-page { min-height: 100vh; padding-bottom: 20px; box-sizing: border-box; display: flex; flex-direction: column; }
 .pin-header { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 18px; }
 .pin-header h2 { margin: 0; font-size: 16px; color: var(--charcoal, #24211d); }
-.pin-body { padding: 20px 18px 10px; }
+.pin-body { padding: 0 18px 10px; }
 .status-text { text-align: center; color: var(--muted, #8f897f); font-size: 14px; padding: 40px 0; }
 .retry-btn {
   display: block; margin: 0 auto; padding: 10px 20px; border-radius: 10px;
@@ -185,5 +185,5 @@ async function submitNewPin() {
 .pin-error { margin: 14px 0 0; text-align: center; color: var(--danger, #d94343); font-size: 12px; }
 .pin-hint { margin: 14px 0 0; text-align: center; font-size: 12px; }
 
-.keypad-wrap { margin-top: auto; padding: 20px 18px 0; }
+.keypad-wrap { margin-top: auto; padding: 20px 18px 16px; }
 </style>

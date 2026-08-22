@@ -9,10 +9,15 @@
         </svg>
         <span v-if="notificationsStore.unreadCount > 0" class="unread-badge" aria-hidden="true"></span>
       </button>
-      <button type="button" class="icon-btn" aria-label="북마크" @click="goToBookmarks">
+      <button type="button" class="icon-btn bookmark-header-btn" aria-label="북마크" @click="goToBookmarks">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
         </svg>
+        <span
+          v-if="bookmarksStore.hasNewBookmark"
+          class="bookmark-notification-dot"
+          aria-hidden="true"
+        ></span>
       </button>
       <button type="button" class="icon-btn" aria-label="메뉴" @click="goToMenu">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -28,6 +33,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useBookmarksStore } from '@/stores/bookmarks';
 import { useNotificationsStore } from '@/stores/notifications';
 
 const route = useRoute();
@@ -40,14 +46,15 @@ const PAGE_TITLES = {
   pay: '결제',
   benefits: '혜택',
   cards: '카드',
-  bookmarks: '저장한 매장',
 };
 const pageTitle = computed(() => PAGE_TITLES[route.name] ?? '');
 const isMapPage = computed(() => route.name === 'map');
 
 const notificationsStore = useNotificationsStore();
+const bookmarksStore = useBookmarksStore();
 const goToNotification = () => router.push('/notifications');
 const goToBookmarks = () => {
+  bookmarksStore.markBookmarksSeen();
   router.push('/bookmarks');
 };
 const goToMenu = () => {
@@ -115,6 +122,23 @@ const goToMenu = () => {
   cursor: pointer;
   padding: 7px;
   color: var(--charcoal, #24211d);
+}
+
+.bookmark-header-btn {
+  position: relative;
+}
+
+.bookmark-notification-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 4px;
+  height: 4px;
+  box-sizing: content-box;
+  border: 1.5px solid #ffffff;
+  border-radius: 50%;
+  background: #e5484d;
+  pointer-events: none;
 }
 
 .unread-badge {

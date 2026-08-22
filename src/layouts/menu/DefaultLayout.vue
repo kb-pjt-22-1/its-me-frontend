@@ -3,10 +3,10 @@
   <div class="layout-container">
     <Header />
     <main class="main-content" :class="{ 'main-content--map': isMapPage }">
-      <!-- 홈/지도/결제/혜택/카드 등 탭 사이를 이동할 때, 헤더/하단바는 그대로 두고
-           이 안의 내용만 페이드됩니다 (main.css의 .page-fade-* 참고). -->
+      <!-- 탭끼리는 페이드하고, 같은 레이아웃 안의 저장한 매장은 방향 슬라이드를 쓴다.
+           어느 경우든 Header/Footer는 이 router-view 밖에 있어 함께 움직이지 않는다. -->
       <router-view v-slot="{ Component, route }">
-        <transition name="page-fade">
+        <transition :name="pageTransitionName">
           <div :key="route.path" class="route-transition-wrap">
             <component :is="Component" />
           </div>
@@ -22,9 +22,11 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import Header from './Header.vue'
 import Footer from './Footer.vue'
+import { getPageTransitionName } from '@/router'
 
 const route = useRoute()
 const isMapPage = computed(() => route.name === 'map')
+const pageTransitionName = computed(() => getPageTransitionName())
 </script>
 
 <style scoped>

@@ -14,6 +14,7 @@ vi.mock('@/services/notificationService', () => ({
 }))
 
 import Header from '@/layouts/menu/Header.vue'
+import { useBookmarksStore } from '@/stores/bookmarks'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -37,5 +38,30 @@ describe('Header.vue - 알림 버튼', () => {
     await wrapper.find('button[aria-label="알림"]').trigger('click')
 
     expect(pushMock).toHaveBeenCalledWith('/notifications')
+  })
+})
+
+describe('Header.vue - 북마크 버튼', () => {
+  it('새 북마크가 있을 때만 알림 점을 표시한다', async () => {
+    const wrapper = mount(Header)
+    const bookmarksStore = useBookmarksStore()
+
+    expect(wrapper.find('.bookmark-notification-dot').exists()).toBe(false)
+
+    bookmarksStore.hasNewBookmark = true
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.bookmark-notification-dot').exists()).toBe(true)
+  })
+
+  it('북마크 버튼을 누르면 새 북마크 표시를 해제하고 /bookmarks로 이동한다', async () => {
+    const bookmarksStore = useBookmarksStore()
+    bookmarksStore.hasNewBookmark = true
+    const wrapper = mount(Header)
+
+    await wrapper.find('button[aria-label="북마크"]').trigger('click')
+
+    expect(bookmarksStore.hasNewBookmark).toBe(false)
+    expect(pushMock).toHaveBeenCalledWith('/bookmarks')
   })
 })

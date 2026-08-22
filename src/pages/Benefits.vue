@@ -263,7 +263,7 @@
                     class="be-status-badge"
                     :class="{ 'be-status-badge--pending': !card.isBreakEven }"
                 >
-                  {{ card.isBreakEven ? '본전 달성' : '본전 전' }}
+                  {{ card.isBreakEven ? '본전 달성' : '본전 달성 전' }}
                 </span>
 
                 <p class="be-status-title">
@@ -335,7 +335,7 @@
                   :key="point.index"
                   :cx="point.x"
                   :cy="point.y"
-                  r="3.5"
+                  r="3"
                   class="be-chart-point"
               />
 
@@ -671,7 +671,7 @@ onMounted(() => {
 /* base.css에 --green/--danger 변수는 있지만 success-text/danger-text 클래스 자체가
    전역 어디에도 정의되어 있지 않아서, 이 컴포넌트 안에서 직접 정의함
    (KB_SUCCESS #00a878 / KB_ERROR #d94343 - base.css :root 기준) */
-.success-text { color: var(--green, #00a878); }
+.success-text { color: #3a977c; }
 .danger-text { color: var(--danger, #d94343); }
 
 .page {
@@ -702,7 +702,7 @@ onMounted(() => {
 .ai-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
 .ai-tips li { display: flex; gap: 10px; align-items: flex-start; }
 .ai-tip-num {
-  width: 20px; height: 20px; border-radius: 50%; background: #F4B942;
+  width: 20px; height: 20px; border-radius: 50%; background: #ffbe49;
   color: #171717; font-size: 11px; font-weight: 800; display: grid; place-items: center;
   flex: 0 0 auto; margin-top: 1px;
 }
@@ -819,7 +819,7 @@ onMounted(() => {
 .usage-link { border: none; background: none; color: #625b50; font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; }.usage-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .usage-desc, .usage-remaining { margin: 0; font-size: 11px; white-space: nowrap; }
 .usage-remaining.muted-text {
-  color: #55bea0;
+  color: #3a977c;
   font-weight: 600;
 }
 .available-card .progress-fill {
@@ -914,7 +914,7 @@ onMounted(() => {
   padding: 5px 8px;
   border-radius: 7px;
   background: #e0f8ef;
-  color: var(--green, #00a878);
+  color: #3a977c;
   font-size: 10.5px;
   font-weight: 700;
 }
@@ -955,7 +955,7 @@ onMounted(() => {
   font-size: 14px;
   font-weight: 700;
 }
-.be-stats-row strong.success-text { color: var(--green, #00a878); }
+.be-stats-row strong.success-text { color: #3a977c; }
 .be-stats-row strong.danger-text { color: var(--danger, #d94343); }
 
 .be-chart {
@@ -976,13 +976,13 @@ onMounted(() => {
 }
 .be-chart-line {
   fill: none;
-  stroke: var(--orange, #ffbc00);
-  stroke-width: 2.5;
+  stroke: #ffbe49;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.be-chart-point { fill: var(--orange, #ffbc00); }
-.be-chart-break-point { fill: var(--green, #00a878); }
+.be-chart-point { fill: #ffbe49; }
+.be-chart-break-point { fill: #3a977c; }
 .be-chart-axis-label,
 .be-chart-month-label {
   fill: var(--muted, #8f897f);
@@ -992,7 +992,7 @@ onMounted(() => {
   font-size: 7.5px;
   font-weight: 700;
 }
-.be-chart-break-label-main { fill: var(--green, #00a878); }
+.be-chart-break-label-main { fill: #3a977c; }
 .be-chart-break-label-sub {
   fill: var(--muted, #8f897f);
   font-weight: 500;
