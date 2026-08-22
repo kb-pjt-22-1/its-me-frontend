@@ -4,7 +4,6 @@ import { setActivePinia, createPinia } from 'pinia'
 vi.mock('@/services/authService', () => ({
   loginRequest: vi.fn(),
   logoutRequest: vi.fn(),
-  devLoginRequest: vi.fn(),
   signUpRequest: vi.fn(),
   refreshTokenRequest: vi.fn(),
   fetchProfile: vi.fn(),
@@ -205,42 +204,6 @@ describe('login', () => {
     await store.login('tester', 'wrong')
 
     expect(store.errorMessage).toBe('로그인에 실패했습니다.')
-  })
-})
-
-describe('devLogin', () => {
-  it('성공하면 세션을 반영하고 true를 반환한다', async () => {
-    authService.devLoginRequest.mockResolvedValue({
-      accessToken: 'dev-access',
-      refreshToken: 'dev-refresh',
-      user: { userId: 3, loginId: 'dev1', name: '개발자1' },
-    })
-
-    const store = useAuthStore()
-    const result = await store.devLogin(1)
-
-    expect(authService.devLoginRequest).toHaveBeenCalledWith(1)
-    expect(result).toBe(true)
-    expect(store.isAuthenticated).toBe(true)
-  })
-
-  it('비활성화(404) 등으로 실패하면 전용 에러 문구를 담는다', async () => {
-    authService.devLoginRequest.mockRejectedValue(new Error())
-
-    const store = useAuthStore()
-    const result = await store.devLogin(1)
-
-    expect(result).toBe(false)
-    expect(store.errorMessage).toBe('개발자 로그인에 실패했습니다.')
-  })
-
-  it('서버가 메시지를 내려주면 그 메시지를 우선한다', async () => {
-    authService.devLoginRequest.mockRejectedValue({ response: { data: { message: 'dev login slot out of range' } } })
-
-    const store = useAuthStore()
-    await store.devLogin(99)
-
-    expect(store.errorMessage).toBe('dev login slot out of range')
   })
 })
 

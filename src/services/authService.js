@@ -2,21 +2,10 @@ import api from '@/api'
 
 /**
  * 로그인 요청. 실제 백엔드(POST /api/auth/login)를 호출한다.
- * 응답(LoginResponseDto)에는 name이 없어 devLoginRequest와 동일하게 /users/me를
- * 한 번 더 불러 프로필을 채운다.
+ * 응답(LoginResponseDto)에는 name이 없어 /users/me를 한 번 더 불러 프로필을 채운다.
  */
 export async function loginRequest(loginId, password) {
   const { data } = await api.post('/auth/login', { loginId, password })
-  const user = await fetchProfileOrFallback(data.accessToken, data.userId, data.loginId)
-  return { accessToken: data.accessToken, refreshToken: data.refreshToken, user }
-}
-
-/**
- * 개발용 자동 로그인. 목데이터가 아니라 실제 백엔드(POST /api/auth/dev-login)를 호출한다.
- * 백엔드의 dev-login.enabled가 꺼져 있으면 404가 그대로 던져진다.
- */
-export async function devLoginRequest(slot) {
-  const { data } = await api.post('/auth/dev-login', { slot })
   const user = await fetchProfileOrFallback(data.accessToken, data.userId, data.loginId)
   return { accessToken: data.accessToken, refreshToken: data.refreshToken, user }
 }
@@ -56,9 +45,9 @@ async function fetchProfileOrFallback(accessToken, userId, loginId) {
 }
 
 /**
- * 회원가입 1단계 - 휴대폰 인증번호 발송. 운영 환경에서는 devVerificationCode가 항상 null이고
- * (실제 SMS로 발송됨), 로컬/개발 서버(dev-login 켜진 서버)에서만 실제 6자리 코드가 그대로 온다 -
- * SMS 연동 전까지는 이 값을 화면에 노출해 테스트한다.
+ * 회원가입 1단계 - 휴대폰 인증번호 발송. 실제 본인인증기관/SMS 게이트웨이 연동이 없는
+ * 목데이터 전용 서비스라, 백엔드가 devVerificationCode에 실제 6자리 코드를 그대로 실어
+ * 준다 - 이 값을 화면에 노출해 테스트한다.
  */
 export async function requestSignupIdentityCode({ name, birthDate, phoneNumber }) {
   const { data } = await api.post('/auth/signup/identity', { name, birthDate, phoneNumber })

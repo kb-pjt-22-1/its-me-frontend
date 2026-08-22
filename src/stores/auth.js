@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import {
   loginRequest,
   logoutRequest,
-  devLoginRequest,
   signUpRequest,
   refreshTokenRequest,
   fetchProfile,
@@ -121,26 +120,6 @@ export const useAuthStore = defineStore('auth', {
         return true
       } catch (err) {
         this.errorMessage = err.response?.data?.message || err.message || '로그인에 실패했습니다.'
-        this.errorStatus = err.response?.status ?? null
-        return false
-      } finally {
-        this.isLoading = false
-      }
-    },
-
-    // 개발용 자동 로그인. 비밀번호 없이 slot(1~10)만으로 dev{slot} 계정 토큰을 받아온다.
-    // 백엔드의 dev-login.enabled가 꺼져 있으면 404가 나며 아래 catch로 떨어진다.
-    async devLogin(slot) {
-      this.isLoading = true
-      this.errorMessage = ''
-      this.errorStatus = null
-      try {
-        const session = await devLoginRequest(slot)
-        this.applySession(session)
-        this.registerFcmToken()
-        return true
-      } catch (err) {
-        this.errorMessage = err.response?.data?.message || err.message || '개발자 로그인에 실패했습니다.'
         this.errorStatus = err.response?.status ?? null
         return false
       } finally {
