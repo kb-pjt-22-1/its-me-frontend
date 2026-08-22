@@ -237,7 +237,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
 
     const pin = getClusterer().markers[0]
     expect(pin.title).toBe('동네 카페')
-    expect(decodedPinSvg(pin)).toContain('<image href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/2615.svg"')
+    expect(decodedPinSvg(pin)).toContain('href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/2615.svg"')
 
     trigger(pin, 'click')
     await flushPromises()
@@ -247,12 +247,12 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
     expect(wrapper.find('.sort-toggle').exists()).toBe(false)
 
-    await wrapper.find('.detail-back-btn').trigger('click')
-    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
+    await wrapper.find('button[aria-label="닫기"]').trigger('click')
+    expect(wrapper.find('button[aria-label="닫기"]').exists()).toBe(false)
     expect(wrapper.find('.sort-toggle').exists()).toBe(true)
   })
 
-  it('recommended=true인 매장만 핀 테두리가 강조 색상으로 그려지고, 나머지는 기본 색상 핀만 뜬다', async () => {
+  it('recommended=true인 매장은 추천 색상, 나머지는 기본 색상으로 핀이 그려진다', async () => {
     const { kakao, getClusterer } = createKakaoMock()
     window.kakao = kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([
@@ -266,11 +266,11 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(getClusterer().markers).toHaveLength(2) // 추천 여부와 무관하게 둘 다 핀으로 뜬다
     const cafePin = getClusterer().markers.find((m) => m.title === '동네 카페')
     const martPin = getClusterer().markers.find((m) => m.title === '동네 마트')
-    expect(decodedPinSvg(cafePin)).toContain('stroke="#00a878"')
-    expect(decodedPinSvg(martPin)).toContain('stroke="#24211d"')
+    expect(decodedPinSvg(cafePin)).toContain('fill="#ffbc00"')
+    expect(decodedPinSvg(martPin)).toContain('fill="#999999"')
   })
 
-  it('혜택 매장이 10곳을 넘으면 응답 순서 앞의 10곳만 초록 핀, 나머지는 노란 핀으로 그린다', async () => {
+  it('혜택 매장이 10곳을 넘으면 응답 순서 앞의 10곳은 추천 색, 나머지는 혜택 색 핀으로 그린다', async () => {
     const { kakao, getClusterer } = createKakaoMock()
     window.kakao = kakao
     const recommendedMerchants = MANY_MERCHANTS.map((m) => ({ ...m, recommended: true }))
@@ -284,10 +284,10 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     const pinsInOrder = recommendedMerchants.map((m) => markers.find((marker) => marker.title === m.name))
 
     pinsInOrder.slice(0, 10).forEach((pin) => {
-      expect(decodedPinSvg(pin)).toContain('stroke="#00a878"')
+      expect(decodedPinSvg(pin)).toContain('fill="#ffbc00"')
     })
     pinsInOrder.slice(10).forEach((pin) => {
-      expect(decodedPinSvg(pin)).toContain('stroke="#ffbc00"')
+      expect(decodedPinSvg(pin)).toContain('fill="#16b88a"')
     })
   })
 
@@ -424,10 +424,10 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     // 핀: 브랜드가 있어도 사진 대신 카테고리 아이콘으로 통일 (지도 위에서는 매장 종류
     // 구분이 우선이라 브랜드 사진을 안 쓴다).
     const starbucksPin = getClusterer().markers.find((m) => m.title === '동네 카페')
-    expect(decodedPinSvg(starbucksPin)).toContain('<image href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/2615.svg"')
+    expect(decodedPinSvg(starbucksPin)).toContain('href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/2615.svg"')
 
     const noLogoPin = getClusterer().markers.find((m) => m.title === '동네 마트')
-    expect(decodedPinSvg(noLogoPin)).toContain('<image href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f6d2.svg"')
+    expect(decodedPinSvg(noLogoPin)).toContain('href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f6d2.svg"')
 
     // 하단 목록: 기존대로 브랜드 로고 우선, 없으면 카테고리 아이콘으로 폴백.
     const cafeItem = wrapper.findAll('.sheet-item').find((item) => item.find('strong').text() === '동네 카페')
@@ -465,7 +465,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     await flushPromises()
 
     expect(routerMock.push).not.toHaveBeenCalled()
-    expect(wrapper.find('.detail-back-btn').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="닫기"]').exists()).toBe(true)
   })
 
   it('lat/lng이 없는 매장은 핀을 만들지 않는다', async () => {
@@ -603,7 +603,7 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
     trigger(clusterer, 'clusterclick', { getMarkers: () => [martPin] })
     await flushPromises()
 
-    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="닫기"]').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
   })
 
@@ -647,7 +647,7 @@ describe('클러스터 핀 클릭 - 안에 뭉친 매장만 하단 목록에 보
     await wrapper.find('.research-btn').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="닫기"]').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
   })
 })
@@ -719,13 +719,13 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
 
     await wrapper.find('.sheet-item').trigger('click') // 첫 매장(이름순 정렬상 '동네 마트') 상세로 진입
     await flushPromises()
-    expect(wrapper.find('.detail-back-btn').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="닫기"]').exists()).toBe(true)
 
     const cafeChip = wrapper.findAll('.chip').find((btn) => btn.text() === '카페')
     await cafeChip.trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="닫기"]').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
   })
 
@@ -738,12 +738,12 @@ describe('검색/카테고리 필터 - 화면 안 매장만 대상으로 클라�
 
     await wrapper.find('.sheet-item').trigger('click')
     await flushPromises()
-    expect(wrapper.find('.detail-back-btn').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="닫기"]').exists()).toBe(true)
 
     await wrapper.find('input').setValue('카페')
     await flushPromises()
 
-    expect(wrapper.find('.detail-back-btn').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="닫기"]').exists()).toBe(false)
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 카페'])
   })
 })
@@ -1231,7 +1231,7 @@ describe('주변 제휴 매장 바텀시트 3단계 drag/snap', () => {
     await handle.trigger('pointerup', { clientY: 200, pointerId: 5 })
     expect(sheet.attributes('data-position')).toBe('expanded')
 
-    await wrapper.find('.detail-back-btn').trigger('click')
+    await wrapper.find('button[aria-label="닫기"]').trigger('click')
     await wrapper.find('.sheet-item').trigger('click')
     expect(sheet.attributes('data-position')).toBe('expanded')
   })

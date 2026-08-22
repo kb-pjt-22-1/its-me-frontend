@@ -11,6 +11,7 @@ vi.mock('vue-router', () => ({
 
 import Benefits from '@/pages/Benefits.vue'
 import { useBenefitsStore } from '@/stores/benefits'
+import { useMerchantsStore } from '@/stores/merchants'
 
 function makeCard(overrides = {}) {
   return {
@@ -80,6 +81,7 @@ function makeBenefitLimits() {
 function mountPage(stateOverrides = {}) {
   setActivePinia(createPinia())
   const benefitsStore = useBenefitsStore()
+  const merchantsStore = useMerchantsStore()
 
   benefitsStore.$patch({
     reportMonthLabel: '8월',
@@ -96,8 +98,9 @@ function mountPage(stateOverrides = {}) {
   vi.spyOn(benefitsStore, 'fetchBreakEven').mockResolvedValue()
   vi.spyOn(benefitsStore, 'fetchAiCoaching').mockResolvedValue()
   vi.spyOn(benefitsStore, 'fetchLimits').mockResolvedValue()
+  vi.spyOn(merchantsStore, 'fetchCategories').mockResolvedValue()
 
-  return { wrapper: mount(Benefits), benefitsStore }
+  return { wrapper: mount(Benefits), benefitsStore, merchantsStore }
 }
 
 beforeEach(() => {
@@ -115,14 +118,15 @@ afterEach(() => {
 // ---------------------------------------------------------------------
 // 초기 로딩 / 액션 호출
 // ---------------------------------------------------------------------
-it('mount 시 fetchReport/fetchBreakEven/fetchAiCoaching/fetchLimits를 각각 한 번씩 호출한다', async () => {
-  const { benefitsStore } = mountPage()
+it('mount 시 혜택 데이터와 카테고리를 각각 한 번씩 불러온다', async () => {
+  const { benefitsStore, merchantsStore } = mountPage()
   await flushPromises()
 
   expect(benefitsStore.fetchReport).toHaveBeenCalledTimes(1)
   expect(benefitsStore.fetchBreakEven).toHaveBeenCalledTimes(1)
   expect(benefitsStore.fetchAiCoaching).toHaveBeenCalledTimes(1)
   expect(benefitsStore.fetchLimits).toHaveBeenCalledTimes(1)
+  expect(merchantsStore.fetchCategories).toHaveBeenCalledTimes(1)
 })
 
 it('로딩 상태면 로딩 문구를 보여준다', () => {
@@ -361,16 +365,17 @@ describe('이번 달 받을 수 있는 혜택', () => {
   it('같은 categoryCode가 여러 카드/혜택으로 중복되어도 key 중복 없이 모두 렌더링한다', () => {
     const { wrapper } = mountPage({
       benefitLimits: [
-        makeBenefitLimitItem({ key: '1-CAFE-혜택A', userCardId: 1, cardName: '청춘대로 톡톡카드', serviceName: '카페 5% 청구할인', category: '카페', categoryCode: 'CAFE' }),
-        makeBenefitLimitItem({ key: '2-CAFE-혜택B', userCardId: 2, cardName: '가온 올포인트 체크카드', serviceName: '카페 10% 적립', category: '카페', categoryCode: 'CAFE' }),
+        makeBenefitLimitItem({ key: '1-CAFE-혜택A', userCardId: 1, category: '카페', categoryCode: 'CAFE', used: 1000, limit: 5000, remaining: 4000 }),
+        makeBenefitLimitItem({ key: '2-CAFE-혜택B', userCardId: 2, category: '카페', categoryCode: 'CAFE', used: 2500, limit: 10000, remaining: 7500 }),
       ],
     })
 
-    expect(wrapper.findAll('.benefit-usage-item')).toHaveLength(2)
-    expect(wrapper.text()).toContain('청춘대로 톡톡카드')
-    expect(wrapper.text()).toContain('가온 올포인트 체크카드')
-    expect(wrapper.text()).toContain('카페 5% 청구할인')
-    expect(wrapper.text()).toContain('카페 10% 적립')
+    const items = wrapper.findAll('.benefit-usage-item')
+    expect(items).toHaveLength(2)
+    expect(items[0].text()).toContain('1,000원 사용 / 총 5,000원')
+    expect(items[0].text()).toContain('남은 혜택 4,000원')
+    expect(items[1].text()).toContain('2,500원 사용 / 총 10,000원')
+    expect(items[1].text()).toContain('남은 혜택 7,500원')
   })
 
   it('amountLimit이 null이면(한도 없음) "무제한"으로 표시하고 진행률/남은 금액 계산에서 NaN이 나지 않는다', () => {
@@ -425,6 +430,7 @@ describe('해시로 진입 시 스크롤', () => {
   function mountAttached() {
     setActivePinia(createPinia())
     const benefitsStore = useBenefitsStore()
+    const merchantsStore = useMerchantsStore()
 
     benefitsStore.$patch({
       reportMonthLabel: '8월',
@@ -440,6 +446,7 @@ describe('해시로 진입 시 스크롤', () => {
     vi.spyOn(benefitsStore, 'fetchBreakEven').mockResolvedValue()
     vi.spyOn(benefitsStore, 'fetchAiCoaching').mockResolvedValue()
     vi.spyOn(benefitsStore, 'fetchLimits').mockResolvedValue()
+    vi.spyOn(merchantsStore, 'fetchCategories').mockResolvedValue()
 
     return mount(Benefits, { attachTo: document.body })
   }
@@ -457,6 +464,7 @@ describe('해시로 진입 시 스크롤', () => {
     let resolveLimits
     setActivePinia(createPinia())
     const benefitsStore = useBenefitsStore()
+    const merchantsStore = useMerchantsStore()
     benefitsStore.$patch({
       reportMonthLabel: '8월',
       totalBenefit: 42500,
@@ -468,6 +476,7 @@ describe('해시로 진입 시 스크롤', () => {
     vi.spyOn(benefitsStore, 'fetchReport').mockResolvedValue()
     vi.spyOn(benefitsStore, 'fetchBreakEven').mockResolvedValue()
     vi.spyOn(benefitsStore, 'fetchAiCoaching').mockResolvedValue()
+    vi.spyOn(merchantsStore, 'fetchCategories').mockResolvedValue()
     vi.spyOn(benefitsStore, 'fetchLimits').mockImplementation(() => {
       benefitsStore.limitsLoading = true
       return new Promise((resolve) => {
