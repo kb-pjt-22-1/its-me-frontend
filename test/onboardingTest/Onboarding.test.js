@@ -53,7 +53,7 @@ describe('Onboarding.vue', () => {
     await buttonByText(wrapper, '다음').trigger('click')
     await buttonByText(wrapper, '시작하기').trigger('click')
 
-    expect(wrapper.text()).toContain('BenePay에 오신 걸 환영해요!')
+    expect(wrapper.text()).toContain('이제 BenePay에서 챙겨보세요')
   })
 
   it('바로 시작하기 버튼으로 환영 화면을 연다', async () => {
@@ -61,7 +61,7 @@ describe('Onboarding.vue', () => {
 
     await buttonByText(wrapper, '바로 시작하기').trigger('click')
 
-    expect(wrapper.text()).toContain('BenePay에 오신 걸 환영해요!')
+    expect(wrapper.text()).toContain('이제 BenePay에서 챙겨보세요')
   })
 
   it('환영 화면에서는 페이지 점과 바로 시작하기를 숨긴다', async () => {
@@ -103,4 +103,3 @@ describe('Onboarding.vue', () => {
     expect(wrapper.text()).toContain('가까운 혜택 매장을\n한눈에')
   })
 })
-
