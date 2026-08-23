@@ -106,12 +106,6 @@ const slides = [
   },
 ]
 
-// 온보딩 진입 시점에 슬라이드 3장 + 환영 화면 로고까지 한 번에 미리 받아둔다 -
-// new Image()로 만든 요청은 브라우저 캐시에 그대로 남아서, 실제 <img>가 같은 URL을
-// 나중에 참조할 때 재사용된다. 이게 없으면 각 화면의 <img>가 그 화면으로 넘어가는
-// 순간에야 처음 요청을 시작해서, 넘길 때마다 로딩 과정(팝인/깜빡임)이 그대로 보였다.
-;[...slides.map((slide) => slide.image), benePayLogo].forEach((src) => { const img = new Image(); img.src = src })
-
 const router = useRouter()
 const currentIndex = ref(0)
 const direction = ref('next')
