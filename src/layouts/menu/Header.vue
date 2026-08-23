@@ -63,9 +63,7 @@ const goToMenu = () => {
 </script>
 
 <style scoped>
-/* 헤더는 전역 KBFGText 교체 대상에서 제외 - 원래 폰트 스택을 그대로 쓴다 */
 .app-header {
-  font-family: var(--font-default, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
   position: fixed;
   top: 0;
   left: 50%;

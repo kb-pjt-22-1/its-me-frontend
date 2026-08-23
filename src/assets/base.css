@@ -9,7 +9,6 @@
 /* BenePay 디자인 토큰. SmartCard 피그마 프로토타입(src/app/App.tsx의 KB_* 상수)의
    실제 값과 일치시켰다 - 예전 값들은 비슷하게 어림한 근사치였다. */
 :root {
-  /* 헤더는 예외 - Header.vue가 이 토큰을 별도로 원래 폰트로 되돌린다 */
   --font-default: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-family: "KBFGText", var(--font-default);
   color: #24211d;
