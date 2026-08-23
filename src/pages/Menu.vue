@@ -45,7 +45,7 @@
 
       <div class="footer-actions">
         <button class="logout-btn" @click="handleLogout">로그아웃</button>
-        <button class="withdraw-btn danger-text">회원 탈퇴</button>
+        <button class="withdraw-btn danger-text" @click="handleWithdraw">회원 탈퇴</button>
       </div>
     </div>
 
@@ -59,10 +59,15 @@ import { useRouter } from 'vue-router';
 import Footer from '@/layouts/menu/Footer.vue';
 import { useAuthStore } from '@/stores/auth';
 import { usePaymentStore } from '@/stores/payment';
+import { useConfirmDialog } from '@/composables/useConfirmDialog';
+import { useToast } from '@/composables/useToast';
+import { withdraw } from '@/services/memberService';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const paymentStore = usePaymentStore();
+const confirmDialog = useConfirmDialog();
+const toast = useToast();
 
 const userName = computed(() => authStore.userName);
 
@@ -88,6 +93,28 @@ onMounted(() => {
 const handleLogout = async () => {
   await authStore.logout();
   router.push('/login');
+};
+
+const handleWithdraw = async () => {
+  const confirmed = await confirmDialog.confirm('정말로 탈퇴 하시겠습니까?', {
+    confirmText: '예',
+    cancelText: '아니오',
+    danger: true,
+  });
+  if (!confirmed) return;
+
+  try {
+    await withdraw();
+    // 백엔드가 이미 이 세션의 access/refresh 토큰을 무효화했으므로, 서버 로그아웃 호출 없이
+    // 로컬 저장소만 정리한다(authStore.logout()은 서버 로그아웃 API를 한 번 더 부르는데,
+    // 이미 블랙리스트된 토큰이라 의미 없는 401만 발생시킨다).
+    authStore.clearSession();
+    toast.success('탈퇴가 완료됐어요.');
+    router.push('/login');
+  } catch (err) {
+    console.error('회원 탈퇴 실패', err.message);
+    toast.error('회원 탈퇴에 실패했어요. 다시 시도해주세요.');
+  }
 };
 </script>
 

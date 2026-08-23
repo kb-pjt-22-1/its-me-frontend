@@ -58,3 +58,12 @@ export async function updatePin(currentPin, newPin) {
 export async function updateFcmToken(fcmToken) {
   await api.patch('/users/me/fcm-token', { fcmToken })
 }
+
+/**
+ * 회원 탈퇴. DELETE /users/me?confirmed=true - confirmed 없이 호출하면 백엔드가 400으로
+ * 거부한다(WithdrawalNotConfirmedException). 성공하면 백엔드가 이 요청의 accessToken을
+ * 블랙리스트에 넣고 refreshToken도 폐기하므로, 호출부가 로컬 세션도 함께 정리해야 한다.
+ */
+export async function withdraw() {
+  await api.delete('/users/me', { params: { confirmed: true } })
+}
