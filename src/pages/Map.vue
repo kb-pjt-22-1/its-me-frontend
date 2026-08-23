@@ -402,13 +402,18 @@ const nearbyMerchants = computed(() => {
         ...m,
         distanceMeters: distance,
         distanceLabel: distance != null ? formatDistance(distance) : '거리 정보 없음',
+        // 실질 할인율 = 지금 확정 혜택 금액 / 기준 결제액. 둘 중 하나라도 없으면(백엔드가
+        // discountAmount를 아직 안 내려주거나, 애초에 혜택이 없는 매장) 0으로 취급한다.
+        discountRate: m.discountAmount && m.typicalPaymentAmount
+          ? m.discountAmount / m.typicalPaymentAmount
+          : 0,
       }
     })
 
   const sorted = [...withDistance].sort((a, b) => {
     if (sortMode.value === 'benefit') {
-      const benefitDiff = (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0)
-      if (benefitDiff !== 0) return benefitDiff
+      const rateDiff = b.discountRate - a.discountRate
+      if (rateDiff !== 0) return rateDiff
       return a.name.localeCompare(b.name)
     }
     if (a.distanceMeters == null || b.distanceMeters == null) {
@@ -416,7 +421,21 @@ const nearbyMerchants = computed(() => {
     }
     return a.distanceMeters - b.distanceMeters
   })
-  return sorted.slice(0, MAX_SHEET_ITEMS)
+
+  // 같은 브랜드의 다른 지점(예: 네네치킨 용문동/잠원동)이 목록을 도배하지 않도록, 브랜드당
+  // 대표 매장 1곳만 남긴다 - 정렬이 이미 끝난 뒤라 그룹에서 처음 만나는 매장이 곧 그 정렬
+  // 기준상 1등이다. brandId가 없는 매장(개인 매장 등)은 자기 자신만의 키를 써서 애초에
+  // 중복 제거 대상이 되지 않는다. 지도 핀(renderMerchantMarkers)은 이 목록을 안 쓰므로
+  // 실제 지점은 전부 그대로 찍힌다 - 중복 제거는 이 바텀시트 목록에만 적용된다.
+  const seenBrandKeys = new Set()
+  const deduped = sorted.filter((m) => {
+    const key = m.brandId != null ? `brand:${m.brandId}` : `merchant:${m.id}`
+    if (seenBrandKeys.has(key)) return false
+    seenBrandKeys.add(key)
+    return true
+  })
+
+  return deduped.slice(0, MAX_SHEET_ITEMS)
 })
 
 function formatDistance(meters) {

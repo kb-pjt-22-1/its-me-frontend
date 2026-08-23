@@ -871,11 +871,11 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     expect(martItem.find('.pill--gold').exists()).toBe(false)
   })
 
-  it('혜택순 버튼을 누르면 recommended=true인 매장이 먼저 오고, 거리순으로 되돌리면 원래 순서로 돌아간다', async () => {
+  it('혜택순 버튼을 누르면 실질 할인율이 높은 매장이 먼저 오고, 거리순으로 되돌리면 원래 순서로 돌아간다', async () => {
     window.kakao = createKakaoMock().kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([
       MART_MERCHANT,
-      { ...CAFE_MERCHANT, recommended: true },
+      { ...CAFE_MERCHANT, recommended: true, discountAmount: 1000, typicalPaymentAmount: 10000 },
     ])
 
     const wrapper = mountMapPage()
@@ -896,6 +896,24 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     await flushPromises()
 
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
+  })
+
+  it('혜택순 정렬 시 같은 브랜드의 다른 지점은 실질 할인율이 더 높은 곳 1곳만 남긴다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      { ...CAFE_MERCHANT, name: '네네치킨 용문동', brandId: 9, discountAmount: 500, typicalPaymentAmount: 10000 },
+      { ...MART_MERCHANT, name: '네네치킨 잠원동', brandId: 9, discountAmount: 2000, typicalPaymentAmount: 10000 },
+      { id: 3, name: '개인 매장', categoryCode: '5813', lat: 37.52, lng: 127.12 },
+    ])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const benefitBtn = wrapper.findAll('.sort-btn').find((btn) => btn.text() === '혜택순')
+    await benefitBtn.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['네네치킨 잠원동', '개인 매장'])
   })
 
   it('매장이 10개 이하면 페이지 버튼을 보여주지 않는다', async () => {
