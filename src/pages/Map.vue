@@ -427,6 +427,14 @@ const nearbyMerchants = computed(() => {
   // 기준상 1등이다. brandId가 없는 매장(개인 매장 등)은 자기 자신만의 키를 써서 애초에
   // 중복 제거 대상이 되지 않는다. 지도 핀(renderMerchantMarkers)은 이 목록을 안 쓰므로
   // 실제 지점은 전부 그대로 찍힌다 - 중복 제거는 이 바텀시트 목록에만 적용된다.
+  //
+  // 검색어가 있을 때는 이 중복 제거를 끈다 - "만랩커피"처럼 지점이 여러 곳인 브랜드를
+  // 검색했는데 대표 매장 1곳만 남아버리면 사용자가 찾는 지점이 안 보일 수 있다. 검색은
+  // "이 브랜드가 어디 있는지 전부 보고 싶다"는 의도라, 평소의 "브랜드 다양성" 목적과 다르다.
+  if (searchQuery.value.trim()) {
+    return sorted.slice(0, MAX_SHEET_ITEMS)
+  }
+
   const seenBrandKeys = new Set()
   const deduped = sorted.filter((m) => {
     const key = m.brandId != null ? `brand:${m.brandId}` : `merchant:${m.id}`

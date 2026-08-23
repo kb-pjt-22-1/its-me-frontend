@@ -916,6 +916,24 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['네네치킨 잠원동', '개인 매장'])
   })
 
+  it('검색어가 있으면 브랜드 중복 제거를 끄고 같은 브랜드 지점을 전부 보여준다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      { ...CAFE_MERCHANT, name: '만랩커피 용문점', brandId: 9 },
+      { ...MART_MERCHANT, name: '만랩커피 잠원점', brandId: 9 },
+    ])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    await wrapper.find('input').setValue('만랩커피')
+    await flushPromises()
+
+    const names = wrapper.findAll('.sheet-item-info strong').map((el) => el.text())
+    expect(names).toEqual(expect.arrayContaining(['만랩커피 용문점', '만랩커피 잠원점']))
+    expect(names).toHaveLength(2)
+  })
+
   it('매장이 10개 이하면 페이지 버튼을 보여주지 않는다', async () => {
     window.kakao = createKakaoMock().kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
