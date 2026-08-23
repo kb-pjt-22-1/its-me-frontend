@@ -25,9 +25,9 @@ function mountPage({ history = [], isLoading = false } = {}) {
   setActivePinia(createPinia())
   const paymentStore = usePaymentStore()
 
-  paymentStore.history = history
-  paymentStore.isLoading = isLoading
-  paymentStore.fetchHistory = vi.fn()
+  paymentStore.monthlyHistory = history
+  paymentStore.isMonthlyLoading = isLoading
+  paymentStore.fetchMonthlyHistory = vi.fn()
 
   const wrapper = mount(PaymentsList, {
     global: { stubs: { Footer: true, PaymentDetailSheet: true } },
@@ -144,14 +144,14 @@ describe('상호작용', () => {
 
   it('이번 달을 보고 있으면 다음 달 버튼이 비활성화되고, 눌러도 추가로 조회하지 않는다', async () => {
     const { wrapper, paymentStore } = mountPage()
-    const callsAfterMount = paymentStore.fetchHistory.mock.calls.length
+    const callsAfterMount = paymentStore.fetchMonthlyHistory.mock.calls.length
     const nextBtn = wrapper.find('.date-arrow[aria-label="다음 달"]')
 
     expect(nextBtn.attributes('disabled')).toBeDefined()
 
     await nextBtn.trigger('click')
 
-    expect(paymentStore.fetchHistory.mock.calls.length).toBe(callsAfterMount)
+    expect(paymentStore.fetchMonthlyHistory.mock.calls.length).toBe(callsAfterMount)
   })
 
   it('과거 달에서 다음 달을 여러 번 눌러도 이번 달을 넘어서 이동하지 않는다', async () => {
@@ -168,7 +168,7 @@ describe('상호작용', () => {
     }
 
     const expected = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
-    expect(paymentStore.fetchHistory).toHaveBeenLastCalledWith({ yearMonth: expected })
+    expect(paymentStore.fetchMonthlyHistory).toHaveBeenLastCalledWith({ yearMonth: expected })
     expect(wrapper.find('.date-arrow[aria-label="다음 달"]').attributes('disabled')).toBeDefined()
   })
 
@@ -181,6 +181,6 @@ describe('상호작용', () => {
     }
 
     const expected = `${now.getFullYear() - 1}${String(now.getMonth() + 1).padStart(2, '0')}`
-    expect(paymentStore.fetchHistory).toHaveBeenLastCalledWith({ yearMonth: expected })
+    expect(paymentStore.fetchMonthlyHistory).toHaveBeenLastCalledWith({ yearMonth: expected })
   })
 })

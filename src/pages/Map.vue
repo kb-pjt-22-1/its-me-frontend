@@ -413,8 +413,10 @@ const MAX_SHEET_ITEMS = 100
 const clusterFilterMerchantIds = ref(null)
 
 // 혜택순 정렬의 보조 기준(할인율이 같거나 비슷할 때) - 결제내역에서 매장>브랜드>카테고리
-// 순으로 자주 결제한 곳일수록 위로 오도록 빈도를 센다. 범위는 지금 이미 불러와 있는
-// paymentStore.history 그대로(보통 이번 달 조회분) - 이 화면이 별도로 더 불러오지 않는다.
+// 순으로 자주 결제한 곳일수록 위로 오도록 빈도를 센다. 범위는 App.vue가 로그인/앱 진입 시
+// 채워두는 paymentStore.history(최근/기본 범위) 그대로 - 이 화면이 별도로 더 불러오지
+// 않는다. PaymentsList.vue의 월별 조회는 별도 state(monthlyHistory)를 쓰므로 사용자가
+// 결제내역에서 다른 달을 조회해도 여기엔 영향이 없다.
 const paymentFrequency = computed(() => {
   const byMerchant = new Map()
   const byBrand = new Map()
