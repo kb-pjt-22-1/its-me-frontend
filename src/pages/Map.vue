@@ -11,7 +11,13 @@
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <input v-model="searchQuery" type="text" placeholder="지금 화면에 보이는 매장명 또는 카테고리 검색" />
+        <input
+          :value="searchQuery"
+          type="text"
+          placeholder="지금 화면에 보이는 매장명 또는 카테고리 검색"
+          maxlength="50"
+          @input="onSearchInput"
+        />
       </div>
 
       <div
@@ -448,6 +454,12 @@ const searchQuery = ref(mapViewStore.searchQuery)
 // '전체' 칩은 따로 두지 않고, 선택된 칩을 다시 누르면 해제되어 전체 보기로 돌아갑니다.
 const categories = computed(() => merchantsStore.categories.map((c) => c.categoryName).filter(Boolean))
 const selectedCategory = ref(mapViewStore.selectedCategory)
+
+// maxlength만으로는 붙여넣기 시 초과분이 막히지 않는 입력 방식(IME 등)이 있어 이중으로 막는다
+// (Signup.vue의 이름 입력과 같은 이유).
+function onSearchInput(event) {
+  searchQuery.value = event.target.value.slice(0, 50)
+}
 
 watch(searchQuery, (value) => {
   mapViewStore.searchQuery = value
