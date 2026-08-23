@@ -9,15 +9,27 @@ vi.mock('firebase/app', () => ({
   getApps: getAppsMock,
 }))
 
-const { isSupportedMock, getMessagingMock, getTokenMock } = vi.hoisted(() => ({
+const { isSupportedMock, getMessagingMock, getTokenMock, onMessageMock } = vi.hoisted(() => ({
   isSupportedMock: vi.fn(),
   getMessagingMock: vi.fn(() => ({ name: 'fake-messaging' })),
   getTokenMock: vi.fn(),
+  onMessageMock: vi.fn(),
 }))
 vi.mock('firebase/messaging', () => ({
   isSupported: isSupportedMock,
   getMessaging: getMessagingMock,
   getToken: getTokenMock,
+  onMessage: onMessageMock,
+}))
+
+const { toastInfoMock } = vi.hoisted(() => ({ toastInfoMock: vi.fn() }))
+vi.mock('@/composables/useToast', () => ({
+  useToast: () => ({ info: toastInfoMock }),
+}))
+
+const { fetchNotificationsMock } = vi.hoisted(() => ({ fetchNotificationsMock: vi.fn() }))
+vi.mock('@/stores/notifications', () => ({
+  useNotificationsStore: () => ({ fetchNotifications: fetchNotificationsMock }),
 }))
 
 // 실제 Firebase 설정값이 채워진 상태를 흉내낸다 - 하나라도 비면 isFirebaseConfigured()가
@@ -144,5 +156,52 @@ describe('getFcmToken', () => {
     const result = await getFcmToken()
 
     expect(result).toBeNull()
+  })
+})
+
+describe('listenForegroundMessages', () => {
+  it('Firebase 설정값이 비어 있으면 리스너를 붙이지 않는다', async () => {
+    stubEmptyFirebaseConfig()
+    const { listenForegroundMessages } = await import('@/services/pushNotificationService')
+
+    await listenForegroundMessages()
+
+    expect(onMessageMock).not.toHaveBeenCalled()
+  })
+
+  it('포그라운드 메시지를 받으면 title/body를 토스트로 띄우고 알림 목록을 다시 불러온다', async () => {
+    stubFullFirebaseConfig()
+    const { listenForegroundMessages } = await import('@/services/pushNotificationService')
+
+    await listenForegroundMessages()
+    const onMessageHandler = onMessageMock.mock.calls[0][1]
+    onMessageHandler({ notification: { title: '결제가 완료됐어요', body: '스타벅스에서 5,000원 결제했어요.' } })
+
+    expect(toastInfoMock).toHaveBeenCalledWith('결제가 완료됐어요 · 스타벅스에서 5,000원 결제했어요.')
+    // 포그라운드 push의 data에는 notificationId/type이 없어서(paymentId/merchantId만 있음)
+    // 목록을 다시 조회해야 새 알림이 안읽음 상태로 배지에 반영된다.
+    expect(fetchNotificationsMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('notification 페이로드가 없으면 토스트도, 목록 재조회도 하지 않는다', async () => {
+    stubFullFirebaseConfig()
+    const { listenForegroundMessages } = await import('@/services/pushNotificationService')
+
+    await listenForegroundMessages()
+    const onMessageHandler = onMessageMock.mock.calls[0][1]
+    onMessageHandler({ data: { paymentId: '1' } })
+
+    expect(toastInfoMock).not.toHaveBeenCalled()
+    expect(fetchNotificationsMock).not.toHaveBeenCalled()
+  })
+
+  it('여러 번 호출해도 리스너는 한 번만 붙인다', async () => {
+    stubFullFirebaseConfig()
+    const { listenForegroundMessages } = await import('@/services/pushNotificationService')
+
+    await listenForegroundMessages()
+    await listenForegroundMessages()
+
+    expect(onMessageMock).toHaveBeenCalledTimes(1)
   })
 })

@@ -14,7 +14,8 @@ firebase.initializeApp({
   appId: '1:155487599331:web:c5ac033223f7ef980663d6',
 });
 
-// 이번 작업 범위는 토큰 등록까지다(백엔드 안내 참고) - 포그라운드 알림 표시/딥링크 처리는
-// 별도 기능이라 커스텀 onBackgroundMessage 핸들러 없이 Firebase 기본 동작(payload의
-// notification 필드를 그대로 시스템 알림으로 띄움)만 켜둔다.
+// 포그라운드 알림 표시는 src/services/pushNotificationService.js의 onMessage() 리스너가
+// 토스트로 처리한다(stores/auth.js registerFcmToken 참고). 여기(백그라운드/탭 닫힘)는
+// 딥링크 처리 없이 Firebase 기본 동작(payload의 notification 필드를 그대로 시스템 알림으로
+// 띄움)만 켜둔다 - 커스텀 onBackgroundMessage 핸들러는 아직 범위 밖.
 firebase.messaging();
