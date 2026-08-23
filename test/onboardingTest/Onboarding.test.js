@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 
 const routerMock = {
   replace: vi.fn(),
@@ -127,5 +127,76 @@ describe('Onboarding.vue', () => {
     await page.trigger('touchend', { changedTouches: [{ clientX: 60, clientY: 102 }] })
 
     expect(wrapper.text()).toContain('가까운 혜택 매장을\n한눈에')
+  })
+
+  it('50px을 넘는 오른쪽 스와이프로 이전 화면으로 되돌아간다', async () => {
+    const wrapper = mountOnboarding()
+    const page = wrapper.get('.onboarding-page')
+
+    await buttonByText(wrapper, '다음').trigger('click')
+    expect(wrapper.text()).toContain('가까운 혜택 매장을\n한눈에')
+
+    await page.trigger('touchstart', { changedTouches: [{ clientX: 60, clientY: 100 }] })
+    await page.trigger('touchend', { changedTouches: [{ clientX: 120, clientY: 102 }] })
+
+    expect(wrapper.text()).toContain('결제할 때마다\n가장 좋은 카드로')
+  })
+
+  it('스와이프 거리가 50px 미만이면 화면을 넘기지 않는다', async () => {
+    const wrapper = mountOnboarding()
+    const page = wrapper.get('.onboarding-page')
+
+    await page.trigger('touchstart', { changedTouches: [{ clientX: 100, clientY: 100 }] })
+    await page.trigger('touchend', { changedTouches: [{ clientX: 130, clientY: 100 }] })
+
+    expect(wrapper.text()).toContain('결제할 때마다\n가장 좋은 카드로')
+  })
+
+  it('세로 이동이 가로 이동보다 크면(스크롤 의도) 화면을 넘기지 않는다', async () => {
+    const wrapper = mountOnboarding()
+    const page = wrapper.get('.onboarding-page')
+
+    await page.trigger('touchstart', { changedTouches: [{ clientX: 100, clientY: 100 }] })
+    await page.trigger('touchend', { changedTouches: [{ clientX: 160, clientY: 220 }] })
+
+    expect(wrapper.text()).toContain('결제할 때마다\n가장 좋은 카드로')
+  })
+
+  it('이미지 로딩이 끝나 decode가 성공하면 조용히 미리 로드를 마친다', async () => {
+    const onloadCallbacks = []
+    vi.stubGlobal('Image', class {
+      set src(value) {
+        this._src = value
+        onloadCallbacks.push(() => this.onload?.())
+      }
+      decode() {
+        return Promise.resolve()
+      }
+    })
+
+    const wrapper = mountOnboarding()
+    onloadCallbacks.forEach((fire) => fire())
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('결제할 때마다\n가장 좋은 카드로')
+  })
+
+  it('이미지 decode가 실패해도(구형 브라우저 등) 무시하고 정상적으로 미리 로드를 마친다', async () => {
+    const onloadCallbacks = []
+    vi.stubGlobal('Image', class {
+      set src(value) {
+        this._src = value
+        onloadCallbacks.push(() => this.onload?.())
+      }
+      decode() {
+        return Promise.reject(new Error('decode not supported'))
+      }
+    })
+
+    const wrapper = mountOnboarding()
+    onloadCallbacks.forEach((fire) => fire())
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('결제할 때마다\n가장 좋은 카드로')
   })
 })
