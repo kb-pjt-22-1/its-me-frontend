@@ -1,19 +1,19 @@
 <template>
   <section
-    class="onboarding-page"
-    aria-label="BenePay 시작 안내"
-    @touchstart.passive="handleTouchStart"
-    @touchend.passive="handleTouchEnd"
+      class="onboarding-page"
+      aria-label="BenePay 시작 안내"
+      @touchstart.passive="handleTouchStart"
+      @touchend.passive="handleTouchEnd"
   >
     <header v-if="!isWelcome" class="onboarding-header">
       <div class="page-dots" aria-label="온보딩 진행 상황">
         <span
-          v-for="(_, index) in slides"
-          :key="index"
-          class="page-dot"
-          :class="{ 'page-dot--active': index === currentIndex }"
-          :aria-label="`${index + 1}번째 화면`"
-          :aria-current="index === currentIndex ? 'step' : undefined"
+            v-for="(_, index) in slides"
+            :key="index"
+            class="page-dot"
+            :class="{ 'page-dot--active': index === currentIndex }"
+            :aria-label="`${index + 1}번째 화면`"
+            :aria-current="index === currentIndex ? 'step' : undefined"
         ></span>
       </div>
 
@@ -25,24 +25,32 @@
     <Transition :name="transitionName" mode="out-in">
       <article v-if="!isWelcome" :key="currentIndex" class="slide-content">
         <h1 class="slide-title">{{ currentSlide.title }}</h1>
+
         <div class="slide-image-wrap">
           <img
-            class="slide-image"
-            :src="currentSlide.image"
-            :alt="currentSlide.alt"
+              class="slide-image"
+              :src="currentSlide.image"
+              :alt="currentSlide.alt"
           />
         </div>
       </article>
 
       <article v-else key="welcome" class="welcome-content">
-        <h1 class="welcome-title">내게 꼭 맞는 카드 혜택,<br />이제 BenePay에서 챙겨보세요</h1>
+        <h1 class="welcome-title">
+          내게 꼭 맞는 카드 혜택,<br />
+          이제 BenePay에서 챙겨보세요
+        </h1>
+
         <div class="welcome-logo-wrap">
           <img class="welcome-logo" :src="benePayLogo" alt="BenePay" />
         </div>
       </article>
     </Transition>
 
-    <footer class="onboarding-actions" :class="{ 'onboarding-actions--welcome': isWelcome }">
+    <footer
+        class="onboarding-actions"
+        :class="{ 'onboarding-actions--welcome': isWelcome }"
+    >
       <template v-if="!isWelcome">
         <Button type="button" size="lg" full-width @click="goNext">
           {{ currentIndex === slides.length - 1 ? '시작하기' : '다음' }}
@@ -53,7 +61,14 @@
         <Button type="button" size="lg" full-width @click="goToLogin">
           로그인
         </Button>
-        <Button type="button" variant="outline" size="lg" full-width @click="goToSignup">
+
+        <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            full-width
+            @click="goToSignup"
+        >
           회원가입
         </Button>
       </template>
@@ -62,7 +77,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from '@/components/common/Button.vue'
 import onboardingHome from '@/assets/images/onboarding/onboarding-home.png'
@@ -100,14 +115,47 @@ const isWelcome = computed(() => currentIndex.value === slides.length)
 const currentSlide = computed(() => slides[currentIndex.value])
 const transitionName = computed(() => `onboarding-${direction.value}`)
 
+const preloadedImages = []
+
+function preloadImage(src) {
+  return new Promise((resolve) => {
+    const image = new Image()
+
+    image.onload = async () => {
+      try {
+        await image.decode?.()
+      } catch {
+        // 이미지 로딩이 완료됐다면 decode 실패는 무시
+      }
+
+      resolve()
+    }
+
+    image.onerror = resolve
+    image.src = src
+    preloadedImages.push(image)
+  })
+}
+
+onMounted(() => {
+  const imageSources = [
+    ...slides.map((slide) => slide.image),
+    benePayLogo,
+  ]
+
+  void Promise.allSettled(imageSources.map(preloadImage))
+})
+
 function goNext() {
   if (currentIndex.value >= slides.length) return
+
   direction.value = 'next'
   currentIndex.value += 1
 }
 
 function goPrevious() {
   if (currentIndex.value <= 0 || isWelcome.value) return
+
   direction.value = 'previous'
   currentIndex.value -= 1
 }
@@ -119,13 +167,19 @@ function showWelcome() {
 
 function handleTouchStart(event) {
   const touch = event.changedTouches?.[0] ?? event.touches?.[0]
-  touchStart.value = touch ? { x: touch.clientX, y: touch.clientY } : null
+  touchStart.value = touch
+      ? {
+        x: touch.clientX,
+        y: touch.clientY,
+      }
+      : null
 }
 
 function handleTouchEnd(event) {
   if (!touchStart.value || isWelcome.value) return
 
   const touch = event.changedTouches?.[0]
+
   if (!touch) {
     touchStart.value = null
     return
@@ -133,11 +187,21 @@ function handleTouchEnd(event) {
 
   const deltaX = touch.clientX - touchStart.value.x
   const deltaY = touch.clientY - touchStart.value.y
+
   touchStart.value = null
 
-  if (Math.abs(deltaX) < SWIPE_THRESHOLD || Math.abs(deltaX) <= Math.abs(deltaY)) return
-  if (deltaX < 0) goNext()
-  else goPrevious()
+  if (
+      Math.abs(deltaX) < SWIPE_THRESHOLD ||
+      Math.abs(deltaX) <= Math.abs(deltaY)
+  ) {
+    return
+  }
+
+  if (deltaX < 0) {
+    goNext()
+  } else {
+    goPrevious()
+  }
 }
 
 function goToLogin() {
@@ -253,24 +317,24 @@ function goToSignup() {
   height: auto;
   object-fit: contain;
   -webkit-mask-image: linear-gradient(
-    to bottom,
-    #000 0%,
-    #000 56%,
-    rgba(0, 0, 0, 0.92) 60%,
-    rgba(0, 0, 0, 0.68) 70%,
-    rgba(0, 0, 0, 0.38) 80%,
-    rgba(0, 0, 0, 0.12) 90%,
-    transparent 100%
+      to bottom,
+      #000 0%,
+      #000 56%,
+      rgba(0, 0, 0, 0.92) 60%,
+      rgba(0, 0, 0, 0.68) 70%,
+      rgba(0, 0, 0, 0.38) 80%,
+      rgba(0, 0, 0, 0.12) 90%,
+      transparent 100%
   );
   mask-image: linear-gradient(
-    to bottom,
-    #000 0%,
-    #000 56%,
-    rgba(0, 0, 0, 0.92) 60%,
-    rgba(0, 0, 0, 0.68) 70%,
-    rgba(0, 0, 0, 0.38) 80%,
-    rgba(0, 0, 0, 0.12) 90%,
-    transparent 100%
+      to bottom,
+      #000 0%,
+      #000 56%,
+      rgba(0, 0, 0, 0.92) 60%,
+      rgba(0, 0, 0, 0.68) 70%,
+      rgba(0, 0, 0, 0.38) 80%,
+      rgba(0, 0, 0, 0.12) 90%,
+      transparent 100%
   );
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
@@ -319,7 +383,7 @@ function goToSignup() {
 .onboarding-next-leave-active,
 .onboarding-previous-enter-active,
 .onboarding-previous-leave-active {
-  transition: opacity 180ms ease, transform 180ms ease;
+  transition: opacity 100ms ease, transform 100ms ease;
 }
 
 .onboarding-next-enter-from,
