@@ -13,7 +13,15 @@
         <form class="stack-form" @submit.prevent="codeStep === 'form' ? requestCode() : confirmCode()">
           <div class="input-box">
             <label for="signup-name" class="sr-only">이름</label>
-            <input id="signup-name" v-model="name" type="text" placeholder="이름" :disabled="codeStep !== 'form'" />
+            <input
+              id="signup-name"
+              :value="name"
+              type="text"
+              placeholder="이름"
+              maxlength="50"
+              :disabled="codeStep !== 'form'"
+              @input="onNameInput"
+            />
           </div>
 
           <div class="input-box">
@@ -220,6 +228,12 @@ function onPhoneInput(event) {
       ? `${digits.slice(0, 3)}-${digits.slice(3)}`
       : digits;
   identityError.value = '';
+}
+
+// users.name이 DB에 VARCHAR(50)이라, 그 이상 입력해봤자 가입 시점에 잘리거나 실패한다.
+// maxlength만으로는 붙여넣기 시 초과분이 막히지 않는 입력 방식(IME 등)이 있어 이중으로 막는다.
+function onNameInput(event) {
+  name.value = event.target.value.slice(0, 50)
 }
 
 function onBirthDateInput(event) {
