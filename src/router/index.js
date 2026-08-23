@@ -8,6 +8,7 @@ import Payments from '@/pages/Payments.vue'
 import Cards from '@/pages/Cards.vue'
 import DefaultLayout from '@/layouts/menu/DefaultLayout.vue'
 import {useAuthStore} from '@/stores/auth'
+import {hasCompletedOnboarding} from '@/utils/onboardingStorage'
 
 const TAB_TRANSITION = 'tab'
 const STACK_TRANSITION = 'stack'
@@ -43,6 +44,12 @@ export function getPageTransitionName() {
 const router = createRouter({
     history: createWebHistory(),
     routes: [
+        {
+            path: '/onboarding',
+            name: 'onboarding',
+            component: () => import('@/pages/Onboarding.vue'),
+            meta: {guestOnly: true},
+        },
         // guestOnly: 이미 로그인된 사용자가 들어오면 홈으로 돌려보낸다.
         {path: '/login', name: 'login', component: Login, meta: {guestOnly: true}},
         {path: '/signup', name: 'signup', component: Signup, meta: {guestOnly: true}},
@@ -131,6 +138,12 @@ router.beforeEach(async (to) => {
     // 새로고침이나 첫 진입이면 저장된 토큰으로 자동 로그인을 먼저 시도한다. 두 번째 호출부터는
     // 이미 끝난 Promise를 그대로 돌려받으므로 라우팅이 느려지지 않는다.
     await authStore.bootstrapSession()
+
+    // 첫 실행의 비로그인 사용자만 온보딩으로 보낸다. 온보딩 자체는 예외로 두어
+    // 자기 자신으로 계속 redirect되는 것을 막고, 완료 저장은 환영 화면의 액션에서만 한다.
+    if (!authStore.isAuthenticated && !hasCompletedOnboarding() && to.name !== 'onboarding') {
+        return {name: 'onboarding'}
+    }
 
     // 토큰이 없거나 모두 만료됐다 - 로그인 화면을 띄운다.
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
