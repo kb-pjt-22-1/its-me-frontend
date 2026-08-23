@@ -48,6 +48,7 @@
       class="research-btn"
       :disabled="merchantsLoading"
       :aria-label="selectedCategory ? `${selectedCategory} 전체 재검색` : '현재 화면에서 재검색'"
+      :style="{ transform: `translateY(-${sheetFabLift}px)` }"
       @click="onResearchClick"
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -57,7 +58,12 @@
       </svg>
     </button>
 
-    <button class="locate-btn" @click="recenterToMyLocation" aria-label="내 위치로 이동">
+    <button
+      class="locate-btn"
+      :style="{ transform: `translateY(-${sheetFabLift}px)` }"
+      @click="recenterToMyLocation"
+      aria-label="내 위치로 이동"
+    >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
       </svg>
@@ -254,6 +260,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { useMapViewStore } from '@/stores/mapView'
+import { usePaymentStore } from '@/stores/payment'
 import { getBrandImage } from '@/utils/brandImages'
 import { getCardImage } from '@/utils/cardImages'
 import { toDataUri } from '@/utils/imageDataUri'
@@ -266,6 +273,7 @@ const router = useRouter()
 const merchantsStore = useMerchantsStore()
 const bookmarksStore = useBookmarksStore()
 const mapViewStore = useMapViewStore()
+const paymentStore = usePaymentStore()
 const toast = useToast()
 
 // 바텀시트 상태 - 최대 높이의 시트는 그대로 두고 translateY만 바꿔 세 단계로 노출합니다.
@@ -306,6 +314,15 @@ function getSheetSnapPoints() {
     expanded: Math.max(0, sheetHeight - visibleExpanded),
   }
 }
+
+// 재검색/내 위치 버튼(오른쪽 아래 고정)이 바텀시트가 올라오는 만큼 같이 위로 따라가게 하는
+// 오프셋. collapsed(평소) 상태를 기준(0)으로 삼고, 시트가 그보다 위로 올라온 만큼(=
+// translateY가 collapsed보다 작아진 만큼)을 버튼도 그대로 밀어올린다 - 드래그 중에도
+// sheetTranslateY가 실시간으로 바뀌므로 버튼도 같이 실시간으로 따라 움직인다.
+const sheetFabLift = computed(() => {
+  const collapsed = getSheetSnapPoints().collapsed
+  return Math.max(0, collapsed - sheetTranslateY.value)
+})
 
 function snapSheetTo(position) {
   const snapPoints = getSheetSnapPoints()
@@ -394,6 +411,22 @@ const MAX_SHEET_ITEMS = 100
 // 클러스터 핀을 클릭하면 그 안에 뭉쳐있던 매장 id만 담아, 목록을 그 매장들로 좁혀 보여줍니다.
 // null이면 필터 없음(화면 안 전체). bounds가 새로 갱신되면(팬/줌) 초기화합니다.
 const clusterFilterMerchantIds = ref(null)
+
+// 혜택순 정렬의 보조 기준(할인율이 같거나 비슷할 때) - 결제내역에서 매장>브랜드>카테고리
+// 순으로 자주 결제한 곳일수록 위로 오도록 빈도를 센다. 범위는 지금 이미 불러와 있는
+// paymentStore.history 그대로(보통 이번 달 조회분) - 이 화면이 별도로 더 불러오지 않는다.
+const paymentFrequency = computed(() => {
+  const byMerchant = new Map()
+  const byBrand = new Map()
+  const byCategory = new Map()
+  for (const p of paymentStore.history) {
+    if (p.merchantId != null) byMerchant.set(p.merchantId, (byMerchant.get(p.merchantId) ?? 0) + 1)
+    if (p.brandId != null) byBrand.set(p.brandId, (byBrand.get(p.brandId) ?? 0) + 1)
+    if (p.categoryCode) byCategory.set(p.categoryCode, (byCategory.get(p.categoryCode) ?? 0) + 1)
+  }
+  return { byMerchant, byBrand, byCategory }
+})
+
 const nearbyMerchants = computed(() => {
   const source = clusterFilterMerchantIds.value
     ? merchants.value.filter((m) => clusterFilterMerchantIds.value.has(m.id))
@@ -408,13 +441,29 @@ const nearbyMerchants = computed(() => {
         ...m,
         distanceMeters: distance,
         distanceLabel: distance != null ? formatDistance(distance) : '거리 정보 없음',
+        // 실질 할인율 = 지금 확정 혜택 금액 / 기준 결제액. 둘 중 하나라도 없으면(백엔드가
+        // discountAmount를 아직 안 내려주거나, 애초에 혜택이 없는 매장) 0으로 취급한다.
+        discountRate: m.discountAmount && m.typicalPaymentAmount
+          ? m.discountAmount / m.typicalPaymentAmount
+          : 0,
+        merchantFrequency: paymentFrequency.value.byMerchant.get(m.id) ?? 0,
+        brandFrequency: m.brandId != null ? paymentFrequency.value.byBrand.get(m.brandId) ?? 0 : 0,
+        categoryFrequency: paymentFrequency.value.byCategory.get(m.categoryCode) ?? 0,
       }
     })
 
   const sorted = [...withDistance].sort((a, b) => {
     if (sortMode.value === 'benefit') {
-      const benefitDiff = (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0)
-      if (benefitDiff !== 0) return benefitDiff
+      const rateDiff = b.discountRate - a.discountRate
+      if (rateDiff !== 0) return rateDiff
+      // 할인율이 같으면(흔함 - 같은 카테고리엔 보통 같은 정률 할인) 결제내역 빈도로
+      // 한 번 더 가른다 - 매장 일치가 브랜드 일치보다, 브랜드 일치가 카테고리 일치보다 우선.
+      const merchantFreqDiff = b.merchantFrequency - a.merchantFrequency
+      if (merchantFreqDiff !== 0) return merchantFreqDiff
+      const brandFreqDiff = b.brandFrequency - a.brandFrequency
+      if (brandFreqDiff !== 0) return brandFreqDiff
+      const categoryFreqDiff = b.categoryFrequency - a.categoryFrequency
+      if (categoryFreqDiff !== 0) return categoryFreqDiff
       return a.name.localeCompare(b.name)
     }
     if (a.distanceMeters == null || b.distanceMeters == null) {
@@ -422,7 +471,29 @@ const nearbyMerchants = computed(() => {
     }
     return a.distanceMeters - b.distanceMeters
   })
-  return sorted.slice(0, MAX_SHEET_ITEMS)
+
+  // 같은 브랜드의 다른 지점(예: 네네치킨 용문동/잠원동)이 목록을 도배하지 않도록, 브랜드당
+  // 대표 매장 1곳만 남긴다 - 정렬이 이미 끝난 뒤라 그룹에서 처음 만나는 매장이 곧 그 정렬
+  // 기준상 1등이다. brandId가 없는 매장(개인 매장 등)은 자기 자신만의 키를 써서 애초에
+  // 중복 제거 대상이 되지 않는다. 지도 핀(renderMerchantMarkers)은 이 목록을 안 쓰므로
+  // 실제 지점은 전부 그대로 찍힌다 - 중복 제거는 이 바텀시트 목록에만 적용된다.
+  //
+  // 검색어가 있을 때는 이 중복 제거를 끈다 - "만랩커피"처럼 지점이 여러 곳인 브랜드를
+  // 검색했는데 대표 매장 1곳만 남아버리면 사용자가 찾는 지점이 안 보일 수 있다. 검색은
+  // "이 브랜드가 어디 있는지 전부 보고 싶다"는 의도라, 평소의 "브랜드 다양성" 목적과 다르다.
+  if (searchQuery.value.trim()) {
+    return sorted.slice(0, MAX_SHEET_ITEMS)
+  }
+
+  const seenBrandKeys = new Set()
+  const deduped = sorted.filter((m) => {
+    const key = m.brandId != null ? `brand:${m.brandId}` : `merchant:${m.id}`
+    if (seenBrandKeys.has(key)) return false
+    seenBrandKeys.add(key)
+    return true
+  })
+
+  return deduped.slice(0, MAX_SHEET_ITEMS)
 })
 
 function formatDistance(meters) {
@@ -1176,15 +1247,46 @@ function startWatchingMyLocation() {
   )
 }
 
+// 지도 초기 진입 시 기본 레벨(initMap의 level 기본값)과 맞춘다 - "내 위치로" 눌렀을 때도
+// 매번 같은 배율(주변 매장이 보이는 정도)로 고정해서, 이전에 확대/축소해뒀던 배율에
+// 상관없이 일관된 화면을 보여준다.
+const RECENTER_ZOOM_LEVEL = 3
+
+function panToMyLocation(location) {
+  const center = new kakaoInstance.maps.LatLng(location.lat, location.lng)
+  mapInstance.setLevel(RECENTER_ZOOM_LEVEL)
+  mapInstance.panTo(center)
+}
+
 function recenterToMyLocation() {
   if (!mapInstance || !kakaoInstance) return
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition((position) => {
-      myLocation.value = { lat: position.coords.latitude, lng: position.coords.longitude }
-      const center = new kakaoInstance.maps.LatLng(position.coords.latitude, position.coords.longitude)
-      mapInstance.panTo(center)
-    })
+
+  // 위치 마커(myLocation)는 마운트 시점부터 watchPosition으로 계속 갱신되고 있으니, 이미
+  // 알고 있으면 새로 요청하지 않고 그 자리로 바로 이동한다 - 매번 getCurrentPosition을
+  // 다시 부르면 왕복 시간만큼 느려지고, 브라우저에 따라 권한 프롬프트가 또 뜰 수도 있다.
+  if (myLocation.value) {
+    panToMyLocation(myLocation.value)
+    return
   }
+
+  // 아직 한 번도 위치를 못 받은 경우(권한 프롬프트에 응답하기 전 등)에만 새로 요청한다.
+  if (!navigator.geolocation) {
+    toast.error('이 브라우저에서는 위치 정보를 사용할 수 없어요.')
+    return
+  }
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const location = { lat: position.coords.latitude, lng: position.coords.longitude }
+      myLocation.value = location
+      panToMyLocation(location)
+    },
+    // 권한 거부/타임아웃 등으로 실패해도 예전엔 아무 반응이 없어서 버튼이 먹통처럼
+    // 보였다 - 실패 이유를 몰라도 최소한 뭔가 반응은 있어야 한다.
+    () => {
+      toast.error('현재 위치를 가져오지 못했어요. 위치 권한을 확인해주세요.')
+    },
+    { enableHighAccuracy: true },
+  )
 }
 
 function onChipsWheel(event) {

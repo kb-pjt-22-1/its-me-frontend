@@ -139,6 +139,11 @@ function normalizeRecommendedMerchant(dto) {
     recommended: dto.benefitAvailable,
     benefitSummary: topCard?.benefitSummary ?? null,
     recommendedCardName: topCard?.cardName ?? null,
+    // 1등 추천 카드의 "지금 확정" 혜택 금액(원) - Map.vue의 혜택순 정렬이 이 값과
+    // typicalPaymentAmount로 실질 할인율(discountAmount / typicalPaymentAmount)을 계산한다.
+    // 백엔드가 아직 이 필드를 안 내려주면 null로 떨어져 할인율이 0 취급되고, recommended
+    // 불리언 + 이름순으로 자연스럽게 폴백한다(예전 정렬 방식과 동일).
+    discountAmount: topCard?.discountAmount ?? null,
     typicalPaymentAmount: dto.typicalPaymentAmount ?? null,
   }
 }
