@@ -250,3 +250,27 @@ describe('ensureBenefitsLoaded', () => {
         expect(serviceMocks.fetchCardBenefits).not.toHaveBeenCalled()
     })
 })
+
+describe('cards store 자동 연동(sync)', () => {
+    it('연동 후 syncedCount를 반환하고 목록을 다시 불러온다', async () => {
+        serviceMocks.syncCards.mockResolvedValue({ syncedCount: 2 })
+        serviceMocks.fetchMyCards.mockResolvedValue([])
+
+        const store = useCardsStore()
+        store.hasLoadedCards = true
+
+        const result = await store.syncCards()
+
+        expect(result).toBe(2)
+        expect(serviceMocks.fetchMyCards).toHaveBeenCalled()
+    })
+
+    it('새로 연동된 카드가 없으면 syncedCount 0을 그대로 반환한다', async () => {
+        serviceMocks.syncCards.mockResolvedValue({ syncedCount: 0 })
+        serviceMocks.fetchMyCards.mockResolvedValue([])
+
+        const store = useCardsStore()
+
+        await expect(store.syncCards()).resolves.toBe(0)
+    })
+})

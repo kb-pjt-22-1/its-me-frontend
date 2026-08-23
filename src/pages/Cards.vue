@@ -108,11 +108,16 @@ async function handlePrimaryChanged(userCardId) {
 async function handleSync() {
   syncing.value = true; syncError.value = ''
   try {
-    await cardsStore.syncCards()
-    if (!cards.value.length) syncError.value = '연동 요청은 됐는데 카드가 안 들어왔어요. 백엔드에 카드 연동 기능이 아직 없을 수 있어요.'
-    else { cardOrderIds.value = cards.value.map((card) => card.userCardId); await selectCard(initialCardId(), { scroll: true }) }
+    const syncedCount = await cardsStore.syncCards()
+    if (syncedCount > 0) {
+      toast.success(`카드 ${syncedCount}개를 새로 연동했어요.`)
+      cardOrderIds.value = cards.value.map((card) => card.userCardId)
+      await selectCard(initialCardId(), { scroll: true })
+    } else {
+      toast.info('새로 연동할 카드가 없어요.')
+    }
   } catch (err) {
-    syncError.value = err.response?.status === 404 ? '백엔드에 카드 연동(/cards/sync) 기능이 아직 없어요.' : (err.response?.data?.message ?? '카드 연동에 실패했어요.')
+    syncError.value = err.response?.data?.message ?? '카드 연동에 실패했어요.'
   } finally { syncing.value = false }
 }
 
