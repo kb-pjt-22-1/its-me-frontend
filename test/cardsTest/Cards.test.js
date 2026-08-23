@@ -5,8 +5,10 @@ import { createPinia, setActivePinia } from 'pinia'
 const routeMock = { query: {} }
 const routerMock = { replace: vi.fn().mockResolvedValue() }
 vi.mock('vue-router', () => ({ useRoute: () => routeMock, useRouter: () => routerMock }))
-const { toastError, confirmMock } = vi.hoisted(() => ({ toastError: vi.fn(), confirmMock: vi.fn(() => true) }))
-vi.mock('@/composables/useToast', () => ({ useToast: () => ({ error: toastError }) }))
+const { toastError, toastSuccess, toastInfo, confirmMock } = vi.hoisted(() => ({
+  toastError: vi.fn(), toastSuccess: vi.fn(), toastInfo: vi.fn(), confirmMock: vi.fn(() => true),
+}))
+vi.mock('@/composables/useToast', () => ({ useToast: () => ({ error: toastError, success: toastSuccess, info: toastInfo }) }))
 vi.mock('@/composables/useConfirmDialog', () => ({ useConfirmDialog: () => ({ confirm: confirmMock }) }))
 
 import Cards from '@/pages/Cards.vue'
@@ -168,8 +170,28 @@ describe('삭제와 자동 연동', () => {
 
   it('빈 상태의 자동 연동 후 카드를 선택한다', async () => {
     const { wrapper, store } = await mountPage([])
-    vi.spyOn(store, 'syncCards').mockImplementation(async () => { store.cards = [makeCard(4, { isPrimary: true })] })
+    vi.spyOn(store, 'syncCards').mockImplementation(async () => {
+      store.cards = [makeCard(4, { isPrimary: true })]
+      return 1
+    })
     await wrapper.find('.sync-btn').trigger('click'); await flushPromises()
     expect(wrapper.find('.selected-heading').text()).toContain('카드4')
+    expect(toastSuccess).toHaveBeenCalledWith('카드 1개를 새로 연동했어요.')
+  })
+
+  it('새로 연동할 카드가 없으면(syncedCount 0) 안내만 띄우고 목록을 재선택하지 않는다', async () => {
+    const { wrapper, store } = await mountPage([])
+    vi.spyOn(store, 'syncCards').mockResolvedValue(0)
+    await wrapper.find('.sync-btn').trigger('click'); await flushPromises()
+    expect(toastInfo).toHaveBeenCalledWith('새로 연동할 카드가 없어요.')
+    expect(toastSuccess).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('등록된 카드가 없어요')
+  })
+
+  it('연동 실패 시 표준 에러 응답의 message를 보여준다', async () => {
+    const { wrapper, store } = await mountPage([])
+    vi.spyOn(store, 'syncCards').mockRejectedValue({ response: { data: { message: '카드사 서버 응답 지연' } } })
+    await wrapper.find('.sync-btn').trigger('click'); await flushPromises()
+    expect(wrapper.find('.sync-error').text()).toBe('카드사 서버 응답 지연')
   })
 })

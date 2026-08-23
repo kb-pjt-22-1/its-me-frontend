@@ -201,9 +201,10 @@ export const useCardsStore = defineStore('cards', {
     },
 
     async syncCards() {
-      await syncCards()
+      const { syncedCount } = await syncCards()
       this.hasLoadedCards = false
       await this.fetchCards()
+      return syncedCount
     },
 
     async deleteCard(userCardId) {
