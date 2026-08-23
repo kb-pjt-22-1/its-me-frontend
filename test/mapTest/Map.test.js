@@ -788,12 +788,53 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     }
   })
 
-  it('"내 위치로 이동" 버튼을 누르면 현재 위치로 지도 중심을 옮긴다', async () => {
+  it('"내 위치로 이동" 버튼을 누르면 이미 알고 있는(watchPosition으로 갱신 중인) 위치로 지도 중심을 옮기고, 새로 위치를 요청하지 않는다', async () => {
     const originalGeolocation = navigator.geolocation
+    const getCurrentPositionSpy = vi.fn((success) => success({ coords: { latitude: 37.1234, longitude: 127.5678 } }))
     Object.defineProperty(navigator, 'geolocation', {
       configurable: true,
       value: {
-        getCurrentPosition: (success) => success({ coords: { latitude: 37.1234, longitude: 127.5678 } }),
+        getCurrentPosition: getCurrentPositionSpy,
+        watchPosition: () => 1,
+        clearWatch: () => {},
+      },
+    })
+
+    try {
+      const { kakao, mapInstance } = createKakaoMock()
+      window.kakao = kakao
+
+      const wrapper = mountMapPage()
+      await flushPromises()
+      // 마운트 시점에 이미 한 번 호출됐다 - 이후 버튼 클릭에서 또 부르는지가 이 테스트의 핵심.
+      const callsAfterMount = getCurrentPositionSpy.mock.calls.length
+
+      await wrapper.find('.locate-btn').trigger('click')
+
+      expect(getCurrentPositionSpy.mock.calls.length).toBe(callsAfterMount) // 추가 호출 없음
+      expect(mapInstance.panTo).toHaveBeenCalledTimes(1)
+      const center = mapInstance.panTo.mock.calls[0][0]
+      expect(center.lat).toBe(37.1234)
+      expect(center.lng).toBe(127.5678)
+      // 이전 확대/축소 배율과 무관하게 항상 같은(주변 매장이 보이는) 배율로 고정한다.
+      expect(mapInstance.setLevel).toHaveBeenCalledWith(3)
+    } finally {
+      Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
+    }
+  })
+
+  it('아직 위치를 한 번도 못 받았으면 버튼 클릭 시 새로 요청해서 그 자리로 이동한다', async () => {
+    const originalGeolocation = navigator.geolocation
+    let callCount = 0
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        // 마운트 시점 첫 호출은 실패시켜 myLocation을 비워두고, 이후(버튼 클릭) 호출부터 성공시킨다.
+        getCurrentPosition: (success, error) => {
+          callCount += 1
+          if (callCount === 1) error({ code: 1 })
+          else success({ coords: { latitude: 37.9999, longitude: 127.9999 } })
+        },
         watchPosition: () => 1,
         clearWatch: () => {},
       },
@@ -810,10 +851,8 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
 
       expect(mapInstance.panTo).toHaveBeenCalledTimes(1)
       const center = mapInstance.panTo.mock.calls[0][0]
-      expect(center.lat).toBe(37.1234)
-      expect(center.lng).toBe(127.5678)
-      // 이전 확대/축소 배율과 무관하게 항상 같은(주변 매장이 보이는) 배율로 고정한다.
-      expect(mapInstance.setLevel).toHaveBeenCalledWith(3)
+      expect(center.lat).toBe(37.9999)
+      expect(center.lng).toBe(127.9999)
     } finally {
       Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
     }

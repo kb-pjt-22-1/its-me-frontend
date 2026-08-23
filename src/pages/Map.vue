@@ -1240,18 +1240,33 @@ function startWatchingMyLocation() {
 // 상관없이 일관된 화면을 보여준다.
 const RECENTER_ZOOM_LEVEL = 3
 
+function panToMyLocation(location) {
+  const center = new kakaoInstance.maps.LatLng(location.lat, location.lng)
+  mapInstance.setLevel(RECENTER_ZOOM_LEVEL)
+  mapInstance.panTo(center)
+}
+
 function recenterToMyLocation() {
   if (!mapInstance || !kakaoInstance) return
+
+  // 위치 마커(myLocation)는 마운트 시점부터 watchPosition으로 계속 갱신되고 있으니, 이미
+  // 알고 있으면 새로 요청하지 않고 그 자리로 바로 이동한다 - 매번 getCurrentPosition을
+  // 다시 부르면 왕복 시간만큼 느려지고, 브라우저에 따라 권한 프롬프트가 또 뜰 수도 있다.
+  if (myLocation.value) {
+    panToMyLocation(myLocation.value)
+    return
+  }
+
+  // 아직 한 번도 위치를 못 받은 경우(권한 프롬프트에 응답하기 전 등)에만 새로 요청한다.
   if (!navigator.geolocation) {
     toast.error('이 브라우저에서는 위치 정보를 사용할 수 없어요.')
     return
   }
   navigator.geolocation.getCurrentPosition(
     (position) => {
-      myLocation.value = { lat: position.coords.latitude, lng: position.coords.longitude }
-      const center = new kakaoInstance.maps.LatLng(position.coords.latitude, position.coords.longitude)
-      mapInstance.setLevel(RECENTER_ZOOM_LEVEL)
-      mapInstance.panTo(center)
+      const location = { lat: position.coords.latitude, lng: position.coords.longitude }
+      myLocation.value = location
+      panToMyLocation(location)
     },
     // 권한 거부/타임아웃 등으로 실패해도 예전엔 아무 반응이 없어서 버튼이 먹통처럼
     // 보였다 - 실패 이유를 몰라도 최소한 뭔가 반응은 있어야 한다.
