@@ -13,7 +13,7 @@
       <div class="date-nav">
         <button class="date-arrow" @click="shiftMonth(-1)" aria-label="이전 달">&lt;</button>
         <h3>{{ currentMonthLabel }}</h3>
-        <button class="date-arrow" @click="shiftMonth(1)" aria-label="다음 달">&gt;</button>
+        <button class="date-arrow" :disabled="isCurrentMonth" @click="shiftMonth(1)" aria-label="다음 달">&gt;</button>
       </div>
     </div>
 
@@ -99,11 +99,19 @@ const yearMonth = computed(() => `${viewYear.value}${String(viewMonth.value).pad
 const currentMonthLabel = computed(() => `${viewYear.value}년 ${viewMonth.value}월`);
 const monthShort = computed(() => `${viewMonth.value}월`);
 
+// 아직 안 지난 달은 결제내역이 있을 수 없으니, 지금 보고 있는 달이 실제 이번 달이면
+// "다음 달" 버튼을 막는다 - 어차피 빈 화면만 보여주게 되는 걸 막는 것.
+const isCurrentMonth = computed(() => {
+  const now = new Date();
+  return viewYear.value === now.getFullYear() && viewMonth.value === now.getMonth() + 1;
+});
+
 function fetchHistoryForCurrentMonth() {
   paymentStore.fetchHistory({ yearMonth: yearMonth.value });
 }
 
 const shiftMonth = (direction) => {
+  if (direction > 0 && isCurrentMonth.value) return;
   const next = viewMonth.value + direction;
   if (next < 1) { viewMonth.value = 12; viewYear.value -= 1; }
   else if (next > 12) { viewMonth.value = 1; viewYear.value += 1; }
@@ -202,6 +210,7 @@ onMounted(() => {
 .date-nav { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 0 -18px; padding: 2px 18px; background: #ffffff; }
 .date-nav h3 { margin: 0; color: var(--charcoal, #24211d); font-size: 15px; }
 .date-arrow { padding: 2px 8px; border: none; background: none; color: var(--muted, #8a8a8a); font-size: 14px; cursor: pointer; }
+.date-arrow:disabled { opacity: .4; cursor: default; }
 
 .loading-text, .empty-text { text-align: center; padding: 60px 0; font-size: 0.9rem; }
 

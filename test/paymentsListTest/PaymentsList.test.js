@@ -142,29 +142,34 @@ describe('상호작용', () => {
     expect(pushMock).not.toHaveBeenCalled()
   })
 
-  it('다음 달 화살표를 누르면 다음 달 데이터를 다시 조회한다', async () => {
+  it('이번 달을 보고 있으면 다음 달 버튼이 비활성화되고, 눌러도 추가로 조회하지 않는다', async () => {
     const { wrapper, paymentStore } = mountPage()
-    const now = new Date()
-    const nextMonth = now.getMonth() + 2 > 12
-      ? { y: now.getFullYear() + 1, m: 1 }
-      : { y: now.getFullYear(), m: now.getMonth() + 2 }
-    const expected = `${nextMonth.y}${String(nextMonth.m).padStart(2, '0')}`
+    const callsAfterMount = paymentStore.fetchHistory.mock.calls.length
+    const nextBtn = wrapper.find('.date-arrow[aria-label="다음 달"]')
 
-    await wrapper.find('.date-arrow[aria-label="다음 달"]').trigger('click')
+    expect(nextBtn.attributes('disabled')).toBeDefined()
 
-    expect(paymentStore.fetchHistory).toHaveBeenLastCalledWith({ yearMonth: expected })
+    await nextBtn.trigger('click')
+
+    expect(paymentStore.fetchHistory.mock.calls.length).toBe(callsAfterMount)
   })
 
-  it('다음 달 화살표를 12번 누르면 1년 뒤 같은 달로 이동한다 (12월→1월 롤오버 포함)', async () => {
+  it('과거 달에서 다음 달을 여러 번 눌러도 이번 달을 넘어서 이동하지 않는다', async () => {
     const { wrapper, paymentStore } = mountPage()
     const now = new Date()
 
     for (let i = 0; i < 12; i++) {
+      await wrapper.find('.date-arrow[aria-label="이전 달"]').trigger('click')
+    }
+
+    // 12번이면 정확히 이번 달, 그 이상(15번)을 눌러도 넘어가지 못해야 한다.
+    for (let i = 0; i < 15; i++) {
       await wrapper.find('.date-arrow[aria-label="다음 달"]').trigger('click')
     }
 
-    const expected = `${now.getFullYear() + 1}${String(now.getMonth() + 1).padStart(2, '0')}`
+    const expected = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
     expect(paymentStore.fetchHistory).toHaveBeenLastCalledWith({ yearMonth: expected })
+    expect(wrapper.find('.date-arrow[aria-label="다음 달"]').attributes('disabled')).toBeDefined()
   })
 
   it('이전 달 화살표를 12번 누르면 1년 전 같은 달로 이동한다 (1월→12월 롤오버 포함)', async () => {
