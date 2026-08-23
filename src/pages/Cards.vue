@@ -126,10 +126,10 @@ onBeforeUnmount(() => window.clearTimeout(scrollTimer))
 .layout-container { padding: 4px 16px 24px; }
 .loading-text, .empty-text { text-align: center; padding: 60px 0 12px; font-size: .9rem; }
 .empty-state { text-align: center; padding: 40px 0; }
-.sync-btn { margin-top: 16px; height: 48px; padding: 0 24px; border: 0; border-radius: 14px; background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 800; }
+.sync-btn { margin-top: 16px; height: 48px; padding: 0 24px; border: 0; border-radius: 14px; background: #ffbe49; color: var(--charcoal, #24211d); font-weight: 800; }
 .sync-btn:disabled { opacity: .6; }.sync-error { margin-top: 12px; font-size: 12px; }
 .selected-heading { display: flex; align-items: baseline; justify-content: center; gap: 7px; min-height: 28px; margin: 0 0 6px; }
-.selected-heading h2 { margin: 0; max-width: calc(100% - 60px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 600;color: #171512; line-height: 1.3; }.card-last4 { color: var(--muted, #8f897f); font-size: 11px; }
+.selected-heading h2 { margin: 0; max-width: calc(100% - 60px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; color: #171512; line-height: 1.3; }.card-last4 { color: var(--muted, #8f897f); font-size: 11px; }
 .card-slider {
   --slide-width: min(84vw, 360px);
   display: flex;
@@ -155,7 +155,7 @@ onBeforeUnmount(() => window.clearTimeout(scrollTimer))
   transition: opacity 0.2s;
 }
 .card-slider--single .card-slide { flex-basis: 100%; max-width: none; }.card-slide--selected { opacity: 1; }
-.card-image { width: 100%; height: 100%; display: block; object-fit: contain; filter: drop-shadow(0 8px 13px rgba(0,0,0,.14)); user-select: none; -webkit-user-drag: none; }
+.card-image { width: 100%; height: 100%; display: block; object-fit: contain; user-select: none; -webkit-user-drag: none; }
 .card-image-fallback { width: 100%; height: 100%; border-radius: 18px; display: grid; place-items: center; background: var(--dark, #545045); color: #fff; font-weight: 700; }
 .slide-badges { position: absolute; z-index: 1; top: 10px; left: 10px; display: flex; gap: 5px; }
 .slide-badges .pill--mint {

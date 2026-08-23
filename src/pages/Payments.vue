@@ -391,7 +391,7 @@ onBeforeRouteLeave(() => {
 .auth-prompt h3 { margin:0 0 6px; color:var(--charcoal,#24211d); font-size:16px; }
 .auth-prompt p { margin:0; color:var(--muted,#8f897f); font-size:12px; }
 
-.main-action-btn { width:100%; height:52px; border-radius:14px; background: #f8b63f; color:var(--charcoal,#24211d); font-size:15px; font-weight:900; }
+.main-action-btn { width:100%; height:52px; border-radius:14px; background: #ffbe49; color:var(--charcoal,#24211d); font-size:15px; font-weight:900; }
 .main-action-btn:disabled { opacity:.6; cursor:not-allowed; }
 .payment-start-btn,.payment-complete-btn { width:calc(100% - 40px); margin:16px 20px 0; flex:0 0 auto; }
 .card-name { margin:0 0 14px; color:var(--charcoal,#24211d); font-size:17px; }

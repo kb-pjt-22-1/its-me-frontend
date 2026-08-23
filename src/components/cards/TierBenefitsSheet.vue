@@ -171,7 +171,8 @@ onBeforeUnmount(() => {
   gap: 0;
   margin: 0;
   padding: 0 20px;
-  overflow-x: auto;
+  overflow-x: hidden;
+  touch-action: pan-y;
   border-bottom: 1px solid var(--line, #e7e4de);
   background: #fff;
   scrollbar-width: none;

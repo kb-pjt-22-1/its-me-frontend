@@ -128,7 +128,7 @@
       <div class="bottom-container">
         <Button variant="box" class="bottom-box bottom-box--compact quick-pay-box" @click="goToPay">
           <h3>간편 결제</h3>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.6" class="barcode-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.6" class="barcode-icon">
             <rect x="3" y="3" width="7" height="7" rx="1"></rect>
             <rect x="14" y="3" width="7" height="7" rx="1"></rect>
             <rect x="3" y="14" width="7" height="7" rx="1"></rect>
@@ -151,7 +151,7 @@
         </Button>
         <Button variant="box-outline" class="bottom-box bottom-box--compact monthly-benefit-box" @click="router.push('/benefits')">
           <h3>이번 달 혜택</h3>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--orange, #ffbc00)" stroke-width="1.8" class="gift-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#ffbe49" stroke-width="1.8" class="gift-icon">
             <rect x="3" y="8" width="18" height="4"></rect>
             <path d="M12 8v13"></path>
             <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path>
@@ -260,7 +260,7 @@
               </div>
               <div class="item-payment">
                 <span class="amount">{{ item.finalAmount.toLocaleString() }}원</span>
-                <span v-if="item.discountAmount > 0" class="item-discount success-text">{{ item.discountAmount.toLocaleString() }}원 할인</span>
+                <span v-if="item.discountAmount > 0" class="item-discount">{{ item.discountAmount.toLocaleString() }}원 할인</span>
               </div>
             </div>
           </div>
@@ -484,7 +484,7 @@ onMounted(() => {
 .reco-badge { display:inline-flex; align-items:center; gap:7px; margin:0 0 7px 3px; padding:0 !important; border:none !important; border-radius:0; background:transparent !important; color:#76613a; font-size:12px; font-weight:700; letter-spacing:.02em; }
 .reco-badge::before { content:''; width:6px; height:6px; border-radius:50%; background:#c89b32; }
 
-.reco-title { margin: 0 0 5px; color: var(--charcoal, #24211d); font-size: 16px; font-weight: 700; line-height: 1.45; }
+.reco-title { width: 175px; max-width: 100%; margin: 0 0 5px; color: var(--charcoal, #24211d); font-size: 16px; font-weight: 700; line-height: 1.45; }
 
 .reco-sub { margin: 0; font-size: 12.5px; }
 
@@ -588,7 +588,7 @@ onMounted(() => {
 .reco-merchant-info { min-width:0; display:flex; align-items:baseline; gap:5px; }
 .reco-merchant-info strong { overflow:hidden; color:var(--charcoal,#24211d); font-size:13px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
 .reco-merchant-info small { flex:0 0 auto; color:var(--muted,#8f897f); font-size:11px; }
-.reco-merchant-benefit { padding:0; border-radius:0; background:transparent; color:#2f826c; font-size:11px; font-weight:700; white-space:nowrap; }
+.reco-merchant-benefit { padding:0; border-radius:0; background:transparent; color:#3a977c; font-size:11px; font-weight:700; white-space:nowrap; }
 .reco-merchant-chevron { color:#b3a994; font-size:16px; }
 
 /* 간편결제 / 이번 달 혜택 (기존 박스를 작게 줄여서 유지) */
@@ -738,5 +738,5 @@ onMounted(() => {
 .item-date { margin: 0; color: var(--muted, #8f897f); font-size: 12px; white-space: nowrap; }
 .item-payment { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .item-payment .amount { font-size: 14px; font-weight: 500; white-space: nowrap; }
-.item-discount { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.item-discount { color: #3a977c; font-size: 12px; font-weight: 700; white-space: nowrap; }
 </style>

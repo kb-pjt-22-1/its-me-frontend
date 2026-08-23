@@ -192,7 +192,7 @@ onMounted(loadPayment);
 .value { font-size: 0.92rem; font-weight: 600; color: var(--charcoal, #24211d); }
 .value.amount { font-weight: 800; font-size: 1rem; }
 .value.benefit { color: var(--orange, #ffbc00); font-weight: 700; }
-.status-approved { color: var(--green, #2e9e5b); }
+.status-approved { color: #3a977c; }
 .status-cancelled { color: var(--muted, #8f897f); }
 .status-pending { color: var(--orange, #ffbc00); }
 </style>

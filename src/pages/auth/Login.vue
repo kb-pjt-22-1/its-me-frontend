@@ -35,14 +35,43 @@
             placeholder="비밀번호"
             @keydown.enter="canSubmit && handleLogin()"
           />
-          <button type="button" class="input-action" @click="showPassword = !showPassword" aria-label="비밀번호 표시">
-            <svg v-if="!showPassword" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="4" y="10" width="16" height="10" rx="2"></rect>
-              <path d="M7 10V7a5 5 0 0 1 10 0v3"></path>
+          <button
+              type="button"
+              class="input-action"
+              :aria-label="showPassword ? '비밀번호 숨기기' : '비밀번호 표시'"
+              @click="showPassword = !showPassword"
+          >
+            <!-- 안 보이는 상태 -->
+            <svg
+                v-if="!showPassword"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+              <path d="M2.5 12s3.6-6 9.5-6 9.5 6 9.5 6-3.6 6-9.5 6-9.5-6-9.5-6Z" />
+              <circle cx="12" cy="12" r="2.7" />
+              <path d="M4 4l16 16" />
             </svg>
-            <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="4" y="10" width="16" height="10" rx="2"></rect>
-              <path d="M7 10V7a5 5 0 0 1 9.5-2"></path>
+
+            <!-- 보이는 상태 -->
+            <svg
+                v-else
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+              <path d="M2.5 12s3.6-6 9.5-6 9.5 6 9.5 6-3.6 6-9.5 6-9.5-6-9.5-6Z" />
+              <circle cx="12" cy="12" r="2.7" />
             </svg>
           </button>
         </div>

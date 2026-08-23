@@ -265,7 +265,7 @@ const toast = useToast()
 // 바텀시트 상태 - 최대 높이의 시트는 그대로 두고 translateY만 바꿔 세 단계로 노출합니다.
 const SHEET_COLLAPSED_HEIGHT = 80
 const SHEET_MIDDLE_RATIO = 0.5
-const SHEET_EXPANDED_RATIO = 0.82
+const SHEET_EXPANDED_TOP = 60
 const SHEET_DRAG_THRESHOLD = 6
 const mapPage = ref(null)
 const storeSheet = ref(null)
@@ -279,11 +279,21 @@ let sheetDragMoved = false
 let suppressSheetClick = false
 
 function getSheetSnapPoints() {
-  const pageHeight = mapPage.value?.clientHeight || mapPage.value?.getBoundingClientRect().height || window.innerHeight
-  const sheetHeight = storeSheet.value?.clientHeight || pageHeight * SHEET_EXPANDED_RATIO
-  const visibleExpanded = Math.min(sheetHeight, pageHeight * SHEET_EXPANDED_RATIO)
-  const visibleMiddle = Math.min(visibleExpanded, Math.max(SHEET_COLLAPSED_HEIGHT, pageHeight * SHEET_MIDDLE_RATIO))
-  const visibleCollapsed = Math.min(SHEET_COLLAPSED_HEIGHT, sheetHeight)
+  const pageHeight =
+      mapPage.value?.clientHeight ||
+      mapPage.value?.getBoundingClientRect().height ||
+      window.innerHeight
+  const expandedHeight = Math.max(SHEET_COLLAPSED_HEIGHT, pageHeight - SHEET_EXPANDED_TOP,)
+  const sheetHeight = storeSheet.value?.clientHeight || expandedHeight
+  const visibleExpanded = Math.min(sheetHeight, expandedHeight,)
+  const visibleMiddle = Math.min(
+      visibleExpanded,
+      Math.max(
+          SHEET_COLLAPSED_HEIGHT,
+          pageHeight * SHEET_MIDDLE_RATIO,
+      ),
+  )
+  const visibleCollapsed = Math.min(SHEET_COLLAPSED_HEIGHT, sheetHeight,)
   return {
     collapsed: Math.max(0, sheetHeight - visibleCollapsed),
     middle: Math.max(0, sheetHeight - visibleMiddle),
@@ -1031,16 +1041,68 @@ function buildMerchantMarkerImage(kakao, merchant, iconDataUri) {
 // 현재 위치 표시용 점+링 아이콘. 카카오 기본 마커(검은 물방울)를 대신해서 매장 핀과
 // 헷갈리지 않도록 별도로 그립니다 - 클러스터 배지와 같은 dark 톤으로 통일했습니다.
 function buildCurrentLocationMarkerImage(kakao) {
-  const size = 22
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 22 22">` +
-    '<circle cx="11" cy="11" r="10" fill="#545045" fill-opacity="0.18"/>' +
-    '<circle cx="11" cy="11" r="6.5" fill="#545045" stroke="#ffffff" stroke-width="2.5"/>' +
-    '</svg>'
+  const size = 30
+  const locationColor = '#1677ff'
+
+  const svg = `
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="${size}"
+      height="${size}"
+      viewBox="0 0 30 30"
+    >
+      <defs>
+        <radialGradient id="locationHalo">
+          <stop
+            offset="0%"
+            stop-color="${locationColor}"
+            stop-opacity="0.55"
+          />
+          <stop
+            offset="50%"
+            stop-color="${locationColor}"
+            stop-opacity="0.38"
+          />
+          <stop
+            offset="80%"
+            stop-color="${locationColor}"
+            stop-opacity="0.18"
+          />
+          <stop
+            offset="100%"
+            stop-color="${locationColor}"
+            stop-opacity="0"
+          />
+        </radialGradient>
+      </defs>
+
+      <circle
+        cx="15"
+        cy="15"
+        r="14"
+        fill="url(#locationHalo)"
+      />
+
+      <circle
+        cx="15"
+        cy="15"
+        r="6.3"
+        fill="${locationColor}"
+        stroke="#ffffff"
+        stroke-width="2.5"
+      />
+    </svg>
+  `
+
   const src = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
-  return new kakao.maps.MarkerImage(src, new kakao.maps.Size(size, size), {
-    offset: new kakao.maps.Point(size / 2, size / 2),
-  })
+
+  return new kakao.maps.MarkerImage(
+      src,
+      new kakao.maps.Size(size, size),
+      {
+        offset: new kakao.maps.Point(size / 2, size / 2),
+      },
+  )
 }
 
 function createMerchantMarker(kakao, merchant) {
@@ -1235,7 +1297,7 @@ onUnmounted(() => {
 <style scoped>
 .map-page {
   /* store-sheet 최대 높이. 중간 단계는 JS에서 실제 높이의 50%로 계산합니다. */
-  --sheet-expanded-height: 82%;
+  --sheet-expanded-height: calc(100% - 60px);
   position: relative;
   width: 100%;
   height: 100%;
@@ -1379,8 +1441,8 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .sort-btn.active {
-  background: var(--orange, #ffbc00);
-  border-color: var(--orange, #ffbc00);
+  background: #ffbe49;
+  border-color: #ffbe49;
   color: var(--charcoal, #24211d);
 }
 
@@ -1434,7 +1496,7 @@ onUnmounted(() => {
 .sheet-item-benefit {
   font-size: 11.5px;
   font-weight: 700;
-  color: var(--orange-deep, #e6aa00);
+  color: #ffbe49;
   flex: 0 0 auto;
   white-space: nowrap;
 }
@@ -1448,7 +1510,7 @@ onUnmounted(() => {
   flex: 0 0 auto;
   cursor: pointer;
 }
-.sheet-bookmark.active { color: var(--orange, #ffbc00); }
+.sheet-bookmark.active { color: #ffbe49; }
 
 .sheet-pagination {
   display: flex;
@@ -1488,7 +1550,7 @@ onUnmounted(() => {
   color: var(--muted, #8f897f);
   cursor: pointer;
 }
-.detail-action-btn.active { color: var(--orange, #ffbc00); }
+.detail-action-btn.active { color: #ffbe49; }
 
 .store-info { margin-bottom: 20px; }
 .sheet-detail-sub-row { display: flex; align-items: center; margin-top: 5.4px; }
@@ -1521,10 +1583,10 @@ onUnmounted(() => {
 }
 /* --best(추천 배지)는 위 reco-badge 태그만으로 표시하고 테두리는 안 준다 - 실제 결제에 쓸
    카드를 고르는 --selected 테두리와 같은 색이면 "추천"과 "지금 선택됨"이 헷갈린다. */
-.reco-card--selected { border: 2px solid var(--orange, #ffbc00); padding: 13px; background: #fffaf0; }
+.reco-card--selected { border: 2px solid #ffbe49; padding: 13px; background: #fffaf0; }
 
 .reco-badge {
-  position: absolute; top: -9px; left: 12px; background: var(--orange, #ffbc00); color: var(--charcoal, #24211d);
+  position: absolute; top: -9px; left: 12px; background: #ffbe49; color: var(--charcoal, #24211d);
   font-size: 10px; font-weight: 800; border-radius: 6px; padding: 2px 7px;
 }
 
@@ -1540,7 +1602,7 @@ onUnmounted(() => {
 .reco-rate {
   font-size: 12.5px;
   font-weight: 800;
-  color: var(--orange, #d98d00);
+  color: #ffbe49;
   flex: 0 1 auto;
   max-width: 38%;
   text-align: right;
@@ -1559,7 +1621,7 @@ onUnmounted(() => {
   padding: 0 16px;
   border-radius: 999px;
   border: none;
-  background: var(--orange, #ffbc00);
+  background: #ffbe49;
   color: var(--charcoal, #24211d);
   font-weight: 900;
   font-size: 13px;

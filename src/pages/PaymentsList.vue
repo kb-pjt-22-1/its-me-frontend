@@ -199,13 +199,13 @@ onMounted(() => {
    음수 마진으로 상쇄해 화면 끝까지 흰색이 번지게(bleed) 한 뒤 자체 패딩으로 다시 채운다. */
 .page-header { height: 60px; justify-content: flex-start; gap: 10px; margin: 0 -18px; padding: 0 18px; box-sizing: border-box; background: var(--surface, #ffffff); }
 .page-header h2 { font-size: 17px; }
-.date-nav { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 0 -18px; padding: 14px 18px; background: #ffffff; }
+.date-nav { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 0 -18px; padding: 2px 18px; background: #ffffff; }
 .date-nav h3 { margin: 0; color: var(--charcoal, #24211d); font-size: 15px; }
 .date-arrow { padding: 2px 8px; border: none; background: none; color: var(--muted, #8a8a8a); font-size: 14px; cursor: pointer; }
 
 .loading-text, .empty-text { text-align: center; padding: 60px 0; font-size: 0.9rem; }
 
-.summary-card { padding: 22px; margin-bottom: 16px; }
+.summary-card { padding: 22px; margin-bottom: 1px; }
 .summary-text p, .summary-benefit p { margin: 0 0 8px; font-size: 12px; color: rgba(255, 255, 255, .75); }
 .summary-text h2 { margin: 0; font-size: 20px; color: #ffffff; }
 .summary-benefit { text-align: right; }
@@ -225,5 +225,5 @@ onMounted(() => {
 .desc { margin: 0; font-size: 0.8rem; }
 .item-price { flex: 0 0 auto; text-align: right; }
 .price { margin: 0 0 4px; color: var(--charcoal, #24211d); font-size: 0.9rem; font-weight: 700; white-space: nowrap; }
-.benefit { margin: 0; color: var(--green, #00a878); font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
+.benefit { margin: 0; color: #3a977c; font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
 </style>

@@ -222,7 +222,7 @@ const goToPay = () => {
 .reco-rate {
   font-size: 12.5px;
   font-weight: 800;
-  color: var(--orange, #d98d00);
+  color: #ffbe49;
   flex: 0 1 auto;
   max-width: 38%;
   text-align: right;
@@ -231,7 +231,7 @@ const goToPay = () => {
 
 .pay-btn {
   width: 100%; height: 54px; border-radius: 14px; border: none;
-  background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900; font-size: 15px; cursor: pointer;
+  background: var(--orange, #ffbc00); color: #ffbe49; font-weight: 900; font-size: 15px; cursor: pointer;
 }
 .not-found { padding-top: 60px; text-align: center; }
 </style>
