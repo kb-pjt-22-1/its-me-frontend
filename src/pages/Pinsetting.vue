@@ -40,6 +40,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { getMyProfile, registerPin, updatePin } from '@/services/memberService';
+import { verifyPin } from '@/services/paymentAuthService';
 import { useToast } from '@/composables/useToast';
 import { hasWeakPinPattern } from '@/utils/pinValidation';
 import PinDots from '@/components/auth/PinDots.vue';
@@ -55,8 +56,12 @@ const loadError = ref('');
 const pinAlreadyRegistered = ref(false);
 
 // 최초 설정: new -> confirm. 변경: current -> new -> confirm.
-// current는 형식만 맞으면 다음 단계로 넘어가고, 실제로 맞는지는 서버가 최종 제출 때 확인한다
-// (틀렸을 때 잠금 카운트까지 서버가 관리하므로 프론트에서 미리 판단할 방법이 없다).
+// current는 verifyPin([POST /users/me/verify-pin])으로 그 자리에서 바로 검증한다 - 예전엔
+// 형식만 맞으면 다음 단계로 넘어가고 실제로 맞는지는 신규 PIN까지 다 받은 뒤 updatePin
+// 제출 시점에야 확인해서, 틀렸을 때 사용자가 신규 PIN을 두 번 입력한 뒤에야 "현재
+// 비밀번호가 틀렸다"는 에러를 보게 되는 문제가 있었다. verifyPin과 updatePin의
+// 현재 PIN 검증(verifyCurrentPinOrThrow)은 같은 Redis 잠금 카운터를 공유하므로
+// (성공 시 카운터 초기화), 여기서 한 번 더 검증해도 이중 카운트로 잠기지 않는다.
 const steps = computed(() => (pinAlreadyRegistered.value ? ['current', 'new', 'confirm'] : ['new', 'confirm']));
 const stepIndex = ref(0);
 const step = computed(() => steps.value[stepIndex.value]);
@@ -66,6 +71,9 @@ const firstPin = ref('');        // '새 PIN' 1차 입력값 (confirm 단계에�
 const currentInput = ref('');    // 지금 입력 중인 6자리
 const pinError = ref('');
 const submitting = ref(false);
+// 현재 PIN 오답 횟수(current 단계 전용) - 백엔드는 5회 불일치 시 30초 잠금(423)을 이미
+// 적용하지만 실패 횟수 자체는 응답에 안 내려줘서(상태코드+고정 메시지뿐) 프론트에서 직접 센다.
+const currentPinFailCount = ref(0);
 
 const title = computed(() => {
   if (step.value === 'current') return '현재 비밀번호를 입력해주세요';
@@ -106,10 +114,28 @@ function onPinInput(value) {
   currentInput.value = value;
 }
 
-function advanceStep() {
+async function advanceStep() {
   if (step.value === 'current') {
-    currentPinInput.value = currentInput.value;
-    resetToStep('new');
+    const candidate = currentInput.value;
+    submitting.value = true;
+    pinError.value = '';
+    try {
+      await verifyPin(candidate);
+      currentPinInput.value = candidate;
+      currentPinFailCount.value = 0;
+      resetToStep('new');
+    } catch (err) {
+      currentInput.value = '';
+      if (err.response?.status === 423) {
+        currentPinFailCount.value = 0;
+        pinError.value = 'PIN 번호 5회 불일치로 30초 간 PIN 인증하실 수 없습니다.';
+      } else {
+        currentPinFailCount.value = Math.min(currentPinFailCount.value + 1, 5);
+        pinError.value = `PIN 번호가 틀립니다. 5회 불일치 시 30초 간 PIN 인증하실 수 없습니다.(${currentPinFailCount.value}/5)`;
+      }
+    } finally {
+      submitting.value = false;
+    }
     return;
   }
 

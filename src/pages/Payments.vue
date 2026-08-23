@@ -82,7 +82,7 @@
             <span v-for="i in 6" :key="i" class="pin-dot" :class="{ filled: i <= pin.length }"></span>
           </div>
 
-          <p v-if="pinError" class="pin-error">비밀번호가 올바르지 않습니다. 다시 입력해주세요.</p>
+          <p v-if="pinError" class="pin-error">{{ pinError }}</p>
         </div>
 
         <div class="keypad">
@@ -124,7 +124,10 @@ const isIssuingToken = ref(false);
 const isCompleting = ref(false);
 const isReissuing = ref(false);
 const pin = ref('');
-const pinError = ref(false);
+const pinError = ref('');
+// PIN 오답 횟수 - 백엔드는 5회 불일치 시 30초 잠금(423)을 이미 적용하지만 실패 횟수
+// 자체는 응답에 안 내려줘서(상태코드+고정 메시지뿐) 프론트에서 직접 센다.
+const pinFailCount = ref(0);
 const barcodeCanvasRef = ref(null);
 const cardSliderRef = ref(null);
 
@@ -222,25 +225,26 @@ function handlePaymentBoxClick(event) {
 function openPinSheet() {
   if (!selectedMethodId.value || isAuthenticated.value || isIssuingToken.value) return;
   pin.value = '';
-  pinError.value = false;
+  pinError.value = '';
+  pinFailCount.value = 0;
   isEnteringPin.value = true;
 }
 
 function closePinSheet() {
   isEnteringPin.value = false;
   pin.value = '';
-  pinError.value = false;
+  pinError.value = '';
 }
 
 function handleKeypadPress(key) {
   if (key.type === 'digit') {
     if (pin.value.length >= 6) return;
-    pinError.value = false;
+    pinError.value = '';
     pin.value += key.label;
     if (pin.value.length === 6) checkPin();
   } else if (key.type === 'backspace') {
     pin.value = pin.value.slice(0, -1);
-    pinError.value = false;
+    pinError.value = '';
   }
 }
 
@@ -249,9 +253,15 @@ async function checkPin() {
     await verifyPin(pin.value);
     isAuthenticated.value = true;
     closePinSheet();
-  } catch {
+  } catch (err) {
     pin.value = '';
-    pinError.value = true;
+    if (err.response?.status === 423) {
+      pinFailCount.value = 0;
+      pinError.value = 'PIN 번호 5회 불일치로 30초 간 PIN 인증하실 수 없습니다.';
+    } else {
+      pinFailCount.value = Math.min(pinFailCount.value + 1, 5);
+      pinError.value = `PIN 번호가 틀립니다. 5회 불일치 시 30초 간 PIN 인증하실 수 없습니다.(${pinFailCount.value}/5)`;
+    }
     return;
   }
 

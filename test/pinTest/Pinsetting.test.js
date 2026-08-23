@@ -13,6 +13,10 @@ vi.mock('@/services/memberService', () => ({
   updatePin: vi.fn(),
 }))
 
+vi.mock('@/services/paymentAuthService', () => ({
+  verifyPin: vi.fn(),
+}))
+
 const { mockToastSuccess } = vi.hoisted(() => ({ mockToastSuccess: vi.fn() }))
 vi.mock('@/composables/useToast', () => ({
   useToast: () => ({ success: mockToastSuccess, error: vi.fn(), info: vi.fn() }),
@@ -20,6 +24,7 @@ vi.mock('@/composables/useToast', () => ({
 
 import Pinsetting from '@/pages/Pinsetting.vue'
 import { getMyProfile, registerPin, updatePin } from '@/services/memberService'
+import { verifyPin } from '@/services/paymentAuthService'
 
 function mountPage() {
   return mount(Pinsetting, {
@@ -118,25 +123,68 @@ describe('최초 등록 흐름 (pinRegistered: false)', () => {
 describe('변경 흐름 (pinRegistered: true)', () => {
   it('current -> new -> confirm 세 단계를 거친다', async () => {
     getMyProfile.mockResolvedValueOnce({ pinRegistered: true })
+    verifyPin.mockResolvedValueOnce()
     const wrapper = mountPage()
     await flushPromises()
 
     expect(wrapper.text()).toContain('현재 비밀번호를 입력해주세요')
 
-    await pressDigits(wrapper, '111111') // current 단계는 형식만 맞으면 통과, 패턴 검사 없음
+    await pressDigits(wrapper, '111111') // current 단계는 verifyPin으로 즉시 검증한다
+    await flushPromises()
+    expect(verifyPin).toHaveBeenCalledWith('111111')
     expect(wrapper.text()).toContain('새 비밀번호를 입력해주세요')
 
     await pressDigits(wrapper, '481027')
     expect(wrapper.text()).toContain('다시 한번 입력해주세요')
   })
 
+  it('current 단계에서 PIN이 틀리면(401) 즉시 에러를 보여주고 new 단계로 넘어가지 않는다', async () => {
+    getMyProfile.mockResolvedValueOnce({ pinRegistered: true })
+    verifyPin.mockRejectedValueOnce({ response: { status: 401 } })
+    const wrapper = mountPage()
+    await flushPromises()
+
+    await pressDigits(wrapper, '111111')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('PIN 번호가 틀립니다. 5회 불일치 시 30초 간 PIN 인증하실 수 없습니다.(1/5)')
+    expect(wrapper.text()).toContain('현재 비밀번호를 입력해주세요')
+    expect(wrapper.text()).not.toContain('새 비밀번호를 입력해주세요')
+    expect(updatePin).not.toHaveBeenCalled()
+  })
+
+  it('current 단계에서 틀릴 때마다 (n/5) 횟수가 올라가고, 423이 오면 잠금 문구로 바뀐다', async () => {
+    getMyProfile.mockResolvedValueOnce({ pinRegistered: true })
+    verifyPin
+      .mockRejectedValueOnce({ response: { status: 401 } })
+      .mockRejectedValueOnce({ response: { status: 401 } })
+      .mockRejectedValueOnce({ response: { status: 423 } })
+    const wrapper = mountPage()
+    await flushPromises()
+
+    await pressDigits(wrapper, '111111')
+    await flushPromises()
+    expect(wrapper.text()).toContain('(1/5)')
+
+    await pressDigits(wrapper, '111111')
+    await flushPromises()
+    expect(wrapper.text()).toContain('(2/5)')
+
+    await pressDigits(wrapper, '111111')
+    await flushPromises()
+    expect(wrapper.text()).toContain('PIN 번호 5회 불일치로 30초 간 PIN 인증하실 수 없습니다.')
+    expect(wrapper.text()).not.toContain('(3/5)')
+  })
+
   it('전부 일치하면 updatePin(currentPin, newPin)을 호출하고 이전 화면으로 돌아간다', async () => {
     getMyProfile.mockResolvedValueOnce({ pinRegistered: true })
+    verifyPin.mockResolvedValueOnce()
     updatePin.mockResolvedValueOnce()
     const wrapper = mountPage()
     await flushPromises()
 
     await pressDigits(wrapper, '111111')
+    await flushPromises()
     await pressDigits(wrapper, '481027')
     await pressDigits(wrapper, '481027')
     await flushPromises()
@@ -148,13 +196,15 @@ describe('변경 흐름 (pinRegistered: true)', () => {
     expect(routerMock.replace).not.toHaveBeenCalled()
   })
 
-  it('제출이 401로 실패하면 current 단계부터 다시 받는다', async () => {
+  it('current 검증 후에도 제출이 401로 실패하면(드문 경쟁 상태) current 단계부터 다시 받는다', async () => {
     getMyProfile.mockResolvedValueOnce({ pinRegistered: true })
+    verifyPin.mockResolvedValueOnce()
     updatePin.mockRejectedValueOnce({ response: { status: 401, data: { message: 'current PIN is incorrect' } } })
     const wrapper = mountPage()
     await flushPromises()
 
     await pressDigits(wrapper, '111111')
+    await flushPromises()
     await pressDigits(wrapper, '481027')
     await pressDigits(wrapper, '481027')
     await flushPromises()
@@ -165,11 +215,13 @@ describe('변경 흐름 (pinRegistered: true)', () => {
 
   it('제출이 401이 아닌 사유(예: 423 잠금)로 실패하면 new 단계부터 다시 받는다', async () => {
     getMyProfile.mockResolvedValueOnce({ pinRegistered: true })
+    verifyPin.mockResolvedValueOnce()
     updatePin.mockRejectedValueOnce({ response: { status: 423, data: { message: 'PIN verification is temporarily locked' } } })
     const wrapper = mountPage()
     await flushPromises()
 
     await pressDigits(wrapper, '111111')
+    await flushPromises()
     await pressDigits(wrapper, '481027')
     await pressDigits(wrapper, '481027')
     await flushPromises()

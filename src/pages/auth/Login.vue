@@ -76,7 +76,7 @@
           </button>
         </div>
 
-        <p v-if="authStore.errorMessage" class="error-text">{{ authStore.errorMessage }}</p>
+        <p v-if="loginErrorMessage" class="error-text">{{ loginErrorMessage }}</p>
 
         <Button
           type="submit"
@@ -114,6 +114,22 @@ const showPassword = ref(false);
 
 const canSubmit = computed(() => userId.value.length > 0 && password.value.length > 0);
 
+// 비밀번호 오답 횟수 - 백엔드는 계정당 5회 불일치 시 30분 잠금(423)을 이미 적용하지만
+// 응답에 실패 횟수 자체는 안 내려줘서(상태코드+고정 메시지뿐) 프론트에서 직접 센다.
+// 새로고침/다른 기기에서의 시도는 반영되지 않으니 서버의 실제 카운트와 어긋날 수 있다 -
+// 423이 오면 그 즉시 잠김 문구로 전환해 이 오차를 최소화한다.
+const passwordFailCount = ref(0);
+
+const loginErrorMessage = computed(() => {
+  if (authStore.errorStatus === 423) {
+    return '비밀번호 5회 불일치로 해당 계정은 30분 간 로그인할 수 없습니다.';
+  }
+  if (authStore.errorStatus === 401 && passwordFailCount.value > 0) {
+    return `비밀번호가 틀립니다. 5회 불일치 시 해당 계정에 30분 간 로그인 할 수 없습니다.(${passwordFailCount.value}/5)`;
+  }
+  return authStore.errorMessage;
+});
+
 // 라우터 가드가 로그인 화면으로 보낼 때 원래 가려던 경로를 redirect로 남겨둔다.
 // 외부 사이트로 튕기지 않도록 '/'로 시작하는 내부 경로만 받아들인다('//'는 프로토콜
 // 상대 URL이라 외부로 나간다). 회원가입은 이제 가입 즉시 자동 로그인되어 이 화면을
@@ -129,8 +145,11 @@ async function handleLogin() {
   if (!canSubmit.value) return;
   const success = await authStore.login(userId.value, password.value);
   if (success) {
+    passwordFailCount.value = 0;
     router.push(redirectTarget.value);
+    return;
   }
+  passwordFailCount.value = authStore.errorStatus === 401 ? Math.min(passwordFailCount.value + 1, 5) : 0;
 }
 </script>
 
