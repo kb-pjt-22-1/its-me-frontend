@@ -42,6 +42,7 @@
       class="research-btn"
       :disabled="merchantsLoading"
       :aria-label="selectedCategory ? `${selectedCategory} 전체 재검색` : '현재 화면에서 재검색'"
+      :style="{ transform: `translateY(-${sheetFabLift}px)` }"
       @click="onResearchClick"
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -51,7 +52,12 @@
       </svg>
     </button>
 
-    <button class="locate-btn" @click="recenterToMyLocation" aria-label="내 위치로 이동">
+    <button
+      class="locate-btn"
+      :style="{ transform: `translateY(-${sheetFabLift}px)` }"
+      @click="recenterToMyLocation"
+      aria-label="내 위치로 이동"
+    >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
       </svg>
@@ -302,6 +308,15 @@ function getSheetSnapPoints() {
     expanded: Math.max(0, sheetHeight - visibleExpanded),
   }
 }
+
+// 재검색/내 위치 버튼(오른쪽 아래 고정)이 바텀시트가 올라오는 만큼 같이 위로 따라가게 하는
+// 오프셋. collapsed(평소) 상태를 기준(0)으로 삼고, 시트가 그보다 위로 올라온 만큼(=
+// translateY가 collapsed보다 작아진 만큼)을 버튼도 그대로 밀어올린다 - 드래그 중에도
+// sheetTranslateY가 실시간으로 바뀌므로 버튼도 같이 실시간으로 따라 움직인다.
+const sheetFabLift = computed(() => {
+  const collapsed = getSheetSnapPoints().collapsed
+  return Math.max(0, collapsed - sheetTranslateY.value)
+})
 
 function snapSheetTo(position) {
   const snapPoints = getSheetSnapPoints()

@@ -1247,6 +1247,26 @@ describe('주변 제휴 매장 바텀시트 3단계 drag/snap', () => {
     expect(sheet.attributes('data-position')).toBe('collapsed')
   })
 
+  it('시트가 middle/expanded로 올라가면 재검색/내 위치 버튼도 같은 만큼 위로 따라 올라간다', async () => {
+    const wrapper = await mountSizedSheet()
+    const handle = wrapper.find('.sheet-handle-area')
+
+    // collapsed(기본) - 버튼은 원래 자리 그대로(0px 이동)
+    expect(wrapper.find('.research-btn').attributes('style')).toContain('translateY(-0px)')
+    expect(wrapper.find('.locate-btn').attributes('style')).toContain('translateY(-0px)')
+
+    await handle.trigger('click') // collapsed(330) -> middle(160), 시트가 170px 올라감
+    expect(wrapper.find('.research-btn').attributes('style')).toContain('translateY(-170px)')
+    expect(wrapper.find('.locate-btn').attributes('style')).toContain('translateY(-170px)')
+
+    await handle.trigger('pointerdown', { clientY: 400, pointerId: 2 })
+    await handle.trigger('pointermove', { clientY: 80, pointerId: 2 })
+    await handle.trigger('pointerup', { clientY: 80, pointerId: 2 }) // middle -> expanded(0), 시트가 330px 올라감
+
+    expect(wrapper.find('.research-btn').attributes('style')).toContain('translateY(-330px)')
+    expect(wrapper.find('.locate-btn').attributes('style')).toContain('translateY(-330px)')
+  })
+
   it('위로 drag하면 실시간 translate 후 expanded로 snap하고, drag 직후 click은 toggle하지 않는다', async () => {
     const wrapper = await mountSizedSheet()
     const sheet = wrapper.find('.store-sheet')
