@@ -1054,6 +1054,18 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     expect(names).toHaveLength(2)
   })
 
+  it('검색어를 50자 넘게 입력해도(붙여넣기 등) 50자까지만 반영된다', async () => {
+    window.kakao = createKakaoMock().kakao
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const searchInput = wrapper.find('input')
+    await searchInput.setValue('가'.repeat(60))
+
+    expect(searchInput.element.value).toBe('가'.repeat(50))
+    expect(searchInput.attributes('maxlength')).toBe('50')
+  })
+
   it('매장이 10개 이하면 페이지 버튼을 보여주지 않는다', async () => {
     window.kakao = createKakaoMock().kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT, MART_MERCHANT])
