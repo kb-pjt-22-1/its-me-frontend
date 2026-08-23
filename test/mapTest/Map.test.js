@@ -45,6 +45,7 @@ import MapPage from '@/pages/Map.vue'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { useMapViewStore } from '@/stores/mapView'
+import { usePaymentStore } from '@/stores/payment'
 import {
   fetchRecommendedNearbyMerchants,
   fetchMerchantCategories,
@@ -145,6 +146,7 @@ function createKakaoMock({ level = 3 } = {}) {
     getCenter: vi.fn(() => ({ getLat: () => 37.5, getLng: () => 127.1 })),
     panTo: vi.fn(),
     setCenter: vi.fn(),
+    setLevel: vi.fn(),
   }
   class KakaoMap {
     constructor() {
@@ -786,12 +788,53 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     }
   })
 
-  it('"내 위치로 이동" 버튼을 누르면 현재 위치로 지도 중심을 옮긴다', async () => {
+  it('"내 위치로 이동" 버튼을 누르면 이미 알고 있는(watchPosition으로 갱신 중인) 위치로 지도 중심을 옮기고, 새로 위치를 요청하지 않는다', async () => {
     const originalGeolocation = navigator.geolocation
+    const getCurrentPositionSpy = vi.fn((success) => success({ coords: { latitude: 37.1234, longitude: 127.5678 } }))
     Object.defineProperty(navigator, 'geolocation', {
       configurable: true,
       value: {
-        getCurrentPosition: (success) => success({ coords: { latitude: 37.1234, longitude: 127.5678 } }),
+        getCurrentPosition: getCurrentPositionSpy,
+        watchPosition: () => 1,
+        clearWatch: () => {},
+      },
+    })
+
+    try {
+      const { kakao, mapInstance } = createKakaoMock()
+      window.kakao = kakao
+
+      const wrapper = mountMapPage()
+      await flushPromises()
+      // 마운트 시점에 이미 한 번 호출됐다 - 이후 버튼 클릭에서 또 부르는지가 이 테스트의 핵심.
+      const callsAfterMount = getCurrentPositionSpy.mock.calls.length
+
+      await wrapper.find('.locate-btn').trigger('click')
+
+      expect(getCurrentPositionSpy.mock.calls.length).toBe(callsAfterMount) // 추가 호출 없음
+      expect(mapInstance.panTo).toHaveBeenCalledTimes(1)
+      const center = mapInstance.panTo.mock.calls[0][0]
+      expect(center.lat).toBe(37.1234)
+      expect(center.lng).toBe(127.5678)
+      // 이전 확대/축소 배율과 무관하게 항상 같은(주변 매장이 보이는) 배율로 고정한다.
+      expect(mapInstance.setLevel).toHaveBeenCalledWith(3)
+    } finally {
+      Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
+    }
+  })
+
+  it('아직 위치를 한 번도 못 받았으면 버튼 클릭 시 새로 요청해서 그 자리로 이동한다', async () => {
+    const originalGeolocation = navigator.geolocation
+    let callCount = 0
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        // 마운트 시점 첫 호출은 실패시켜 myLocation을 비워두고, 이후(버튼 클릭) 호출부터 성공시킨다.
+        getCurrentPosition: (success, error) => {
+          callCount += 1
+          if (callCount === 1) error({ code: 1 })
+          else success({ coords: { latitude: 37.9999, longitude: 127.9999 } })
+        },
         watchPosition: () => 1,
         clearWatch: () => {},
       },
@@ -808,8 +851,35 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
 
       expect(mapInstance.panTo).toHaveBeenCalledTimes(1)
       const center = mapInstance.panTo.mock.calls[0][0]
-      expect(center.lat).toBe(37.1234)
-      expect(center.lng).toBe(127.5678)
+      expect(center.lat).toBe(37.9999)
+      expect(center.lng).toBe(127.9999)
+    } finally {
+      Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
+    }
+  })
+
+  it('"내 위치로 이동" 버튼을 눌렀는데 위치 조회에 실패하면 에러 토스트를 띄운다(예전엔 아무 반응이 없었음)', async () => {
+    const originalGeolocation = navigator.geolocation
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success, error) => error({ code: 1, message: 'User denied Geolocation' }),
+        watchPosition: () => 1,
+        clearWatch: () => {},
+      },
+    })
+
+    try {
+      const { kakao, mapInstance } = createKakaoMock()
+      window.kakao = kakao
+
+      const wrapper = mountMapPage()
+      await flushPromises()
+
+      await wrapper.find('.locate-btn').trigger('click')
+
+      expect(mapInstance.panTo).not.toHaveBeenCalled()
+      expect(mockToastError).toHaveBeenCalledWith('현재 위치를 가져오지 못했어요. 위치 권한을 확인해주세요.')
     } finally {
       Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
     }
@@ -871,11 +941,11 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     expect(martItem.find('.pill--gold').exists()).toBe(false)
   })
 
-  it('혜택순 버튼을 누르면 recommended=true인 매장이 먼저 오고, 거리순으로 되돌리면 원래 순서로 돌아간다', async () => {
+  it('혜택순 버튼을 누르면 실질 할인율이 높은 매장이 먼저 오고, 거리순으로 되돌리면 원래 순서로 돌아간다', async () => {
     window.kakao = createKakaoMock().kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([
       MART_MERCHANT,
-      { ...CAFE_MERCHANT, recommended: true },
+      { ...CAFE_MERCHANT, recommended: true, discountAmount: 1000, typicalPaymentAmount: 10000 },
     ])
 
     const wrapper = mountMapPage()
@@ -896,6 +966,104 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     await flushPromises()
 
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트', '동네 카페'])
+  })
+
+  it('혜택순 정렬 시 같은 브랜드의 다른 지점은 실질 할인율이 더 높은 곳 1곳만 남긴다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      { ...CAFE_MERCHANT, name: '네네치킨 용문동', brandId: 9, discountAmount: 500, typicalPaymentAmount: 10000 },
+      { ...MART_MERCHANT, name: '네네치킨 잠원동', brandId: 9, discountAmount: 2000, typicalPaymentAmount: 10000 },
+      { id: 3, name: '개인 매장', categoryCode: '5813', lat: 37.52, lng: 127.12 },
+    ])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const benefitBtn = wrapper.findAll('.sort-btn').find((btn) => btn.text() === '혜택순')
+    await benefitBtn.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['네네치킨 잠원동', '개인 매장'])
+  })
+
+  it('할인율이 같으면 결제내역에서 자주 이용한 매장이 먼저 온다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      { ...CAFE_MERCHANT, id: 1, name: '자주 가는 카페', discountAmount: 100, typicalPaymentAmount: 1000 },
+      { ...MART_MERCHANT, id: 2, name: '가끔 가는 마트', discountAmount: 100, typicalPaymentAmount: 1000 },
+    ])
+    const paymentStore = usePaymentStore()
+    paymentStore.history = [
+      { merchantId: 1, brandId: null, categoryCode: '5813' },
+      { merchantId: 1, brandId: null, categoryCode: '5813' },
+    ]
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const benefitBtn = wrapper.findAll('.sort-btn').find((btn) => btn.text() === '혜택순')
+    await benefitBtn.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['자주 가는 카페', '가끔 가는 마트'])
+  })
+
+  it('매장 일치가 없으면 브랜드 일치가 카테고리 일치보다 우선한다(빈도 크기와 무관)', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      { ...CAFE_MERCHANT, id: 1, name: '브랜드 일치 매장', brandId: 9, categoryCode: '5813', discountAmount: 100, typicalPaymentAmount: 1000 },
+      { ...MART_MERCHANT, id: 2, name: '카테고리만 일치 매장', brandId: null, categoryCode: '5411', discountAmount: 100, typicalPaymentAmount: 1000 },
+    ])
+    const paymentStore = usePaymentStore()
+    paymentStore.history = [
+      { merchantId: 999, brandId: 9, categoryCode: '5813' },
+      { merchantId: 998, brandId: null, categoryCode: '5411' },
+      { merchantId: 998, brandId: null, categoryCode: '5411' },
+      { merchantId: 998, brandId: null, categoryCode: '5411' },
+      { merchantId: 998, brandId: null, categoryCode: '5411' },
+      { merchantId: 998, brandId: null, categoryCode: '5411' },
+    ]
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const benefitBtn = wrapper.findAll('.sort-btn').find((btn) => btn.text() === '혜택순')
+    await benefitBtn.trigger('click')
+    await flushPromises()
+
+    // 카테고리만 일치하는 매장은 이력이 5건, 브랜드 일치 매장은 1건뿐이지만 - 매장>브랜드>카테고리
+    // 순서상 브랜드 일치가 우선이라 빈도 크기와 무관하게 브랜드 일치 매장이 먼저 와야 한다.
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['브랜드 일치 매장', '카테고리만 일치 매장'])
+  })
+
+  it('검색어가 있으면 브랜드 중복 제거를 끄고 같은 브랜드 지점을 전부 보여준다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      { ...CAFE_MERCHANT, name: '만랩커피 용문점', brandId: 9 },
+      { ...MART_MERCHANT, name: '만랩커피 잠원점', brandId: 9 },
+    ])
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    await wrapper.find('input').setValue('만랩커피')
+    await flushPromises()
+
+    const names = wrapper.findAll('.sheet-item-info strong').map((el) => el.text())
+    expect(names).toEqual(expect.arrayContaining(['만랩커피 용문점', '만랩커피 잠원점']))
+    expect(names).toHaveLength(2)
+  })
+
+  it('검색어를 50자 넘게 입력해도(붙여넣기 등) 50자까지만 반영된다', async () => {
+    window.kakao = createKakaoMock().kakao
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const searchInput = wrapper.find('input')
+    await searchInput.setValue('가'.repeat(60))
+
+    expect(searchInput.element.value).toBe('가'.repeat(50))
+    expect(searchInput.attributes('maxlength')).toBe('50')
   })
 
   it('매장이 10개 이하면 페이지 버튼을 보여주지 않는다', async () => {
@@ -1158,6 +1326,26 @@ describe('주변 제휴 매장 바텀시트 3단계 drag/snap', () => {
 
     await handle.trigger('click')
     expect(sheet.attributes('data-position')).toBe('collapsed')
+  })
+
+  it('시트가 middle/expanded로 올라가면 재검색/내 위치 버튼도 같은 만큼 위로 따라 올라간다', async () => {
+    const wrapper = await mountSizedSheet()
+    const handle = wrapper.find('.sheet-handle-area')
+
+    // collapsed(기본) - 버튼은 원래 자리 그대로(0px 이동)
+    expect(wrapper.find('.research-btn').attributes('style')).toContain('translateY(-0px)')
+    expect(wrapper.find('.locate-btn').attributes('style')).toContain('translateY(-0px)')
+
+    await handle.trigger('click') // collapsed(330) -> middle(160), 시트가 170px 올라감
+    expect(wrapper.find('.research-btn').attributes('style')).toContain('translateY(-170px)')
+    expect(wrapper.find('.locate-btn').attributes('style')).toContain('translateY(-170px)')
+
+    await handle.trigger('pointerdown', { clientY: 400, pointerId: 2 })
+    await handle.trigger('pointermove', { clientY: 80, pointerId: 2 })
+    await handle.trigger('pointerup', { clientY: 80, pointerId: 2 }) // middle -> expanded(0), 시트가 330px 올라감
+
+    expect(wrapper.find('.research-btn').attributes('style')).toContain('translateY(-330px)')
+    expect(wrapper.find('.locate-btn').attributes('style')).toContain('translateY(-330px)')
   })
 
   it('위로 drag하면 실시간 translate 후 expanded로 snap하고, drag 직후 click은 toggle하지 않는다', async () => {

@@ -99,6 +99,16 @@ describe('1단계: 본인인증', () => {
     expect(phoneInput.attributes('maxlength')).toBe('13')
   })
 
+  it('이름을 50자 넘게 입력해도(붙여넣기 등) 50자까지만 반영된다(users.name이 VARCHAR(50))', async () => {
+    const wrapper = mountPage()
+    const nameInput = wrapper.find('#signup-name')
+
+    await nameInput.setValue('가'.repeat(60))
+
+    expect(nameInput.element.value).toBe('가'.repeat(50))
+    expect(nameInput.attributes('maxlength')).toBe('50')
+  })
+
   it('devVerificationCode가 오면 화면에 노출하지 않고 코드 입력란만 미리 채워준다', async () => {
     requestSignupIdentityCode.mockResolvedValueOnce('654321')
     const wrapper = mountPage()
