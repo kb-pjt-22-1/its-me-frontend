@@ -17,9 +17,16 @@ export const usePaymentStore = defineStore('payment', {
     payableCards: [],
     recommendedCard: null,
     currentToken: null,
+    // App.vue가 로그인/앱 진입 시 채워두는 "최근/기본 범위" 이력. Map.vue(혜택순 정렬 보조
+    // 기준)와 Home.vue/Menu.vue(이번 달 혜택 합계)가 참조한다 - PaymentsList.vue의 월별
+    // 조회(monthlyHistory)와는 분리되어 있어 서로 덮어쓰지 않는다.
     history: [],
+    // PaymentsList.vue 전용 - 사용자가 "이전/다음 달" 버튼으로 조회한 특정 월 이력.
+    monthlyHistory: [],
     isLoading: false,
+    isMonthlyLoading: false,
     error: null,
+    monthlyError: null,
   }),
 
   actions: {
@@ -72,6 +79,23 @@ export const usePaymentStore = defineStore('payment', {
         this.error = err.response?.data?.message ?? '결제 내역을 불러오지 못했습니다.'
       } finally {
         this.isLoading = false
+      }
+    },
+
+    // PaymentsList.vue의 월 이동 전용 조회. this.history(App.vue가 채우는 기본 범위,
+    // Map.vue/Home.vue/Menu.vue가 참조)를 덮어쓰지 않도록 별도 state에 담는다.
+    async fetchMonthlyHistory(params) {
+      const authStore = useAuthStore()
+      if (!authStore.isAuthenticated) return
+
+      this.isMonthlyLoading = true
+      this.monthlyError = null
+      try {
+        this.monthlyHistory = await fetchPaymentHistory(params)
+      } catch (err) {
+        this.monthlyError = err.response?.data?.message ?? '결제 내역을 불러오지 못했습니다.'
+      } finally {
+        this.isMonthlyLoading = false
       }
     },
 

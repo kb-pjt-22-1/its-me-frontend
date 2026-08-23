@@ -1008,6 +1008,41 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['자주 가는 카페', '가끔 가는 마트'])
   })
 
+  it('결제내역 화면에서 다른 달을 조회해도(monthlyHistory) 혜택순 정렬 결과는 바뀌지 않는다', async () => {
+    // PR #180 리뷰에서 발견된 회귀: PaymentsList.vue가 월 이동 시 예전엔 공유 state인
+    // paymentStore.history를 그 달 이력으로 덮어써서, 지도로 돌아오면 혜택순 2차 기준이
+    // "최근 전체 이용 내역" 대신 "마지막으로 조회했던 과거 한 달"만 반영했다. 지금은
+    // PaymentsList가 별도 state(monthlyHistory)를 쓰므로, monthlyHistory가 무엇이든
+    // Map.vue의 정렬(history 기준)은 영향받지 않아야 한다.
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      { ...CAFE_MERCHANT, id: 1, name: '자주 가는 카페', discountAmount: 100, typicalPaymentAmount: 1000 },
+      { ...MART_MERCHANT, id: 2, name: '가끔 가는 마트', discountAmount: 100, typicalPaymentAmount: 1000 },
+    ])
+    const paymentStore = usePaymentStore()
+    // 최근/기본 범위(App.vue가 채움) - 카페를 자주 이용.
+    paymentStore.history = [
+      { merchantId: 1, brandId: null, categoryCode: '5813' },
+      { merchantId: 1, brandId: null, categoryCode: '5813' },
+    ]
+    // PaymentsList.vue에서 사용자가 지난 달로 이동해 조회한 결과 - 마트만 있는 완전히
+    // 다른 내역이라도 지도 화면의 정렬 근거(history)와는 무관해야 한다.
+    paymentStore.monthlyHistory = [
+      { merchantId: 2, brandId: null, categoryCode: '5411' },
+      { merchantId: 2, brandId: null, categoryCode: '5411' },
+      { merchantId: 2, brandId: null, categoryCode: '5411' },
+    ]
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const benefitBtn = wrapper.findAll('.sort-btn').find((btn) => btn.text() === '혜택순')
+    await benefitBtn.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['자주 가는 카페', '가끔 가는 마트'])
+  })
+
   it('매장 일치가 없으면 브랜드 일치가 카테고리 일치보다 우선한다(빈도 크기와 무관)', async () => {
     window.kakao = createKakaoMock().kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([

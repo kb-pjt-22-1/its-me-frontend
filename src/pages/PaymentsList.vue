@@ -18,7 +18,7 @@
     </div>
 
     <div class="scroll-area">
-      <div v-if="paymentStore.isLoading" class="loading-text muted-text">불러오는 중...</div>
+      <div v-if="paymentStore.isMonthlyLoading" class="loading-text muted-text">불러오는 중...</div>
 
       <template v-else>
         <Button
@@ -107,7 +107,7 @@ const isCurrentMonth = computed(() => {
 });
 
 function fetchHistoryForCurrentMonth() {
-  paymentStore.fetchHistory({ yearMonth: yearMonth.value });
+  paymentStore.fetchMonthlyHistory({ yearMonth: yearMonth.value });
 }
 
 const shiftMonth = (direction) => {
@@ -121,7 +121,7 @@ const shiftMonth = (direction) => {
 
 
 const normalizedHistory = computed(() =>
-  paymentStore.history.map((item) => {
+  paymentStore.monthlyHistory.map((item) => {
     const paymentTime = item.paymentTime ?? item.paidAt ?? '';
     const d = new Date(paymentTime);
     const hasValidDate = !Number.isNaN(d.getTime());
