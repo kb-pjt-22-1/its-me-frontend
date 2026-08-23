@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 
 const routerMock = {
@@ -11,6 +11,9 @@ vi.mock('vue-router', () => ({
 
 import Onboarding from '@/pages/Onboarding.vue'
 import onboardingHome from '@/assets/images/onboarding/onboarding-home.png'
+import onboardingMap from '@/assets/images/onboarding/onboarding-map.png'
+import onboardingBenefits from '@/assets/images/onboarding/onboarding-benefits.png'
+import benePayLogo from '@/assets/images/BenePay.png'
 
 function mountOnboarding() {
   return mount(Onboarding)
@@ -25,6 +28,10 @@ beforeEach(() => {
   localStorage.clear()
 })
 
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe('Onboarding.vue', () => {
   it('최초 렌더링에서 첫 번째 제목과 홈 이미지를 보여준다', () => {
     const wrapper = mountOnboarding()
@@ -33,6 +40,25 @@ describe('Onboarding.vue', () => {
     const image = wrapper.get('img')
     expect(image.attributes('src')).toBe(onboardingHome)
     expect(image.attributes('alt')).toBe('추천 카드와 가까운 혜택 매장 안내 화면')
+  })
+
+  it('마운트 시 세 슬라이드 이미지와 환영 로고를 미리 로드한다', () => {
+    const preloadedSources = []
+
+    vi.stubGlobal('Image', class {
+      set src(value) {
+        preloadedSources.push(value)
+      }
+    })
+
+    mountOnboarding()
+
+    expect(preloadedSources).toEqual([
+      onboardingHome,
+      onboardingMap,
+      onboardingBenefits,
+      benePayLogo,
+    ])
   })
 
   it('다음 버튼으로 두 번째와 세 번째 화면을 차례로 이동한다', async () => {
