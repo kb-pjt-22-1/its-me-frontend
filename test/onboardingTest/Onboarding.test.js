@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
 
 const routerMock = {
   replace: vi.fn(),
@@ -11,6 +11,9 @@ vi.mock('vue-router', () => ({
 
 import Onboarding from '@/pages/Onboarding.vue'
 import onboardingHome from '@/assets/images/onboarding/onboarding-home.png'
+import onboardingMap from '@/assets/images/onboarding/onboarding-map.png'
+import onboardingBenefits from '@/assets/images/onboarding/onboarding-benefits.png'
+import benePayLogo from '@/assets/images/BenePay.png'
 
 function mountOnboarding() {
   return mount(Onboarding)
@@ -25,6 +28,10 @@ beforeEach(() => {
   localStorage.clear()
 })
 
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe('Onboarding.vue', () => {
   it('최초 렌더링에서 첫 번째 제목과 홈 이미지를 보여준다', () => {
     const wrapper = mountOnboarding()
@@ -33,6 +40,25 @@ describe('Onboarding.vue', () => {
     const image = wrapper.get('img')
     expect(image.attributes('src')).toBe(onboardingHome)
     expect(image.attributes('alt')).toBe('추천 카드와 가까운 혜택 매장 안내 화면')
+  })
+
+  it('마운트 시 세 슬라이드 이미지와 환영 로고를 미리 로드한다', () => {
+    const preloadedSources = []
+
+    vi.stubGlobal('Image', class {
+      set src(value) {
+        preloadedSources.push(value)
+      }
+    })
+
+    mountOnboarding()
+
+    expect(preloadedSources).toEqual([
+      onboardingHome,
+      onboardingMap,
+      onboardingBenefits,
+      benePayLogo,
+    ])
   })
 
   it('다음 버튼으로 두 번째와 세 번째 화면을 차례로 이동한다', async () => {
@@ -101,5 +127,76 @@ describe('Onboarding.vue', () => {
     await page.trigger('touchend', { changedTouches: [{ clientX: 60, clientY: 102 }] })
 
     expect(wrapper.text()).toContain('가까운 혜택 매장을\n한눈에')
+  })
+
+  it('50px을 넘는 오른쪽 스와이프로 이전 화면으로 되돌아간다', async () => {
+    const wrapper = mountOnboarding()
+    const page = wrapper.get('.onboarding-page')
+
+    await buttonByText(wrapper, '다음').trigger('click')
+    expect(wrapper.text()).toContain('가까운 혜택 매장을\n한눈에')
+
+    await page.trigger('touchstart', { changedTouches: [{ clientX: 60, clientY: 100 }] })
+    await page.trigger('touchend', { changedTouches: [{ clientX: 120, clientY: 102 }] })
+
+    expect(wrapper.text()).toContain('결제할 때마다\n가장 좋은 카드로')
+  })
+
+  it('스와이프 거리가 50px 미만이면 화면을 넘기지 않는다', async () => {
+    const wrapper = mountOnboarding()
+    const page = wrapper.get('.onboarding-page')
+
+    await page.trigger('touchstart', { changedTouches: [{ clientX: 100, clientY: 100 }] })
+    await page.trigger('touchend', { changedTouches: [{ clientX: 130, clientY: 100 }] })
+
+    expect(wrapper.text()).toContain('결제할 때마다\n가장 좋은 카드로')
+  })
+
+  it('세로 이동이 가로 이동보다 크면(스크롤 의도) 화면을 넘기지 않는다', async () => {
+    const wrapper = mountOnboarding()
+    const page = wrapper.get('.onboarding-page')
+
+    await page.trigger('touchstart', { changedTouches: [{ clientX: 100, clientY: 100 }] })
+    await page.trigger('touchend', { changedTouches: [{ clientX: 160, clientY: 220 }] })
+
+    expect(wrapper.text()).toContain('결제할 때마다\n가장 좋은 카드로')
+  })
+
+  it('이미지 로딩이 끝나 decode가 성공하면 조용히 미리 로드를 마친다', async () => {
+    const onloadCallbacks = []
+    vi.stubGlobal('Image', class {
+      set src(value) {
+        this._src = value
+        onloadCallbacks.push(() => this.onload?.())
+      }
+      decode() {
+        return Promise.resolve()
+      }
+    })
+
+    const wrapper = mountOnboarding()
+    onloadCallbacks.forEach((fire) => fire())
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('결제할 때마다\n가장 좋은 카드로')
+  })
+
+  it('이미지 decode가 실패해도(구형 브라우저 등) 무시하고 정상적으로 미리 로드를 마친다', async () => {
+    const onloadCallbacks = []
+    vi.stubGlobal('Image', class {
+      set src(value) {
+        this._src = value
+        onloadCallbacks.push(() => this.onload?.())
+      }
+      decode() {
+        return Promise.reject(new Error('decode not supported'))
+      }
+    })
+
+    const wrapper = mountOnboarding()
+    onloadCallbacks.forEach((fire) => fire())
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('결제할 때마다\n가장 좋은 카드로')
   })
 })
