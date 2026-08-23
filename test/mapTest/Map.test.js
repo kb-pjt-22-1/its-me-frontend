@@ -45,6 +45,7 @@ import MapPage from '@/pages/Map.vue'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { useMapViewStore } from '@/stores/mapView'
+import { usePaymentStore } from '@/stores/payment'
 import {
   fetchRecommendedNearbyMerchants,
   fetchMerchantCategories,
@@ -914,6 +915,56 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     await flushPromises()
 
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['네네치킨 잠원동', '개인 매장'])
+  })
+
+  it('할인율이 같으면 결제내역에서 자주 이용한 매장이 먼저 온다', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      { ...CAFE_MERCHANT, id: 1, name: '자주 가는 카페', discountAmount: 100, typicalPaymentAmount: 1000 },
+      { ...MART_MERCHANT, id: 2, name: '가끔 가는 마트', discountAmount: 100, typicalPaymentAmount: 1000 },
+    ])
+    const paymentStore = usePaymentStore()
+    paymentStore.history = [
+      { merchantId: 1, brandId: null, categoryCode: '5813' },
+      { merchantId: 1, brandId: null, categoryCode: '5813' },
+    ]
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const benefitBtn = wrapper.findAll('.sort-btn').find((btn) => btn.text() === '혜택순')
+    await benefitBtn.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['자주 가는 카페', '가끔 가는 마트'])
+  })
+
+  it('매장 일치가 없으면 브랜드 일치가 카테고리 일치보다 우선한다(빈도 크기와 무관)', async () => {
+    window.kakao = createKakaoMock().kakao
+    fetchRecommendedNearbyMerchants.mockResolvedValue([
+      { ...CAFE_MERCHANT, id: 1, name: '브랜드 일치 매장', brandId: 9, categoryCode: '5813', discountAmount: 100, typicalPaymentAmount: 1000 },
+      { ...MART_MERCHANT, id: 2, name: '카테고리만 일치 매장', brandId: null, categoryCode: '5411', discountAmount: 100, typicalPaymentAmount: 1000 },
+    ])
+    const paymentStore = usePaymentStore()
+    paymentStore.history = [
+      { merchantId: 999, brandId: 9, categoryCode: '5813' },
+      { merchantId: 998, brandId: null, categoryCode: '5411' },
+      { merchantId: 998, brandId: null, categoryCode: '5411' },
+      { merchantId: 998, brandId: null, categoryCode: '5411' },
+      { merchantId: 998, brandId: null, categoryCode: '5411' },
+      { merchantId: 998, brandId: null, categoryCode: '5411' },
+    ]
+
+    const wrapper = mountMapPage()
+    await flushPromises()
+
+    const benefitBtn = wrapper.findAll('.sort-btn').find((btn) => btn.text() === '혜택순')
+    await benefitBtn.trigger('click')
+    await flushPromises()
+
+    // 카테고리만 일치하는 매장은 이력이 5건, 브랜드 일치 매장은 1건뿐이지만 - 매장>브랜드>카테고리
+    // 순서상 브랜드 일치가 우선이라 빈도 크기와 무관하게 브랜드 일치 매장이 먼저 와야 한다.
+    expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['브랜드 일치 매장', '카테고리만 일치 매장'])
   })
 
   it('검색어가 있으면 브랜드 중복 제거를 끄고 같은 브랜드 지점을 전부 보여준다', async () => {

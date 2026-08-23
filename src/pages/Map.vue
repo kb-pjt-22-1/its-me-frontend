@@ -248,6 +248,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { useMapViewStore } from '@/stores/mapView'
+import { usePaymentStore } from '@/stores/payment'
 import { getBrandImage } from '@/utils/brandImages'
 import { getCardImage } from '@/utils/cardImages'
 import { toDataUri } from '@/utils/imageDataUri'
@@ -260,6 +261,7 @@ const router = useRouter()
 const merchantsStore = useMerchantsStore()
 const bookmarksStore = useBookmarksStore()
 const mapViewStore = useMapViewStore()
+const paymentStore = usePaymentStore()
 const toast = useToast()
 
 // 바텀시트 상태 - 최대 높이의 시트는 그대로 두고 translateY만 바꿔 세 단계로 노출합니다.
@@ -388,6 +390,22 @@ const MAX_SHEET_ITEMS = 100
 // 클러스터 핀을 클릭하면 그 안에 뭉쳐있던 매장 id만 담아, 목록을 그 매장들로 좁혀 보여줍니다.
 // null이면 필터 없음(화면 안 전체). bounds가 새로 갱신되면(팬/줌) 초기화합니다.
 const clusterFilterMerchantIds = ref(null)
+
+// 혜택순 정렬의 보조 기준(할인율이 같거나 비슷할 때) - 결제내역에서 매장>브랜드>카테고리
+// 순으로 자주 결제한 곳일수록 위로 오도록 빈도를 센다. 범위는 지금 이미 불러와 있는
+// paymentStore.history 그대로(보통 이번 달 조회분) - 이 화면이 별도로 더 불러오지 않는다.
+const paymentFrequency = computed(() => {
+  const byMerchant = new Map()
+  const byBrand = new Map()
+  const byCategory = new Map()
+  for (const p of paymentStore.history) {
+    if (p.merchantId != null) byMerchant.set(p.merchantId, (byMerchant.get(p.merchantId) ?? 0) + 1)
+    if (p.brandId != null) byBrand.set(p.brandId, (byBrand.get(p.brandId) ?? 0) + 1)
+    if (p.categoryCode) byCategory.set(p.categoryCode, (byCategory.get(p.categoryCode) ?? 0) + 1)
+  }
+  return { byMerchant, byBrand, byCategory }
+})
+
 const nearbyMerchants = computed(() => {
   const source = clusterFilterMerchantIds.value
     ? merchants.value.filter((m) => clusterFilterMerchantIds.value.has(m.id))
@@ -407,6 +425,9 @@ const nearbyMerchants = computed(() => {
         discountRate: m.discountAmount && m.typicalPaymentAmount
           ? m.discountAmount / m.typicalPaymentAmount
           : 0,
+        merchantFrequency: paymentFrequency.value.byMerchant.get(m.id) ?? 0,
+        brandFrequency: m.brandId != null ? paymentFrequency.value.byBrand.get(m.brandId) ?? 0 : 0,
+        categoryFrequency: paymentFrequency.value.byCategory.get(m.categoryCode) ?? 0,
       }
     })
 
@@ -414,6 +435,14 @@ const nearbyMerchants = computed(() => {
     if (sortMode.value === 'benefit') {
       const rateDiff = b.discountRate - a.discountRate
       if (rateDiff !== 0) return rateDiff
+      // 할인율이 같으면(흔함 - 같은 카테고리엔 보통 같은 정률 할인) 결제내역 빈도로
+      // 한 번 더 가른다 - 매장 일치가 브랜드 일치보다, 브랜드 일치가 카테고리 일치보다 우선.
+      const merchantFreqDiff = b.merchantFrequency - a.merchantFrequency
+      if (merchantFreqDiff !== 0) return merchantFreqDiff
+      const brandFreqDiff = b.brandFrequency - a.brandFrequency
+      if (brandFreqDiff !== 0) return brandFreqDiff
+      const categoryFreqDiff = b.categoryFrequency - a.categoryFrequency
+      if (categoryFreqDiff !== 0) return categoryFreqDiff
       return a.name.localeCompare(b.name)
     }
     if (a.distanceMeters == null || b.distanceMeters == null) {
