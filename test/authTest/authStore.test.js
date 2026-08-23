@@ -266,12 +266,14 @@ describe('logout', () => {
     store.accessToken = 'access'
     store.user = { userId: 1, name: '홍길동' }
     localStorage.setItem('accessToken', 'access')
+    localStorage.setItem('benepay:onboarding:v1', 'true')
 
     await store.logout()
 
     expect(logoutRequest).toHaveBeenCalled()
     expect(store.isAuthenticated).toBe(false)
     expect(localStorage.getItem('accessToken')).toBeNull()
+    expect(localStorage.getItem('benepay:onboarding:v1')).toBe('true')
   })
 })
 

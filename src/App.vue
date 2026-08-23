@@ -10,7 +10,7 @@
     </div>
 
     <template v-else>
-      <main class="page-container app-page has-bottom-nav">
+      <main class="page-container app-page" :class="{ 'has-bottom-nav': hasBottomNav }">
         <!-- 최상위 라우트(예: 탭 화면들 <-> /menu, /member-profile, /payments 등)가
              바뀔 때만 전체 화면이 방향에 맞춰 슬라이드됩니다. 탭 사이 이동은 DefaultLayout.vue의
              내부 router-view가 담당하므로 여기서는 안 움직입니다 -
@@ -49,6 +49,7 @@
 // 세션 복원은 라우터 가드(router/index.js)가 첫 라우팅 전에 처리하므로 여기서 하지 않습니다.
 // 메뉴는 예전엔 여기서 SidebarMenu를 오버레이로 띄웠는데, /menu 라우트 페이지로 바뀌었습니다.
 import { computed, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
@@ -65,7 +66,9 @@ const merchantsStore = useMerchantsStore();
 const bookmarksStore = useBookmarksStore();
 const paymentStore = usePaymentStore();
 const notificationsStore = useNotificationsStore();
+const route = useRoute();
 const pageTransitionName = computed(() => getPageTransitionName());
+const hasBottomNav = computed(() => route.name !== 'onboarding');
 
 function fetchAllUserData() {
   cardsStore.fetchCards();

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { nextTick } from 'vue'
+import { nextTick, reactive } from 'vue'
+import { routeLocationKey } from 'vue-router'
 
 import App from '@/App.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -30,10 +31,13 @@ function setupStores() {
   return { authStore, cardsStore, merchantsStore, bookmarksStore, paymentStore, notificationsStore }
 }
 
-function mountApp() {
+function mountApp(routeName = 'home') {
   return mount(App, {
     global: {
       stubs: { 'router-view': true },
+      provide: {
+        [routeLocationKey]: reactive({ name: routeName }),
+      },
     },
   })
 }
@@ -67,6 +71,18 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
     expect(stores.paymentStore.fetchHistory).not.toHaveBeenCalled()
     expect(stores.notificationsStore.fetchNotifications).not.toHaveBeenCalled()
     expect(stores.authStore.registerFcmToken).not.toHaveBeenCalled()
+  })
+
+  it('온보딩에서만 하단 내비게이션 여백 클래스를 제거한다', () => {
+    const stores = setupStores()
+    stores.authStore.isBootstrapped = true
+
+    const onboardingWrapper = mountApp('onboarding')
+    expect(onboardingWrapper.get('.app-page').classes()).not.toContain('has-bottom-nav')
+    onboardingWrapper.unmount()
+
+    const homeWrapper = mountApp('home')
+    expect(homeWrapper.get('.app-page').classes()).toContain('has-bottom-nav')
   })
 
   it('이미 로그인 상태로 마운트되면 모든 사용자 데이터를 불러오고 FCM 토큰도 등록한다', () => {

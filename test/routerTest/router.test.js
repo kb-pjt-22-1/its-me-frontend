@@ -13,11 +13,41 @@ vi.mock('@/stores/auth', () => ({
 }))
 
 import router, { resolveNavigationTransition } from '@/router'
+import { completeOnboarding } from '@/utils/onboardingStorage'
 
 beforeEach(() => {
   vi.clearAllMocks()
   bootstrapSession.mockResolvedValue(true)
   authState.isAuthenticated = false
+  localStorage.clear()
+  completeOnboarding()
+})
+
+describe('라우터 가드 (onboarding)', () => {
+  it('미인증·미완료 사용자는 온보딩으로 이동한다', async () => {
+    localStorage.removeItem('benepay:onboarding:v1')
+
+    await router.push('/cards')
+
+    expect(bootstrapSession).toHaveBeenCalled()
+    expect(router.currentRoute.value.name).toBe('onboarding')
+  })
+
+  it('미인증·완료 사용자는 기존처럼 로그인으로 이동한다', async () => {
+    await router.push('/cards')
+
+    expect(router.currentRoute.value.name).toBe('login')
+    expect(router.currentRoute.value.query.redirect).toBe('/cards')
+  })
+
+  it('인증 사용자가 온보딩에 접근하면 홈으로 이동한다', async () => {
+    authState.isAuthenticated = true
+    localStorage.removeItem('benepay:onboarding:v1')
+
+    await router.push('/onboarding')
+
+    expect(router.currentRoute.value.name).toBe('home')
+  })
 })
 
 describe('라우터 가드 (requiresAuth)', () => {
