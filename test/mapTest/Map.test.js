@@ -146,6 +146,7 @@ function createKakaoMock({ level = 3 } = {}) {
     getCenter: vi.fn(() => ({ getLat: () => 37.5, getLng: () => 127.1 })),
     panTo: vi.fn(),
     setCenter: vi.fn(),
+    setLevel: vi.fn(),
   }
   class KakaoMap {
     constructor() {
@@ -811,6 +812,35 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
       const center = mapInstance.panTo.mock.calls[0][0]
       expect(center.lat).toBe(37.1234)
       expect(center.lng).toBe(127.5678)
+      // 이전 확대/축소 배율과 무관하게 항상 같은(주변 매장이 보이는) 배율로 고정한다.
+      expect(mapInstance.setLevel).toHaveBeenCalledWith(3)
+    } finally {
+      Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
+    }
+  })
+
+  it('"내 위치로 이동" 버튼을 눌렀는데 위치 조회에 실패하면 에러 토스트를 띄운다(예전엔 아무 반응이 없었음)', async () => {
+    const originalGeolocation = navigator.geolocation
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success, error) => error({ code: 1, message: 'User denied Geolocation' }),
+        watchPosition: () => 1,
+        clearWatch: () => {},
+      },
+    })
+
+    try {
+      const { kakao, mapInstance } = createKakaoMock()
+      window.kakao = kakao
+
+      const wrapper = mountMapPage()
+      await flushPromises()
+
+      await wrapper.find('.locate-btn').trigger('click')
+
+      expect(mapInstance.panTo).not.toHaveBeenCalled()
+      expect(mockToastError).toHaveBeenCalledWith('현재 위치를 가져오지 못했어요. 위치 권한을 확인해주세요.')
     } finally {
       Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
     }

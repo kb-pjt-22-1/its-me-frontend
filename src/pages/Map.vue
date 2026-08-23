@@ -1235,15 +1235,31 @@ function startWatchingMyLocation() {
   )
 }
 
+// 지도 초기 진입 시 기본 레벨(initMap의 level 기본값)과 맞춘다 - "내 위치로" 눌렀을 때도
+// 매번 같은 배율(주변 매장이 보이는 정도)로 고정해서, 이전에 확대/축소해뒀던 배율에
+// 상관없이 일관된 화면을 보여준다.
+const RECENTER_ZOOM_LEVEL = 3
+
 function recenterToMyLocation() {
   if (!mapInstance || !kakaoInstance) return
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition((position) => {
+  if (!navigator.geolocation) {
+    toast.error('이 브라우저에서는 위치 정보를 사용할 수 없어요.')
+    return
+  }
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
       myLocation.value = { lat: position.coords.latitude, lng: position.coords.longitude }
       const center = new kakaoInstance.maps.LatLng(position.coords.latitude, position.coords.longitude)
+      mapInstance.setLevel(RECENTER_ZOOM_LEVEL)
       mapInstance.panTo(center)
-    })
-  }
+    },
+    // 권한 거부/타임아웃 등으로 실패해도 예전엔 아무 반응이 없어서 버튼이 먹통처럼
+    // 보였다 - 실패 이유를 몰라도 최소한 뭔가 반응은 있어야 한다.
+    () => {
+      toast.error('현재 위치를 가져오지 못했어요. 위치 권한을 확인해주세요.')
+    },
+    { enableHighAccuracy: true },
+  )
 }
 
 function onChipsWheel(event) {
