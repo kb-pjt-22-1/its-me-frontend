@@ -340,6 +340,12 @@ async function issuePaymentToken() {
   }
 }
 
+// isIssuingToken을 소스 계산에 넣는 것이 의도적이다: createPaymentToken 액션은 currentToken을
+// 먼저 채운 뒤(아직 isIssuingToken=true인 시점) finally에서 isIssuingToken을 false로 내린다.
+// 소스에 isIssuingToken을 넣어야 그 전환 자체가 "값이 바뀜"으로 잡혀 워처가 재평가된다 -
+// currentToken.tokenValue만 소스로 쓰면 토큰이 채워진 시점엔 아직 isIssuingToken=true라
+// 콜백이 조기 return하고, 이후 플래그만 내려가도 tokenValue 자체는 안 바뀌었으니 다시
+// 트리거되지 않는다.
 watch(
     () => isAuthenticated.value && !isIssuingToken.value ? paymentStore.currentToken?.tokenValue : null,
     async (tokenValue) => {
