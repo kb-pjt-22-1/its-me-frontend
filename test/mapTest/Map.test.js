@@ -268,7 +268,7 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     expect(getClusterer().markers).toHaveLength(2) // 추천 여부와 무관하게 둘 다 핀으로 뜬다
     const cafePin = getClusterer().markers.find((m) => m.title === '동네 카페')
     const martPin = getClusterer().markers.find((m) => m.title === '동네 마트')
-    expect(decodedPinSvg(cafePin)).toContain('fill="#ffbc00"')
+    expect(decodedPinSvg(cafePin)).toContain('fill="#00a878"')
     expect(decodedPinSvg(martPin)).toContain('fill="#999999"')
   })
 
@@ -286,10 +286,10 @@ describe('지도 화면(bounds) 매장 조회 및 핀 렌더링', () => {
     const pinsInOrder = recommendedMerchants.map((m) => markers.find((marker) => marker.title === m.name))
 
     pinsInOrder.slice(0, 10).forEach((pin) => {
-      expect(decodedPinSvg(pin)).toContain('fill="#ffbc00"')
+      expect(decodedPinSvg(pin)).toContain('fill="#00a878"')
     })
     pinsInOrder.slice(10).forEach((pin) => {
-      expect(decodedPinSvg(pin)).toContain('fill="#16b88a"')
+      expect(decodedPinSvg(pin)).toContain('fill="#ffbc00"')
     })
   })
 

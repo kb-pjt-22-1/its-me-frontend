@@ -1043,10 +1043,11 @@ function onResearchClick() {
 const PIN_WIDTH = 30
 const PIN_HEIGHT = 36
 
-// 추천 매장 = 노랑 / 혜택 가능 매장 = 초록 / 일반 매장 = 회색
+// top(혜택 매장 중 상위 10곳) = 초록(--green) / benefit(나머지 혜택 매장) = 노랑(--orange) /
+// none(혜택 없음) = 회색. 클러스터 배지 테두리 색(onClustered)과 반드시 같은 값을 써야 한다.
 const PIN_TIER_COLORS = {
-  top: '#ffbc00',
-  benefit: '#16b88a',
+  top: '#00a878',
+  benefit: '#ffbc00',
   none: '#999999',
 }
 
