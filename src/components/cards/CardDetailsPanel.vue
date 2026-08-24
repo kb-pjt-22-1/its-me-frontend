@@ -28,7 +28,7 @@
       <section class="surface-card status-section">
         <p class="section-label">이번 달 이용실적</p>
         <template v-if="typeof card.currentAmount === 'number'">
-          <h3 class="tier-label">{{ tierLabel }}</h3>
+          <h3 class="tier-label">{{ progressTierLabel }}</h3>
           <div class="progress-track"><div class="progress-fill" :style="{ width: `${tierPercent}%` }"></div></div>
           <p class="recognized-amount muted-text">
             실적인정금액 <strong>{{ card.currentAmount.toLocaleString() }}원</strong>
@@ -159,6 +159,13 @@ const isActive = computed(() => props.card?.status === 'ACTIVE')
 const performanceTiers = computed(() => [...(props.card?.benefitsInfo?.performanceTiers ?? [])].sort((a, b) => (a.minimumSpending ?? 0) - (b.minimumSpending ?? 0)))
 const currentTier = computed(() => props.card?.benefitsInfo ? getCurrentTier(props.card.benefitsInfo, props.card.previousMonthAmount ?? 0) : null)
 const tierLabel = computed(() => currentTier.value?.tierName ?? '0구간')
+// "이번 달 이용실적" 진행률 섹션 전용 - 위 currentTier/tierLabel(전월 실적 기준, 실제
+// 적용 중인 혜택을 나타내는 "이번 달 혜택" 섹션용)과 달리, 이 섹션은 이번 달 누적액
+// (currentAmount) 기준으로 지금까지 쌓인 실적이 어느 구간에 도달했는지를 보여준다.
+// 같은 값을 쓰면 진행 바/목표 금액은 currentAmount로 커지는데 구간 이름표만 전월 실적에
+// 묶여 안 바뀌는 것처럼 보이는 불일치가 생긴다.
+const progressTier = computed(() => props.card?.benefitsInfo ? getCurrentTier(props.card.benefitsInfo, props.card?.currentAmount ?? 0) : null)
+const progressTierLabel = computed(() => progressTier.value?.tierName ?? '0구간')
 const nextTier = computed(() => performanceTiers.value.find((tier) => (tier.minimumSpending ?? 0) > (props.card?.currentAmount ?? 0)) ?? null)
 const nextTargetAmount = computed(() => nextTier.value?.minimumSpending ?? null)
 const tierPercent = computed(() => nextTargetAmount.value === null || nextTargetAmount.value === 0 ? 100 : Math.min(((props.card?.currentAmount ?? 0) / nextTargetAmount.value) * 100, 100))
