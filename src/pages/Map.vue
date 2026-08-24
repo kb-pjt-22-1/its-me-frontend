@@ -2,7 +2,7 @@
   <div ref="mapPage" class="map-page">
     <div ref="mapContainer" class="map-container"></div>
     <div v-if="loadError" class="map-error">
-      지도를 불러오지 못했습니다: {{ loadError }}
+      {{ loadError }}
     </div>
 
     <div class="map-overlay-top">
@@ -1375,7 +1375,8 @@ onMounted(async () => {
   try {
     kakao = await loadKakaoMapScript()
   } catch (err) {
-    loadError.value = err.message
+    console.error('카카오맵 로드 실패', err.message)
+    loadError.value = '지도를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
     return
   }
 

@@ -1621,7 +1621,7 @@ describe('지도 이동 시 마지막 위치 저장 및 재검색 버튼(카테�
       existingScript.dispatchEvent(new Event('error'))
       await flushPromises()
 
-      expect(wrapper.find('.map-error').text()).toContain('카카오맵 스크립트 로드 실패')
+      expect(wrapper.find('.map-error').text()).toContain('지도를 불러오지 못했습니다.')
     } finally {
       existingScript.remove()
     }
