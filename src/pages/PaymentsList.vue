@@ -23,7 +23,6 @@
       <template v-else>
         <Button
           tag="div" variant="box" class="summary-card"
-          style="flex-direction: row; justify-content: space-between; align-items: center; min-height: auto;"
         >
           <div class="summary-text">
             <p>{{ monthShort }} 총 결제</p>
@@ -214,7 +213,14 @@ onMounted(() => {
 
 .loading-text, .empty-text { text-align: center; padding: 60px 0; font-size: 0.9rem; }
 
-.summary-card { padding: 22px; margin-bottom: 1px; }
+.summary-card {
+  padding: 22px;
+  margin-bottom: 1px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  min-height: auto;
+}
 .summary-text p, .summary-benefit p { margin: 0 0 8px; font-size: 12px; color: rgba(255, 255, 255, .75); }
 .summary-text h2 { margin: 0; font-size: 20px; color: #ffffff; }
 .summary-benefit { text-align: right; }

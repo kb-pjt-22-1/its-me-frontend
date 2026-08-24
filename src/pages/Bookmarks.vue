@@ -25,7 +25,6 @@
           :key="shop.merchantId"
           variant="box-outline"
           class="store-card"
-          style="flex-direction: row; align-items: center; min-height: auto; gap: 15px;"
           @click="goToStore(shop.merchantId)"
         >
           <div class="store-icon"><img :src="shop.categoryIcon" alt="" /></div>
@@ -152,6 +151,10 @@ const handleRemove = async (merchantId) => {
 :deep(.store-card.btn--box-outline) {
   padding: 14px 16px;
   border: 1.5px solid var(--line, #e7e4de);
+  flex-direction: row;
+  align-items: center;
+  min-height: auto;
+  gap: 15px;
 }
 
 .store-icon {
