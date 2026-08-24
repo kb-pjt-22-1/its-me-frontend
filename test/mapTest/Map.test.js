@@ -35,8 +35,8 @@ vi.mock('@/utils/imageDataUri', () => ({
   toDataUri: vi.fn((url) => Promise.resolve(url ?? null)),
 }))
 
-// 매장 상세(바텀시트)의 "이 매장 추천 카드"는 Storedetail.vue와 같은 백엔드 엔드포인트를
-// 쓴다 - 프론트에서 카드 혜택을 자체 매칭하지 않으므로 이 서비스만 목으로 대체하면 된다.
+// 매장 상세(바텀시트)의 "이 매장 추천 카드"는 백엔드 엔드포인트를 그대로 쓴다 - 프론트에서
+// 카드 혜택을 자체 매칭하지 않으므로 이 서비스만 목으로 대체하면 된다.
 vi.mock('@/services/recommendationService', () => ({
   fetchMerchantCardRecommendations: vi.fn(),
 }))
@@ -1557,8 +1557,8 @@ describe('다른 화면에서 넘어온 쿼리로 지도 상태를 복원한다'
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
   })
 
-  it('홈 화면 추천에서 ?merchantId=&lat=&lng=로 들어오면 그 좌표로 지도를 옮기고, 검색 결과가 도착하면 해당 매장 상세를 연다', async () => {
-    const { kakao, trigger, mapInstance } = createKakaoMock()
+  it('홈 화면 추천에서 ?merchantId=&lat=&lng=로 들어오면 그 좌표로 지도를 옮기고, idle을 기다리지 않고 바로 그 위치를 재검색해 매장 상세를 연다', async () => {
+    const { kakao, mapInstance } = createKakaoMock()
     window.kakao = kakao
     routeMock.query = { merchantId: String(CAFE_MERCHANT.id), lat: '37.5', lng: '127.1' }
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
@@ -1568,28 +1568,25 @@ describe('다른 화면에서 넘어온 쿼리로 지도 상태를 복원한다'
 
     expect(mapInstance.setCenter).toHaveBeenCalled()
     expect(fetchMerchantDetail).not.toHaveBeenCalled() // lat/lng이 이미 왔으니 상세 조회로 좌표를 다시 구할 필요가 없다
-    // 최초 검색 결과가 도착하면 그 매장 상세가 자동으로 열린다.
-    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
-
-    // setCenter로 지도를 옮긴 뒤 실제로 idle해지면, 옮긴 위치 기준으로 한 번 더 재검색한다.
-    fetchRecommendedNearbyMerchants.mockClear()
-    trigger(mapInstance, 'idle')
-    await flushPromises()
+    // idle 이벤트를 기다리지 않고, 옮긴 위치 기준 재검색이 바로 한 번만 나가고 그 결과로 상세가 열린다.
     expect(fetchRecommendedNearbyMerchants).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
   })
 
-  it('?merchantId=만 있고 좌표가 없으면 매장 상세를 조회해 그 좌표로 지도를 옮긴다', async () => {
+  it('?merchantId=만 있고 좌표가 없으면 매장 상세를 조회해 그 좌표로 지도를 옮기고, 바로 재검색해 매장 상세를 연다', async () => {
     const { kakao, mapInstance } = createKakaoMock()
     window.kakao = kakao
     routeMock.query = { merchantId: String(CAFE_MERCHANT.id) }
     fetchMerchantDetail.mockResolvedValue({ ...CAFE_MERCHANT, lat: 37.55, lng: 127.15 })
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
 
-    mountMapPage()
+    const wrapper = mountMapPage()
     await flushPromises()
 
     expect(fetchMerchantDetail).toHaveBeenCalledWith(CAFE_MERCHANT.id)
     expect(mapInstance.setCenter).toHaveBeenCalled()
+    expect(fetchRecommendedNearbyMerchants).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
   })
 
   it('일반 진입(쿼리 없음)이어도 이전에 보던 매장 상세가 mapViewStore에 남아있으면, 검색 결과가 도착하는 대로 다시 그 상세를 연다', async () => {

@@ -107,7 +107,10 @@ const enrichedBookmarks = computed(() =>
   })
 );
 
-const goToStore = (merchantId) => router.push(`/stores/${merchantId}`);
+// 매장 상세 페이지로 바로 가지 않고 지도 화면으로 이동해서 그 매장의 상세(바텀시트)를
+// 띄운다. Map.vue의 focusMerchantFromQuery가 이 merchantId 쿼리를 보고 지도를 그 매장
+// 위치로 옮긴 뒤 상세를 연다 (Home.vue의 goToMerchantOnMap과 동일한 패턴).
+const goToStore = (merchantId) => router.push({ path: '/map', query: { merchantId } });
 
 const handleRemove = async (merchantId) => {
   try {

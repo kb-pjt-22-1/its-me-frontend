@@ -72,7 +72,7 @@ describe('알림 클릭 라우팅', () => {
     await wrapper.find('.notification-item').trigger('click')
     await flushPromises()
 
-    expect(pushMock).toHaveBeenCalledWith('/stores/99')
+    expect(pushMock).toHaveBeenCalledWith({ path: '/map', query: { merchantId: 99 } })
   })
 })
 

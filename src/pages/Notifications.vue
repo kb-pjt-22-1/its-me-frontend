@@ -43,9 +43,12 @@ import { useRouter } from 'vue-router';
 import { useNotificationsStore } from '@/stores/notifications';
 
 // 알림 종류별로 눌렀을 때 어디로 보낼지 - 새 종류가 추가되면 여기 한 줄만 늘리면 된다.
+// NEARBY_MERCHANT는 매장 상세 페이지 대신 지도 화면으로 보낸다 - Map.vue의
+// focusMerchantFromQuery가 merchantId 쿼리를 보고 그 매장 위치로 이동해 상세(바텀시트)를
+// 연다 (Home.vue의 goToMerchantOnMap과 동일한 패턴).
 const ROUTE_BUILDERS = {
   PAYMENT_APPROVED: (relatedId) => `/payments/${relatedId}`,
-  NEARBY_MERCHANT: (relatedId) => `/stores/${relatedId}`,
+  NEARBY_MERCHANT: (relatedId) => ({ path: '/map', query: { merchantId: relatedId } }),
 };
 
 const router = useRouter();
