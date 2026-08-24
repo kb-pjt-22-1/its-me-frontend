@@ -9,9 +9,8 @@ vi.mock('vue-router', () => ({
   useRouter: () => routerMock,
 }))
 
-const { mockToastError, mockConfirm } = vi.hoisted(() => ({
+const { mockToastError } = vi.hoisted(() => ({
   mockToastError: vi.fn(),
-  mockConfirm: vi.fn(),
 }))
 
 vi.mock('@/composables/useToast', () => ({
@@ -20,10 +19,6 @@ vi.mock('@/composables/useToast', () => ({
     error: mockToastError,
     info: vi.fn(),
   }),
-}))
-
-vi.mock('@/composables/useConfirmDialog', () => ({
-  useConfirmDialog: () => ({ confirm: mockConfirm }),
 }))
 
 import Carddetail from '@/pages/Carddetail.vue'
@@ -90,7 +85,6 @@ async function mountPage(cardOverrides = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockConfirm.mockResolvedValue(true)
   window.console.error = vi.fn()
 })
 
@@ -138,28 +132,44 @@ describe('이번 달 이용실적 진행률 (currentAmount 기준)', () => {
 // 실제로 적용 중인 할인 구간(카드 혜택 목록)은 전월 실적(previousMonthAmount) 기준이다 -
 // performanceTiers[].minimumSpending이 전월 실적 기준이라서다(cardService.js getCurrentTier
 // 주석 참고). 마이핏카드(할인형)에서 "적용 가능한 혜택이 없다"고 잘못 뜨던 버그의 회귀 테스트.
-describe('카드 혜택 적용 구간 (previousMonthAmount 기준)', () => {
-  it('전월 실적이 없으면 0구간이라 혜택이 없다고 표시한다', async () => {
-    const { wrapper } = await mountPage({ previousMonthAmount: 0 })
+describe('이번 달 혜택 (previousMonthAmount/previousPerformanceMet 기준)', () => {
+  it('전월 실적 미충족이면 혜택 목록 대신 미충족 안내를 표시한다', async () => {
+    const { wrapper } = await mountPage({
+      previousMonthAmount: 0,
+      previousPerformanceMet: false,
+      previousRemainingAmount: 100000,
+    })
 
     expect(wrapper.find('.tier-label').text()).toBe('0구간')
-    expect(wrapper.text()).toContain('현재 실적 구간의 혜택이 없어요')
+    expect(wrapper.find('.previous-performance-status').text()).toContain('전월 이용실적')
+    expect(wrapper.find('.previous-performance-status').text()).toContain('0원')
+    expect(wrapper.find('.performance-status-badge').text()).toBe('실적 미충족')
+    expect(wrapper.text()).toContain('이번 달 카드 혜택을 받을 수 없어요')
+    expect(wrapper.text()).toContain('다음 혜택 적용까지 100,000원이 부족했어요')
+    expect(wrapper.find('.benefit-row').exists()).toBe(false)
   })
 
   it('전월 실적이 구간 기준을 채우면 그 구간의 혜택을 표시한다', async () => {
-    const { wrapper } = await mountPage({ previousMonthAmount: 100000 })
+    const { wrapper } = await mountPage({ previousMonthAmount: 100000, previousPerformanceMet: true })
 
     expect(wrapper.find('.tier-label').text()).toBe('1구간')
-    expect(wrapper.text()).toContain('카드 혜택 - 1구간 기준')
+    expect(wrapper.find('.benefits-header .section-label').text()).toBe('이번 달 혜택 · 1구간')
+    expect(wrapper.find('.previous-performance-status').text()).toContain('100,000원')
+    expect(wrapper.find('.performance-status-badge').text()).toBe('실적 충족')
     expect(wrapper.text()).toContain('카페')
     expect(wrapper.text()).toContain('10% 할인')
   })
 
-  it('이번 달 사용액이 구간 기준을 넘었어도, 전월 실적이 못 미치면 혜택 구간은 낮게 유지된다', async () => {
-    const { wrapper } = await mountPage({ currentAmount: 250000, previousMonthAmount: 0 })
+  it('이번 달 사용액이 구간 기준을 넘었어도 전월 실적 미충족이면 혜택 목록을 표시하지 않는다', async () => {
+    const { wrapper } = await mountPage({
+      currentAmount: 250000,
+      previousMonthAmount: 0,
+      previousPerformanceMet: false,
+    })
 
     expect(wrapper.find('.tier-label').text()).toBe('0구간')
-    expect(wrapper.text()).toContain('현재 실적 구간의 혜택이 없어요')
+    expect(wrapper.text()).toContain('전월 이용실적을 충족하지 못했어요')
+    expect(wrapper.find('.benefit-row').exists()).toBe(false)
     // 진행률 표시는 currentAmount 기준 그대로라 100%로 보인다 - 이 둘이 서로 다른 기준을
     // 쓴다는 게 이번 수정의 핵심이라 같이 확인해둔다.
     expect(wrapper.find('.progress-fill').attributes('style')).toContain('width: 100%')
@@ -196,38 +206,29 @@ describe('대표 카드 설정 실패 처리', () => {
   })
 })
 
-describe('카드 삭제 처리', () => {
-  it('deleteCard가 실패하면 에러를 표시하고 페이지를 이동하지 않는다', async () => {
-    const { wrapper, cardsStore } = await mountPage()
-    vi.spyOn(cardsStore, 'deleteCard').mockRejectedValueOnce(new Error('server error'))
+describe('카드 삭제 UI 제거', () => {
+  it('활성 카드 상세에 삭제 버튼과 삭제 문구를 표시하지 않는다', async () => {
+    const { wrapper } = await mountPage()
 
-    await wrapper.find('.delete-card-btn').trigger('click')
-    await flushPromises()
-
-    expect(console.error).toHaveBeenCalledWith('카드 삭제 실패', 'server error')
-    expect(mockToastError).toHaveBeenCalledWith('카드 삭제에 실패했습니다. 다시 시도해주세요.')
-    expect(routerMock.push).not.toHaveBeenCalled()
+    expect(wrapper.find('.delete-card-btn').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('카드 삭제')
   })
 
-  it('삭제 전에 danger 확인 다이얼로그를 표시한다', async () => {
-    const { wrapper, cardsStore } = await mountPage()
-    vi.spyOn(cardsStore, 'deleteCard').mockResolvedValue()
+  it('대표 카드인 경우에도 삭제 UI를 표시하지 않는다', async () => {
+    const { wrapper } = await mountPage({ isPrimary: true })
 
-    await wrapper.find('.delete-card-btn').trigger('click')
-    await flushPromises()
-
-    expect(mockConfirm).toHaveBeenCalledWith(
-        '이 카드를 삭제할까요? 되돌릴 수 없습니다.',
-        { danger: true },
-    )
+    expect(wrapper.find('.delete-card-btn').exists()).toBe(false)
+    expect(wrapper.find('.primary-badge').text()).toBe('대표 카드')
   })
 
-  it('사용자가 취소하면 카드 삭제를 시도하지 않는다', async () => {
+  it('남아 있는 카드 액션을 사용해도 deleteCard를 호출하지 않는다', async () => {
     const { wrapper, cardsStore } = await mountPage()
-    mockConfirm.mockResolvedValue(false)
     const deleteSpy = vi.spyOn(cardsStore, 'deleteCard')
+    vi.spyOn(cardsStore, 'toggleRecommendation').mockResolvedValue()
+    vi.spyOn(cardsStore, 'setPrimary').mockResolvedValue()
 
-    await wrapper.find('.delete-card-btn').trigger('click')
+    await wrapper.find('.recommendation-toggle').trigger('click')
+    await wrapper.find('.set-primary-btn').trigger('click')
     await flushPromises()
 
     expect(deleteSpy).not.toHaveBeenCalled()

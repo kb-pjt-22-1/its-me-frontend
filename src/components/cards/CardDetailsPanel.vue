@@ -41,24 +41,85 @@
 
       <section class="surface-card benefits-section">
         <div class="benefits-header">
-          <p class="section-label">카드 혜택 - {{ tierLabel }} 기준</p>
+          <div class="benefits-title-wrap">
+            <p class="section-label">이번 달 혜택
+              <template v-if="card.previousPerformanceMet === true">· <strong class="applied-tier">{{ tierLabel }}</strong></template>
+            </p>
+          </div>
+
           <button
-            v-if="performanceTiers.length"
-            ref="tierBenefitsLink"
-            type="button"
-            class="tier-benefits-link"
-            @click="openTierBenefitsSheet"
+              v-if="performanceTiers.length"
+              ref="tierBenefitsLink"
+              type="button"
+              class="tier-benefits-link"
+              @click="openTierBenefitsSheet"
           >
             구간별 혜택보기 &gt;
           </button>
         </div>
-        <template v-if="currentTierBenefits.length">
-          <div v-for="(benefit, index) in currentTierBenefits" :key="index" class="benefit-row">
-            <span class="benefit-cat">{{ benefit.categoryName }}</span>
-            <span class="benefit-rate">{{ formatBenefit(benefit) }}</span>
-          </div>
+
+        <div v-if="typeof card.previousPerformanceMet === 'boolean'" class="previous-performance-status">
+          <strong class="previous-performance-title">전월 이용실적</strong>
+          <span v-if="typeof card.previousMonthAmount === 'number'" class="previous-performance-amount">{{ card.previousMonthAmount.toLocaleString() }}원</span>
+          <span
+            class="performance-status-badge"
+            :class="{
+              'performance-status-badge--met':
+                card.previousPerformanceMet,
+              'performance-status-badge--unmet':
+                !card.previousPerformanceMet,
+            }"
+          >
+            {{ card.previousPerformanceMet ? '실적 충족' : '실적 미충족' }}
+          </span>
+        </div>
+
+        <!-- 전월 실적을 충족한 경우에만 이번 달 혜택 표시 -->
+        <template v-if="card.previousPerformanceMet === true">
+          <template v-if="currentTierBenefits.length">
+            <div
+                v-for="(benefit, index) in currentTierBenefits"
+                :key="index"
+                class="benefit-row"
+            >
+        <span class="benefit-cat">
+          {{ benefit.categoryName }}
+        </span>
+
+              <span class="benefit-rate">
+          {{ formatBenefit(benefit) }}
+        </span>
+            </div>
+          </template>
+
+          <p v-else class="muted-text">
+            현재 적용되는 카드 혜택이 없어요.
+          </p>
         </template>
-        <p v-else class="muted-text">현재 실적 구간의 혜택이 없어요.</p>
+
+        <!-- 전월 실적 미충족 -->
+        <div
+            v-else-if="card.previousPerformanceMet === false"
+            class="performance-unmet-notice"
+        >
+          <strong>이번 달 카드 혜택을 받을 수 없어요</strong>
+
+          <p class="muted-text">
+            전월 이용실적을 충족하지 못했어요.
+            <template
+                v-if="typeof card.previousRemainingAmount === 'number'"
+            >
+              다음 혜택 적용까지
+              {{ card.previousRemainingAmount.toLocaleString() }}원이
+              부족했어요.
+            </template>
+          </p>
+        </div>
+
+        <!-- 전월 실적 조회 실패 -->
+        <p v-else class="muted-text">
+          전월 실적 정보를 불러오지 못했어요.
+        </p>
       </section>
 
       <section class="surface-card recommendation-section">
@@ -74,8 +135,6 @@
       <button v-else class="set-primary-btn" @click="handleSetPrimary">대표 카드로 설정</button>
     </template>
 
-    <button class="delete-card-btn danger-text" @click="handleDeleteCard">카드 삭제</button>
-
     <TierBenefitsSheet
       :open="isTierBenefitsSheetOpen"
       :tiers="performanceTiers"
@@ -90,14 +149,12 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useCardsStore } from '@/stores/cards'
 import { getCurrentTier, formatBenefit } from '@/services/cardService'
 import { useToast } from '@/composables/useToast'
-import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import TierBenefitsSheet from '@/components/cards/TierBenefitsSheet.vue'
 
 const props = defineProps({ card: { type: Object, default: null }, loading: Boolean, error: { type: String, default: '' } })
 const emit = defineEmits(['retry', 'deleted', 'primary-changed'])
 const cardsStore = useCardsStore()
 const toast = useToast()
-const confirmDialog = useConfirmDialog()
 const isActive = computed(() => props.card?.status === 'ACTIVE')
 const performanceTiers = computed(() => [...(props.card?.benefitsInfo?.performanceTiers ?? [])].sort((a, b) => (a.minimumSpending ?? 0) - (b.minimumSpending ?? 0)))
 const currentTier = computed(() => props.card?.benefitsInfo ? getCurrentTier(props.card.benefitsInfo, props.card.previousMonthAmount ?? 0) : null)
@@ -135,15 +192,41 @@ async function handleSetPrimary() {
   }
   catch (err) { console.error('대표 카드 설정 실패', err.message); toast.error('대표 카드 설정에 실패했습니다. 다시 시도해주세요.') }
 }
-async function handleDeleteCard() {
-  if (!(await confirmDialog.confirm('이 카드를 삭제할까요? 되돌릴 수 없습니다.', { danger: true }))) return
-  const deletedId = props.card.userCardId
-  try { await cardsStore.deleteCard(deletedId); emit('deleted', deletedId) }
-  catch (err) { console.error('카드 삭제 실패', err.message); toast.error('카드 삭제에 실패했습니다. 다시 시도해주세요.') }
-}
 </script>
 
 <style scoped>
+.previous-performance-status { display:flex; align-items:center; gap:8px; margin:12px 0 16px; padding:12px 14px; border-radius:12px; background:#f7f7f5; }
+.previous-performance-title { flex:0 0 auto; color:var(--charcoal,#24211d); font-size:13px;  }
+.previous-performance-amount { color:var(--muted,#8f897f); font-size:12px; white-space:nowrap; }
+.performance-status-badge { flex:0 0 auto; margin-left:auto; padding:5px 9px; border-radius:999px; font-size:11px; font-weight:800; white-space:nowrap; }
+.performance-status-badge--met { background:#e6f6ee; color:#25845b; }
+.performance-status-badge--unmet { background:#fff3d6; color:#b87500; }
+
+.applied-tier {
+  color: inherit;
+  font-size: inherit;
+  white-space: nowrap;
+}
+
+.performance-unmet-notice {
+  padding: 18px 14px;
+  border-radius: 12px;
+  background: #fff8e8;
+  text-align: center;
+}
+
+.performance-unmet-notice strong {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--charcoal, #24211d);
+  font-size: 14px;
+}
+
+.performance-unmet-notice p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
 .surface-card { padding: 20px; margin-bottom: 14px; }
 .detail-state { text-align: center; color: var(--muted, #8f897f); min-height: 100px; display: grid; place-items: center; }
 .detail-state p { margin: 0 0 12px; }
@@ -159,9 +242,10 @@ async function handleDeleteCard() {
 .progress-track { margin-bottom: 10px; }
 .recognized-amount { margin: 0; font-size: 13px; }
 .recognized-amount strong { color: var(--charcoal, #24211d); margin-left: 4px; }
-.benefits-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-.benefits-header .section-label { margin-bottom: 0; }
-.tier-benefits-link { flex: 0 0 auto; padding: 4px 0 4px 8px; border: 0; background: transparent; color: var(--muted, #8f897f); font-size: 12px; font-weight: 500; }
+.benefits-header {display: flex;align-items: center;justify-content: space-between;gap: 12px;margin-bottom: 8px;}
+.benefits-title-wrap {min-width: 0;display: flex;align-items: center;gap: 8px;}
+.benefits-title-wrap .section-label {flex: 0 0 auto;margin: 0;}
+.tier-benefits-link {flex: 0 0 auto;padding: 4px 0 4px 8px;border: 0;background: transparent;color: var(--muted, #8f897f);font-size: 12px;font-weight: 500;}
 .benefit-row { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; font-size: 12.5px; }
 .benefit-row + .benefit-row { border-top: 1px solid var(--line, #e7e4de); }
 .benefit-cat, .benefit-rate { font-weight: 700; }
@@ -184,5 +268,5 @@ async function handleDeleteCard() {
   color: var(--charcoal, #24211d);
   font-size: 15px;
   font-weight: 700;
-}.delete-card-btn { width: 100%; height: 44px; margin-top: 5px; border: 0; background: transparent; font-weight: 700; font-size: 13px; }
+}
 </style>

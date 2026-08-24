@@ -152,7 +152,7 @@
         </div>
 
         <p class="section-sub muted-text">
-          보유한 전체 카드의 카테고리별 혜택 현황이에요.
+          보유한 전체 카드의 카테고리별 혜택 현황
         </p>
       </div>
 
@@ -268,8 +268,8 @@
 
                 <p class="be-status-title">
                   {{ card.isBreakEven
-                    ? `${card.breakEvenDateLabel}, 연회비 본전을 뽑았어요`
-                    : '아직 연회비 본전 전이에요' }}
+                    ? `${card.breakEvenDateLabel}, 연회비 본전을 달성했어요`
+                    : '아직 연회비 본전 달성 전이에요' }}
                 </p>
               </div>
 
