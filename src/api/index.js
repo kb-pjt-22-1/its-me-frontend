@@ -22,6 +22,25 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// 이 (메서드, 경로) 조합은 세션(토큰) 유효성이 아니라 "지금 입력한 값 자체"를 검증한다 -
+// 401은 토큰 만료가 아니라 현재 비밀번호/PIN이 틀렸다는 뜻이라, 토큰을 갱신해서 그대로
+// 재시도해봐야 같은 값으로 또 401만 받는다. 그런데도 재시도를 강행하면 백엔드에 같은 오답을
+// 두 번 보내게 되어, 5회 실패 잠금 카운터가 사용자의 한 번의 오답 입력을 두 번으로 세어버린다
+// (실제로는 5회를 채워야 잠기는데 3회만 틀려도 잠기는 버그의 원인이었다). registerPin(최초
+// PIN 등록, POST)은 대조할 기존 PIN이 없어 이 목록에 없다 - 그 401은 진짜 토큰 만료일 수 있다.
+const REAUTH_VALUE_CHECK_REQUESTS = [
+  { method: 'post', path: '/users/me/verify-pin' },
+  { method: 'post', path: '/users/me/verify-password' },
+  { method: 'put', path: '/users/me/pin' },
+  { method: 'put', path: '/users/me/password' },
+]
+
+function isReauthValueCheck(config) {
+  const path = config.url?.split('?')[0]
+  const method = config.method?.toLowerCase()
+  return REAUTH_VALUE_CHECK_REQUESTS.some((r) => r.method === method && path?.endsWith(r.path))
+}
+
 // 갱신이 진행 중이면 그 Promise를 재사용한다. 동시에 401을 받은 요청이 여러 개일 때
 // 각자 갱신을 부르면 같은 refreshToken을 여러 번 쓰게 되는데, 백엔드는 이걸 탈취로 보고
 // 세션을 통째로 끊는다(refresh 토큰 재사용 탐지). 그래서 갱신은 반드시 한 번만 해야 한다.
@@ -61,7 +80,8 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       original &&
       !original._retry &&
-      !original.url?.startsWith('/auth/')
+      !original.url?.startsWith('/auth/') &&
+      !isReauthValueCheck(original)
 
     if (!shouldTryRefresh) {
       return Promise.reject(error)
@@ -70,10 +90,10 @@ api.interceptors.response.use(
     original._retry = true
 
     // 갱신 자체가 실패하는 경우와, 갱신엔 성공했는데 "새 토큰으로 다시 보낸 요청"이 또
-    // 401인 경우를 반드시 구분해야 한다. 후자는 흔하다 - 현재 비밀번호/PIN 재확인처럼
-    // 인증(로그인 여부)과 무관하게 401을 쓰는 엔드포인트가 여럿이라(InvalidCredentialsException),
-    // 토큰은 멀쩡한데 "입력한 값이 틀렸다"는 뜻일 뿐이다. 이걸 세션 만료로 오인해 로그아웃시키면
-    // PIN/비밀번호 화면이 오답을 보여줄 새도 없이 로그인 화면으로 튕겨버리게 된다.
+    // 401인 경우를 반드시 구분해야 한다. 알려진 재인증-값-검증 엔드포인트(PIN/비밀번호
+    // 재확인 등)는 위에서 이미 걸러졌지만, 그 목록에 없는 엔드포인트가 인증과 무관하게
+    // 401을 쓰는 경우도 있을 수 있다 - 이런 401까지 세션 만료로 오인해 로그아웃시키면
+    // 안 되므로, 재시도가 다시 401을 받아도 세션은 건드리지 않고 호출부에 그대로 넘긴다.
     let accessToken
     try {
       accessToken = await refreshAccessToken()

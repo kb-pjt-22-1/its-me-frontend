@@ -33,9 +33,9 @@ import { clearAuthStorage } from '@/utils/tokenStorage'
 // 모듈을 로드하는 부수효과로 인터셉터가 등록되고 state.errorHandler가 채워진다.
 import '@/api/index.js'
 
-function makeError({ status, url = '/users/me/verify-pin', retried = false }) {
+function makeError({ status, url = '/users/me', method = 'get', retried = false }) {
   return {
-    config: { url, headers: {}, _retry: retried },
+    config: { url, method, headers: {}, _retry: retried },
     response: { status, data: {} },
   }
 }
@@ -95,6 +95,35 @@ describe('갱신 자체가 실패하는 경우', () => {
     expect(clearAuthStorage).toHaveBeenCalled()
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'auth:session-expired' }))
     dispatchSpy.mockRestore()
+  })
+})
+
+describe('재인증 값 검증 엔드포인트(PIN/비밀번호)는 401이어도 재시도하지 않는다', () => {
+  // 이 PR이 고친 버그: 이 엔드포인트들의 401은 토큰 만료가 아니라 "입력한 값이 틀렸다"는
+  // 뜻인데, 예전 코드는 이걸 만료로 오인해 토큰을 갱신하고 같은(틀린) 값으로 재시도했다.
+  // 그 결과 사용자가 한 번 입력한 오답이 백엔드의 5회 실패 잠금 카운터에 두 번 기록돼,
+  // 실제로는 5번을 틀려야 잠기는데 3번만 틀려도 잠기는 문제가 있었다.
+  it.each([
+    { name: '결제 PIN 인증', method: 'post', url: '/users/me/verify-pin' },
+    { name: '개인정보 수정 재인증', method: 'post', url: '/users/me/verify-password' },
+    { name: 'PIN 변경(현재 PIN 검증 포함)', method: 'put', url: '/users/me/pin' },
+    { name: '비밀번호 변경(현재 비밀번호 검증 포함)', method: 'put', url: '/users/me/password' },
+  ])('$name ($method $url)은 갱신을 시도하지 않고 401을 그대로 던진다', async ({ method, url }) => {
+    const error = makeError({ status: 401, url, method })
+
+    await expect(handle(error)).rejects.toBe(error)
+    expect(axios.post).not.toHaveBeenCalled()
+  })
+
+  it('PIN 최초 등록(POST /users/me/pin)은 대조할 기존 값이 없으므로 계속 재시도 대상이다', async () => {
+    axios.post.mockResolvedValueOnce({ data: { accessToken: 'new-access', refreshToken: 'new-refresh' } })
+    state.instance.mockResolvedValueOnce({ data: 'retry-succeeded' })
+    const error = makeError({ status: 401, url: '/users/me/pin', method: 'post' })
+
+    const result = await handle(error)
+
+    expect(axios.post).toHaveBeenCalledWith('/api/auth/refresh', { refreshToken: 'stored-refresh-token' })
+    expect(result).toEqual({ data: 'retry-succeeded' })
   })
 })
 
