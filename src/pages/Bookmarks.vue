@@ -66,12 +66,20 @@ const toast = useToast();
 const merchantsStore = useMerchantsStore();
 const cardsStore = useCardsStore();
 
-onMounted(() => {
-  bookmarksStore.fetchBookmarks();
-  if (merchantsStore.merchants.length === 0) merchantsStore.fetchMerchants();
+onMounted(async () => {
+  await bookmarksStore.fetchBookmarks();
   // fetchCards()는 실적만 받아오고 benefitsInfo는 안 채운다 - bestDiscountLabel이 그걸로
   // 매칭하니, 이 페이지가 뜨는 시점에 지금 가진 카드만큼만 받아온다.
   cardsStore.ensureBenefitsLoaded(cardsStore.cards.map((c) => c.userCardId));
+
+  // 매장 전체(2만 건+, LIMIT 없음)를 받는 대신, 지금 북마크한 매장들만 개별로 받는다.
+  const merchantIds = bookmarksStore.bookmarks
+    .map((b) => b.merchantId ?? b.merchant_id ?? b.merchant?.id)
+    .filter((id) => id != null);
+  await Promise.allSettled([
+    merchantsStore.fetchCategories(),
+    ...merchantIds.map((merchantId) => merchantsStore.fetchMerchantDetail(merchantId)),
+  ]);
 });
 
 // 보유 카드 중 이 매장 카테고리에 맞는 최고 혜택 찾기

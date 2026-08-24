@@ -52,7 +52,6 @@ import { computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useCardsStore } from '@/stores/cards';
-import { useMerchantsStore } from '@/stores/merchants';
 import { useBookmarksStore } from '@/stores/bookmarks';
 import { usePaymentStore } from '@/stores/payment';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -63,7 +62,6 @@ import { useLocationReporting } from '@/composables/useLocationReporting';
 
 const authStore = useAuthStore();
 const cardsStore = useCardsStore();
-const merchantsStore = useMerchantsStore();
 const bookmarksStore = useBookmarksStore();
 const paymentStore = usePaymentStore();
 const notificationsStore = useNotificationsStore();
@@ -74,7 +72,9 @@ const hasBottomNav = computed(() => route.name !== 'onboarding');
 
 function fetchAllUserData() {
   cardsStore.fetchCards();
-  merchantsStore.fetchMerchants();
+  // 매장 전체(2만 건+, LIMIT 없음)는 여기서 무조건 받지 않습니다 - 로그인마다 500ms+가 들고
+  // 지도 화면 진입 시점과 겹쳐 체감 로딩을 늘렸습니다. 매장 정보가 필요한 화면(Bookmarks,
+  // Storedetail 등)이 fetchMerchantDetail(id)로 필요한 것만 그때 받습니다.
   bookmarksStore.fetchBookmarks();
   paymentStore.fetchHistory();
   notificationsStore.fetchNotifications();
