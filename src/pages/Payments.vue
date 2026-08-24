@@ -163,8 +163,14 @@ const selectedCardLast4 = computed(() =>
 watch(() => cardsStore.cards, async (cards) => {
   if (!cards.length || selectedMethodId.value !== null) return;
 
-  if (queriedUserCardId && cardsStore.getById(queriedUserCardId)) selectedMethodId.value = queriedUserCardId;
-  else selectedMethodId.value = cardsStore.primaryCard?.userCardId ?? cards[0]?.userCardId;
+  if (queriedUserCardId && cardsStore.getById(queriedUserCardId)) {
+    selectedMethodId.value = queriedUserCardId;
+    // 매장 상세/지도/홈 추천에서 카드를 이미 골라 "결제하기"를 누르고 넘어온 경우다 - 여기서
+    // 카드를 다시 고르고 인증 버튼을 한 번 더 누르게 하지 않고, PIN 시트를 곧바로 띄운다.
+    openPinSheet();
+  } else {
+    selectedMethodId.value = cardsStore.primaryCard?.userCardId ?? cards[0]?.userCardId;
+  }
 
   await nextTick();
   centerSelectedCard('auto');

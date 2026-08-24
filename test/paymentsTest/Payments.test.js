@@ -134,6 +134,22 @@ describe('선택 카드 표시', () => {
   })
 })
 
+describe('매장 상세/지도 등에서 카드를 지정해 진입한 경우', () => {
+  it('쿼리에 userCardId가 있으면 PIN 시트가 별도 클릭 없이 곧바로 열린다', () => {
+    routeMock.query = { userCardId: '1' }
+
+    const { wrapper } = mountPage()
+
+    expect(wrapper.find('.pin-sheet-overlay').exists()).toBe(true)
+  })
+
+  it('쿼리에 userCardId가 없으면(일반 진입) PIN 시트가 자동으로 열리지 않는다', () => {
+    const { wrapper } = mountPage()
+
+    expect(wrapper.find('.pin-sheet-overlay').exists()).toBe(false)
+  })
+})
+
 describe('바코드 발급/렌더링', () => {
   it('PIN 인증에 성공하면 결제 토큰을 발급하고 JsBarcode로 바코드를 그린다', async () => {
     verifyPin.mockResolvedValue()
