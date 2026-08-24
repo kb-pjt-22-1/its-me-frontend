@@ -10,10 +10,6 @@
       <div class="right-placeholder"></div>
     </header>
 
-    <div class="store-banner">
-      <span class="banner-icon"><img :src="merchant.icon" alt="" /></span>
-    </div>
-
     <div class="store-info">
       <span class="pill pill--gold">{{ merchant.categoryName ?? merchant.categoryCode }}</span>
       <h1 class="store-name">{{ merchant.name }}</h1>
@@ -161,16 +157,6 @@ const goToPay = () => {
 .layout-container { padding: 18px 18px 40px; }
 .page-header { margin-bottom: 14px; }
 
-.store-banner {
-  height: 160px; border-radius: 18px; background: linear-gradient(135deg, #8a6a4a, #4a382a);
-  display: grid; place-items: center; margin-bottom: 16px;
-}
-.banner-icon {
-  width: 64px; height: 64px; border-radius: 50%; background: rgba(255, 255, 255, .25);
-  display: grid; place-items: center;
-}
-.banner-icon img { width: 30px; height: 30px; }
-
 .store-info { margin-bottom: 22px; }
 .pill { margin-bottom: 8px; }
 .store-name { margin: 0 0 6px; font-size: 19px; color: var(--charcoal, #24211d); }
@@ -231,7 +217,9 @@ const goToPay = () => {
 
 .pay-btn {
   width: 100%; height: 54px; border-radius: 14px; border: none;
-  background: var(--orange, #ffbc00); color: #ffbe49; font-weight: 900; font-size: 15px; cursor: pointer;
+  /* Payments.vue의 결제 CTA(.main-action-btn)와 문구 색을 통일 - 예전엔 배경과 거의 같은
+     밝은 노랑(#ffbe49)이라 글씨가 잘 안 보였다. */
+  background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900; font-size: 15px; cursor: pointer;
 }
 .not-found { padding-top: 60px; text-align: center; }
 </style>
