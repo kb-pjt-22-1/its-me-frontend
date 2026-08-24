@@ -734,17 +734,19 @@ function initMap(kakao, center, level) {
     mapViewStore.level = map.getLevel()
   })
 
-  if (!route.query.merchantId) {
-    restoreSelectedMerchant(selectedMerchantId.value)
-  }
-
-  if (selectedCategory.value) {
-    searchCategoryInView(selectedCategory.value)
+  if (route.query.merchantId) {
+    // focusMerchantFromQuery()가 매장 위치로 지도를 옮긴 뒤 그 위치 기준으로 직접
+    // 재검색하므로, 여기서 옮기기 전 화면 기준으로 먼저 검색할 필요가 없다 - 굳이 하면
+    // 낭비고, 늦게 도착해 방금 옮긴 결과를 덮어쓸 위험만 생긴다.
+    focusMerchantFromQuery()
   } else {
-    searchNearbyCurrentView()
+    restoreSelectedMerchant(selectedMerchantId.value)
+    if (selectedCategory.value) {
+      searchCategoryInView(selectedCategory.value)
+    } else {
+      searchNearbyCurrentView()
+    }
   }
-
-  focusMerchantFromQuery()
 }
 
 function restoreSelectedMerchant(merchantId) {
@@ -771,17 +773,15 @@ async function focusMerchantFromQuery() {
   }
 
   mapInstance.setCenter(new kakaoInstance.maps.LatLng(lat, lng))
-  kakaoInstance.maps.event.addListener(mapInstance, 'idle', function onIdleOnce() {
-    kakaoInstance.maps.event.removeListener(mapInstance, 'idle', onIdleOnce)
-    searchNearbyCurrentView()
-  })
+  // 'idle' 이벤트를 기다리지 않고 옮긴 위치 기준으로 바로 재검색한다 - setCenter는 애니메이션
+  // 없이 즉시 반영되어 getBounds()가 이 시점에 이미 새 위치를 가리키는 반면, idle은 초기
+  // 렌더링 타이밍에 따라 붙는 시점이 들쭉날쭉해 북마크/알림에서 넘어왔을 때 종종 목록이
+  // 안 뜨고 사용자가 재검색 버튼을 직접 눌러야 하는 문제가 있었다.
+  await searchNearbyCurrentView()
 
-  const stopWatchingBounds = watch(boundsMerchants, (list) => {
-    if (list.some((m) => m.id === merchantId)) {
-      selectMerchant(merchantId)
-      stopWatchingBounds()
-    }
-  })
+  if (boundsMerchants.value.some((m) => m.id === merchantId)) {
+    selectMerchant(merchantId)
+  }
 }
 
 function onClusterClick(cluster) {

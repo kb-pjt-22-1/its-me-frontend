@@ -115,13 +115,6 @@ const router = createRouter({
             redirect: (to) => ({path: '/cards', query: {userCardId: String(to.params.userCardId)}}),
             meta: {requiresAuth: true, transition: STACK_TRANSITION},
         },
-        // 매장 목록/지도에서 매장을 눌렀을 때 들어가는 상세 화면
-        {
-            path: '/stores/:merchantId',
-            name: 'store-detail',
-            component: () => import('@/pages/Storedetail.vue'),
-            meta: {requiresAuth: true, transition: STACK_TRANSITION},
-        },
         // 헤더 '알림' 아이콘에서 진입하는 알림 목록 화면
         {
             path: '/notifications',
