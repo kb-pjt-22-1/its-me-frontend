@@ -183,7 +183,7 @@ describe('바코드 발급/렌더링', () => {
     const { wrapper } = mountPage()
     await enterPin(wrapper)
 
-    expect(wrapper.text()).toContain('PIN 번호가 틀립니다. 5회 불일치 시 30초 간 PIN 인증하실 수 없습니다.(1/5)')
+    expect(wrapper.text()).toContain('핀 번호가 틀립니다. (1/5)')
     expect(createPaymentTokenApi).not.toHaveBeenCalled()
   })
 
@@ -201,7 +201,7 @@ describe('바코드 발급/렌더링', () => {
     }
     await flushPromises()
 
-    expect(wrapper.text()).toContain('PIN 번호가 틀립니다. 5회 불일치 시 30초 간 PIN 인증하실 수 없습니다.(2/5)')
+    expect(wrapper.text()).toContain('핀 번호가 틀립니다. (2/5)')
   })
 
   it('PIN이 423(잠금)으로 실패하면 잠금 문구를 보여주고 횟수를 리셋한다', async () => {
@@ -210,7 +210,7 @@ describe('바코드 발급/렌더링', () => {
     const { wrapper } = mountPage()
     await enterPin(wrapper)
 
-    expect(wrapper.text()).toContain('PIN 번호 5회 불일치로 30초 간 PIN 인증하실 수 없습니다.')
+    expect(wrapper.text()).toContain('핀 번호를 5회 이상 틀렸습니다. 잠시 후 다시 시도해주세요')
     expect(createPaymentTokenApi).not.toHaveBeenCalled()
   })
 

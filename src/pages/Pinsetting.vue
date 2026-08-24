@@ -128,10 +128,10 @@ async function advanceStep() {
       currentInput.value = '';
       if (err.response?.status === 423) {
         currentPinFailCount.value = 0;
-        pinError.value = 'PIN 번호 5회 불일치로 30초 간 PIN 인증하실 수 없습니다.';
+        pinError.value = '핀 번호를 5회 이상 틀렸습니다. 잠시 후 다시 시도해주세요';
       } else {
         currentPinFailCount.value = Math.min(currentPinFailCount.value + 1, 5);
-        pinError.value = `PIN 번호가 틀립니다. 5회 불일치 시 30초 간 PIN 인증하실 수 없습니다.(${currentPinFailCount.value}/5)`;
+        pinError.value = `핀 번호가 틀립니다. (${currentPinFailCount.value}/5)`;
       }
     } finally {
       submitting.value = false;
