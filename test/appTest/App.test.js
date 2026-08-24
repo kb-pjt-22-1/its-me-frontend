@@ -4,6 +4,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { nextTick, reactive } from 'vue'
 import { routeLocationKey } from 'vue-router'
 
+const { locationReportingMock } = vi.hoisted(() => ({
+  locationReportingMock: { start: vi.fn(), stop: vi.fn() },
+}))
+vi.mock('@/composables/useLocationReporting', () => ({
+  useLocationReporting: () => locationReportingMock,
+}))
+
 import App from '@/App.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCardsStore } from '@/stores/cards'
@@ -170,5 +177,81 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
 
     expect(stores.cardsStore.fetchCards).toHaveBeenCalledTimes(1)
     vi.useRealTimers()
+  })
+})
+
+describe('북마크 근처 알림용 위치 보고', () => {
+  it('로그인 상태이고 북마크가 있으면 위치 감시를 시작한다', () => {
+    const stores = setupStores()
+    stores.authStore.isBootstrapped = true
+    stores.authStore.accessToken = 'token'
+    stores.authStore.user = { userId: 1, name: '홍길동' }
+    stores.bookmarksStore.bookmarks = [{ merchantId: 1 }]
+
+    mountApp()
+
+    expect(locationReportingMock.start).toHaveBeenCalled()
+    expect(locationReportingMock.stop).not.toHaveBeenCalled()
+  })
+
+  it('로그인 상태여도 북마크가 없으면 위치 감시를 시작하지 않는다', () => {
+    const stores = setupStores()
+    stores.authStore.isBootstrapped = true
+    stores.authStore.accessToken = 'token'
+    stores.authStore.user = { userId: 1, name: '홍길동' }
+
+    mountApp()
+
+    expect(locationReportingMock.start).not.toHaveBeenCalled()
+    expect(locationReportingMock.stop).toHaveBeenCalled()
+  })
+
+  it('마운트 후 첫 북마크가 생기면 그 시점에 감시를 시작한다', async () => {
+    const stores = setupStores()
+    stores.authStore.isBootstrapped = true
+    stores.authStore.accessToken = 'token'
+    stores.authStore.user = { userId: 1, name: '홍길동' }
+
+    mountApp()
+    expect(locationReportingMock.start).not.toHaveBeenCalled()
+
+    stores.bookmarksStore.bookmarks = [{ merchantId: 1 }]
+    await nextTick()
+
+    expect(locationReportingMock.start).toHaveBeenCalled()
+  })
+
+  it('로그아웃하면(인증 해제) 북마크가 있어도 즉시 감시를 멈춘다', async () => {
+    const stores = setupStores()
+    stores.authStore.isBootstrapped = true
+    stores.authStore.accessToken = 'token'
+    stores.authStore.user = { userId: 1, name: '홍길동' }
+    stores.bookmarksStore.bookmarks = [{ merchantId: 1 }]
+
+    mountApp()
+    expect(locationReportingMock.start).toHaveBeenCalled()
+    locationReportingMock.stop.mockClear()
+
+    stores.authStore.accessToken = null
+    stores.authStore.user = null
+    await nextTick()
+
+    expect(locationReportingMock.stop).toHaveBeenCalled()
+  })
+
+  it('마지막 북마크를 지우면 감시를 멈춘다', async () => {
+    const stores = setupStores()
+    stores.authStore.isBootstrapped = true
+    stores.authStore.accessToken = 'token'
+    stores.authStore.user = { userId: 1, name: '홍길동' }
+    stores.bookmarksStore.bookmarks = [{ merchantId: 1 }]
+
+    mountApp()
+    locationReportingMock.stop.mockClear()
+
+    stores.bookmarksStore.bookmarks = []
+    await nextTick()
+
+    expect(locationReportingMock.stop).toHaveBeenCalled()
   })
 })
