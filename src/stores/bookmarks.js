@@ -34,7 +34,9 @@ export const useBookmarksStore = defineStore('bookmarks', {
       const id = merchant.id ?? merchant.merchantId
       if (this.isBookmarked(id)) return
 
-      this.bookmarks.push({ merchantId: id, ...merchant })
+      // merchantId를 스프레드 뒤에 둬서, merchant 자체에 다른 값의 merchantId 필드가 섞여
+      // 들어와도 항상 위에서 계산한 id로 덮어쓰게 한다.
+      this.bookmarks.push({ ...merchant, merchantId: id })
       try {
         await addBookmark(id)
         this.hasNewBookmark = true
