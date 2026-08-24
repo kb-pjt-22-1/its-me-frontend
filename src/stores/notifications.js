@@ -5,7 +5,6 @@ export const useNotificationsStore = defineStore('notifications', {
   state: () => ({
     notifications: [],
     isLoading: false,
-    error: null,
   }),
 
   getters: {
@@ -21,11 +20,10 @@ export const useNotificationsStore = defineStore('notifications', {
   actions: {
     async fetchNotifications() {
       this.isLoading = true
-      this.error = null
       try {
         this.notifications = await getNotifications()
-      } catch (err) {
-        this.error = err.response?.data?.message ?? '알림을 불러오지 못했습니다.'
+      } catch {
+        // 실패해도 화면은 이전 목록을 그대로 유지한다 - 별도 에러 UI 없이 조용히 넘어간다.
       } finally {
         this.isLoading = false
       }

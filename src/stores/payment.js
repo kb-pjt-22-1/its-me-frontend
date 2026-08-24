@@ -25,8 +25,6 @@ export const usePaymentStore = defineStore('payment', {
     monthlyHistory: [],
     isLoading: false,
     isMonthlyLoading: false,
-    error: null,
-    monthlyError: null,
   }),
 
   actions: {
@@ -72,11 +70,10 @@ export const usePaymentStore = defineStore('payment', {
       if (!authStore.isAuthenticated) return
 
       this.isLoading = true
-      this.error = null
       try {
         this.history = await fetchPaymentHistory(params)
-      } catch (err) {
-        this.error = err.response?.data?.message ?? '결제 내역을 불러오지 못했습니다.'
+      } catch {
+        // 실패해도 화면은 이전 history를 그대로 유지한다 - 별도 에러 UI 없이 조용히 넘어간다.
       } finally {
         this.isLoading = false
       }
@@ -89,11 +86,10 @@ export const usePaymentStore = defineStore('payment', {
       if (!authStore.isAuthenticated) return
 
       this.isMonthlyLoading = true
-      this.monthlyError = null
       try {
         this.monthlyHistory = await fetchPaymentHistory(params)
-      } catch (err) {
-        this.monthlyError = err.response?.data?.message ?? '결제 내역을 불러오지 못했습니다.'
+      } catch {
+        // 실패해도 화면은 이전 monthlyHistory를 그대로 유지한다 - 별도 에러 UI 없이 조용히 넘어간다.
       } finally {
         this.isMonthlyLoading = false
       }

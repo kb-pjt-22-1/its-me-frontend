@@ -6,7 +6,6 @@ export const useBookmarksStore = defineStore('bookmarks', {
   state: () => ({
     bookmarks: [],
     isLoading: false,
-    error: null,
     hasNewBookmark: false,
   }),
 
@@ -21,11 +20,11 @@ export const useBookmarksStore = defineStore('bookmarks', {
       if (!authStore.isAuthenticated) return
 
       this.isLoading = true
-      this.error = null
       try {
         this.bookmarks = await fetchBookmarks()
-      } catch (err) {
-        this.error = err.response?.data?.message ?? '북마크 목록을 불러오지 못했습니다.'
+      } catch {
+        // 실패해도 화면은 이전 상태(빈 배열 또는 마지막 조회 결과)를 그대로 유지한다 -
+        // 이 목록을 쓰는 화면들이 별도 에러 UI 없이 조용히 넘어가는 걸로 이미 검증됐다.
       } finally {
         this.isLoading = false
       }

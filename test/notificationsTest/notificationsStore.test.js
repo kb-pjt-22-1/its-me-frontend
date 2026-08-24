@@ -27,16 +27,16 @@ describe('fetchNotifications', () => {
 
     expect(store.notifications).toHaveLength(1)
     expect(store.isLoading).toBe(false)
-    expect(store.error).toBeNull()
   })
 
-  it('실패하면 error를 채우고 예외를 던지지 않는다', async () => {
+  it('실패해도 예외를 던지지 않고 이전 목록을 유지한다', async () => {
     serviceMocks.getNotifications.mockRejectedValue(new Error('network error'))
 
     const store = useNotificationsStore()
     await expect(store.fetchNotifications()).resolves.toBeUndefined()
 
-    expect(store.error).toBe('알림을 불러오지 못했습니다.')
+    expect(store.notifications).toEqual([])
+    expect(store.isLoading).toBe(false)
   })
 })
 
