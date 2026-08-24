@@ -1,26 +1,28 @@
 <template>
   <div class="layout-container" v-if="merchant">
-    <header class="page-header">
-      <button class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-      </button>
-      <h2>매장 상세</h2>
-      <div class="right-placeholder"></div>
-    </header>
+    <div class="fixed-top">
+      <header class="page-header">
+        <button class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <h2>매장 상세</h2>
+        <div class="right-placeholder"></div>
+      </header>
 
-    <div class="store-info">
-      <span class="pill pill--gold">{{ merchant.categoryName ?? merchant.categoryCode }}</span>
-      <h1 class="store-name">{{ merchant.name }}</h1>
-      <p class="store-address muted-text">{{ merchant.address }}</p>
+      <div class="store-info">
+        <span class="pill pill--gold">{{ merchant.categoryName ?? merchant.categoryCode }}</span>
+        <h1 class="store-name">{{ merchant.name }}</h1>
+        <p class="store-address muted-text">{{ merchant.address }}</p>
 
-      <div v-if="bestCard" class="benefit-strip">
-        제휴 혜택: 이 매장에서 <strong>{{ bestCard.cardName }}</strong>로 결제하면
-        <strong>{{ bestCard.benefitDescription }}</strong>
-      </div>
-      <div v-else class="benefit-strip benefit-strip--muted">
-        보유하신 카드 중 이 매장에 적용되는 혜택이 없어요.
+        <div v-if="bestCard" class="benefit-strip">
+          제휴 혜택: 이 매장에서 <strong>{{ bestCard.cardName }}</strong>로 결제하면
+          <strong>{{ bestCard.benefitDescription }}</strong>
+        </div>
+        <div v-else class="benefit-strip benefit-strip--muted">
+          보유하신 카드 중 이 매장에 적용되는 혜택이 없어요.
+        </div>
       </div>
     </div>
 
@@ -156,9 +158,18 @@ const goToPay = () => {
 </script>
 
 <style scoped>
-/* 하단 결제하기 버튼이 position:fixed로 떠서 더 이상 문서 흐름에 안 잡히니, 스크롤이
-   끝까지 내려가도 마지막 카드가 그 버튼에 가려지지 않도록 바닥 여백을 버튼 높이만큼 넉넉히 둔다. */
-.layout-container { padding: 18px 18px 96px; }
+/* 카드가 많아지면 이 화면 전체가 아니라 추천 카드 목록(.recommend-section)만 스크롤되게
+   한다 - 헤더/매장 정보/결제 버튼은 항상 화면에 고정. PaymentsList.vue와 같은 패턴:
+   루트를 position:absolute;inset:0로 스스로 뷰포트를 채우게 하고(부모의 페이지 스크롤을
+   더는 안 씀), 안에서 flex-top(고정)/scroll 영역을 직접 나눈다. */
+.layout-container {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.fixed-top { flex: 0 0 auto; padding: 18px 18px 0; box-sizing: border-box; }
 .page-header { margin-bottom: 14px; }
 
 .store-info { margin-bottom: 22px; }
@@ -174,7 +185,15 @@ const goToPay = () => {
 .benefit-strip--muted { background: var(--inactive, #f0efec); color: var(--muted, #8f897f); }
 .benefit-strip--muted strong { color: inherit; }
 
-.recommend-section { margin-bottom: 26px; }
+.recommend-section {
+  flex: 1 1 auto;
+  min-height: 0; /* flex 자식이 내용 크기만큼 늘어나지 않고 실제로 줄어들어 스크롤되게 함 */
+  overflow-y: auto;
+  box-sizing: border-box;
+  /* 결제하기 버튼이 position:fixed로 떠 있으니, 끝까지 스크롤해도 마지막 카드가 그
+     버튼에 가려지지 않도록 바닥 여백을 버튼 높이만큼 넉넉히 둔다. */
+  padding: 0 18px 96px;
+}
 .section-title { font-size: 15px; margin: 0 0 12px; color: var(--charcoal, #24211d); }
 
 .reco-card {
@@ -243,5 +262,5 @@ const goToPay = () => {
      밝은 노랑(#ffbe49)이라 글씨가 잘 안 보였다. */
   background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900; font-size: 15px; cursor: pointer;
 }
-.not-found { padding-top: 60px; text-align: center; }
+.not-found { padding: 60px 18px 0; text-align: center; }
 </style>
