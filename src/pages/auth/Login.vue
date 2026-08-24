@@ -98,7 +98,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PageContainer from '@/components/common/PageContainer.vue';
 import Button from '@/components/common/Button.vue';
@@ -108,24 +108,27 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
+// authStore.errorMessage/errorStatus는 login() 시작 시점에만 비워진다 - 라우터로
+// 이 화면을 다시 열 때는 안 지워지므로, 이전 방문에서 실패했던 에러가 아무 입력 없이도
+// 그대로 다시 보이는 문제가 있었다. 화면 진입 시 한 번 비워서 매 방문을 깨끗하게 시작한다.
+onMounted(() => {
+  authStore.errorMessage = '';
+  authStore.errorStatus = null;
+});
+
 const userId = ref('');
 const password = ref('');
 const showPassword = ref(false);
 
 const canSubmit = computed(() => userId.value.length > 0 && password.value.length > 0);
 
-// 비밀번호 오답 횟수 - 백엔드는 계정당 5회 불일치 시 30분 잠금(423)을 이미 적용하지만
-// 응답에 실패 횟수 자체는 안 내려줘서(상태코드+고정 메시지뿐) 프론트에서 직접 센다.
-// 새로고침/다른 기기에서의 시도는 반영되지 않으니 서버의 실제 카운트와 어긋날 수 있다 -
-// 423이 오면 그 즉시 잠김 문구로 전환해 이 오차를 최소화한다.
-const passwordFailCount = ref(0);
-
+// 401은 "아이디 없음"과 "비밀번호 틀림"을 백엔드가 의도적으로 구분 없이 내려준다
+// (계정 존재 여부 유출 방지) - 그래서 프론트도 401을 "비밀번호가 틀렸다"로 단정하면
+// 안 되고, 백엔드가 내려준 중립적인 메시지를 그대로 보여줘야 한다. 423(잠금)은 서버가
+// 이미 실존 계정에 대해서만 내리는 상태코드라 전용 문구를 써도 안전하다.
 const loginErrorMessage = computed(() => {
   if (authStore.errorStatus === 423) {
-    return '비밀번호 5회 불일치로 해당 계정은 30분 간 로그인할 수 없습니다.';
-  }
-  if (authStore.errorStatus === 401 && passwordFailCount.value > 0) {
-    return `비밀번호가 틀립니다. 5회 불일치 시 해당 계정에 30분 간 로그인 할 수 없습니다.(${passwordFailCount.value}/5)`;
+    return '비밀번호를 5회 이상 틀렸습니다. 잠시 후 다시 시도해주세요';
   }
   return authStore.errorMessage;
 });
@@ -145,11 +148,8 @@ async function handleLogin() {
   if (!canSubmit.value) return;
   const success = await authStore.login(userId.value, password.value);
   if (success) {
-    passwordFailCount.value = 0;
     router.push(redirectTarget.value);
-    return;
   }
-  passwordFailCount.value = authStore.errorStatus === 401 ? Math.min(passwordFailCount.value + 1, 5) : 0;
 }
 </script>
 

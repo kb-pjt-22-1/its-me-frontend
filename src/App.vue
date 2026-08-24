@@ -59,6 +59,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import ToastHost from '@/components/common/ToastHost.vue';
 import ConfirmDialogHost from '@/components/common/ConfirmDialogHost.vue';
 import { getPageTransitionName } from '@/router';
+import { useLocationReporting } from '@/composables/useLocationReporting';
 
 const authStore = useAuthStore();
 const cardsStore = useCardsStore();
@@ -66,6 +67,7 @@ const merchantsStore = useMerchantsStore();
 const bookmarksStore = useBookmarksStore();
 const paymentStore = usePaymentStore();
 const notificationsStore = useNotificationsStore();
+const locationReporting = useLocationReporting();
 const route = useRoute();
 const pageTransitionName = computed(() => getPageTransitionName());
 const hasBottomNav = computed(() => route.name !== 'onboarding');
@@ -104,6 +106,20 @@ watch(
       setTimeout(() => cardsStore.fetchCards(), 3000);
     }
   }
+);
+
+// 북마크한 매장 근처 도착 알림용 위치 보고 - 로그인 상태이고 북마크가 하나라도 있을 때만
+// 감시한다(북마크가 없으면 알림도 없으니 위치를 계속 물어볼 이유가 없다). 로그아웃하거나
+// 북마크를 전부 지우면 즉시 멈춘다. immediate로 둬서 이미 로그인된 채로 앱이 열린
+// 경우(세션 복원)와, fetchAllUserData()가 북마크를 늦게 불러와 개수가 나중에 채워지는
+// 경우를 모두 반응형으로 잡는다.
+watch(
+  () => [authStore.isAuthenticated, bookmarksStore.bookmarks.length],
+  ([isAuth, count]) => {
+    if (isAuth && count > 0) locationReporting.start();
+    else locationReporting.stop();
+  },
+  { immediate: true }
 );
 </script>
 

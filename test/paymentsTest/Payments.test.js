@@ -215,6 +215,22 @@ describe('매장 추천 카드 표시와 초기 선택', () => {
   })
 })
 
+describe('매장 상세/지도 등에서 카드를 지정해 진입한 경우', () => {
+  it('쿼리에 userCardId가 있으면 PIN 시트가 별도 클릭 없이 곧바로 열린다', () => {
+    routeMock.query = { userCardId: '1' }
+
+    const { wrapper } = mountPage()
+
+    expect(wrapper.find('.pin-sheet-overlay').exists()).toBe(true)
+  })
+
+  it('쿼리에 userCardId가 없으면(일반 진입) PIN 시트가 자동으로 열리지 않는다', () => {
+    const { wrapper } = mountPage()
+
+    expect(wrapper.find('.pin-sheet-overlay').exists()).toBe(false)
+  })
+})
+
 describe('바코드 발급/렌더링', () => {
   it('PIN 인증에 성공하면 결제 토큰을 발급하고 JsBarcode로 바코드를 그린다', async () => {
     verifyPin.mockResolvedValue()
@@ -264,7 +280,7 @@ describe('바코드 발급/렌더링', () => {
     const { wrapper } = mountPage()
     await enterPin(wrapper)
 
-    expect(wrapper.text()).toContain('PIN 번호가 틀립니다. 5회 불일치 시 30초 간 PIN 인증하실 수 없습니다.(1/5)')
+    expect(wrapper.text()).toContain('핀 번호가 틀립니다. (1/5)')
     expect(createPaymentTokenApi).not.toHaveBeenCalled()
   })
 
@@ -282,7 +298,7 @@ describe('바코드 발급/렌더링', () => {
     }
     await flushPromises()
 
-    expect(wrapper.text()).toContain('PIN 번호가 틀립니다. 5회 불일치 시 30초 간 PIN 인증하실 수 없습니다.(2/5)')
+    expect(wrapper.text()).toContain('핀 번호가 틀립니다. (2/5)')
   })
 
   it('PIN이 423(잠금)으로 실패하면 잠금 문구를 보여주고 횟수를 리셋한다', async () => {
@@ -291,7 +307,7 @@ describe('바코드 발급/렌더링', () => {
     const { wrapper } = mountPage()
     await enterPin(wrapper)
 
-    expect(wrapper.text()).toContain('PIN 번호 5회 불일치로 30초 간 PIN 인증하실 수 없습니다.')
+    expect(wrapper.text()).toContain('핀 번호를 5회 이상 틀렸습니다. 잠시 후 다시 시도해주세요')
     expect(createPaymentTokenApi).not.toHaveBeenCalled()
   })
 

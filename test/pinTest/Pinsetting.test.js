@@ -147,7 +147,7 @@ describe('변경 흐름 (pinRegistered: true)', () => {
     await pressDigits(wrapper, '111111')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('PIN 번호가 틀립니다. 5회 불일치 시 30초 간 PIN 인증하실 수 없습니다.(1/5)')
+    expect(wrapper.text()).toContain('핀 번호가 틀립니다. (1/5)')
     expect(wrapper.text()).toContain('현재 비밀번호를 입력해주세요')
     expect(wrapper.text()).not.toContain('새 비밀번호를 입력해주세요')
     expect(updatePin).not.toHaveBeenCalled()
@@ -172,7 +172,7 @@ describe('변경 흐름 (pinRegistered: true)', () => {
 
     await pressDigits(wrapper, '111111')
     await flushPromises()
-    expect(wrapper.text()).toContain('PIN 번호 5회 불일치로 30초 간 PIN 인증하실 수 없습니다.')
+    expect(wrapper.text()).toContain('핀 번호를 5회 이상 틀렸습니다. 잠시 후 다시 시도해주세요')
     expect(wrapper.text()).not.toContain('(3/5)')
   })
 

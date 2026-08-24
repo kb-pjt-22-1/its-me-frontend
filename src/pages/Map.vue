@@ -2,7 +2,7 @@
   <div ref="mapPage" class="map-page">
     <div ref="mapContainer" class="map-container"></div>
     <div v-if="loadError" class="map-error">
-      지도를 불러오지 못했습니다: {{ loadError }}
+      {{ loadError }}
     </div>
 
     <div class="map-overlay-top">
@@ -266,6 +266,7 @@ import { usePaymentStore } from '@/stores/payment'
 import { getBrandImage } from '@/utils/brandImages'
 import { getCardImage } from '@/utils/cardImages'
 import { toDataUri } from '@/utils/imageDataUri'
+import { distanceMeters } from '@/utils/geo'
 import { fetchRecommendedNearbyMerchants, fetchMerchantList } from '@/services/merchantsService'
 import { fetchMerchantCardRecommendations } from '@/services/recommendationService'
 import { useToast } from '@/composables/useToast'
@@ -393,16 +394,11 @@ function onSheetHandleClick(event) {
 const sortMode = ref('distance')
 const myLocation = ref(null) // { lat, lng }
 
-function distanceMeters(lat1, lng1, lat2, lng2) {
-  const toRad = (deg) => (deg * Math.PI) / 180
-  const dLat = toRad(lat2 - lat1)
-  const dLng = toRad(lng2 - lng1)
-  const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
-  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
+// 바텀시트("주변 제휴 매장")는 별도 /nearby 호출 없이, 지도 화면(bounds)에서
+// 이미 받아온 매장을 그대로 재사용합니다 - merchants(검색어/카테고리 칩 필터가 적용된 결과,
+// 지도 핀과 같은 소스)를 그대로 이어받아, 칩을 고르면 핀뿐 아니라 이 목록도 같이 좁혀집니다
+// (거리로는 걸러내지 않습니다 - 지도를 내 위치에서 멀리 옮겨도 목록이 비어버리면 안 됨).
+// 밀집 지역에서 목록이 과도하게 길어지지 않도록 상한을 둡니다.
 const MAX_SHEET_ITEMS = 100
 const clusterFilterMerchantIds = ref(null)
 
@@ -883,9 +879,11 @@ function onResearchClick() {
 const PIN_WIDTH = 30
 const PIN_HEIGHT = 36
 
+// top(혜택 매장 중 상위 10곳) = 초록(--green) / benefit(나머지 혜택 매장) = 노랑(--orange) /
+// none(혜택 없음) = 회색. 클러스터 배지 테두리 색(onClustered)과 반드시 같은 값을 써야 한다.
 const PIN_TIER_COLORS = {
-  top: '#ffbc00',
-  benefit: '#16b88a',
+  top: '#00a878',
+  benefit: '#ffbc00',
   none: '#999999',
 }
 
@@ -1175,7 +1173,8 @@ onMounted(async () => {
   try {
     kakao = await loadKakaoMapScript()
   } catch (err) {
-    loadError.value = err.message
+    console.error('카카오맵 로드 실패', err.message)
+    loadError.value = '지도를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
     return
   }
 

@@ -201,8 +201,14 @@ const selectedCardLast4 = computed(() =>
 watch(() => cardsStore.cards, async (cards) => {
   if (!cards.length || selectedMethodId.value !== null) return;
 
-  if (queriedUserCardId && cardsStore.getById(queriedUserCardId)) selectedMethodId.value = queriedUserCardId;
-  else selectedMethodId.value = cardsStore.primaryCard?.userCardId ?? cards[0]?.userCardId;
+  if (queriedUserCardId && cardsStore.getById(queriedUserCardId)) {
+    selectedMethodId.value = queriedUserCardId;
+    // 매장 상세/지도/홈 추천에서 카드를 이미 골라 "결제하기"를 누르고 넘어온 경우다 - 여기서
+    // 카드를 다시 고르고 인증 버튼을 한 번 더 누르게 하지 않고, PIN 시트를 곧바로 띄운다.
+    openPinSheet();
+  } else {
+    selectedMethodId.value = cardsStore.primaryCard?.userCardId ?? cards[0]?.userCardId;
+  }
 
   await nextTick();
   centerSelectedCard('auto');
@@ -301,10 +307,10 @@ async function checkPin() {
     pin.value = '';
     if (err.response?.status === 423) {
       pinFailCount.value = 0;
-      pinError.value = 'PIN 번호 5회 불일치로 30초 간 PIN 인증하실 수 없습니다.';
+      pinError.value = '핀 번호를 5회 이상 틀렸습니다. 잠시 후 다시 시도해주세요';
     } else {
       pinFailCount.value = Math.min(pinFailCount.value + 1, 5);
-      pinError.value = `PIN 번호가 틀립니다. 5회 불일치 시 30초 간 PIN 인증하실 수 없습니다.(${pinFailCount.value}/5)`;
+      pinError.value = `핀 번호가 틀립니다. (${pinFailCount.value}/5)`;
     }
     return;
   }
