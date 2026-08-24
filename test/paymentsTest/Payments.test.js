@@ -177,14 +177,57 @@ describe('바코드 발급/렌더링', () => {
     expect(JsBarcode).not.toHaveBeenCalled()
   })
 
-  it('PIN이 틀리면 토큰을 발급하지 않는다', async () => {
-    verifyPin.mockRejectedValue(new Error('wrong pin'))
+  it('PIN이 틀리면 토큰을 발급하지 않고 (n/5) 횟수를 보여준다', async () => {
+    verifyPin.mockRejectedValue({ response: { status: 401 } })
 
     const { wrapper } = mountPage()
     await enterPin(wrapper)
 
-    expect(wrapper.text()).toContain('비밀번호가 올바르지 않습니다')
+    expect(wrapper.text()).toContain('PIN 번호가 틀립니다. 5회 불일치 시 30초 간 PIN 인증하실 수 없습니다.(1/5)')
     expect(createPaymentTokenApi).not.toHaveBeenCalled()
+  })
+
+  it('PIN을 두 번째로 틀리면 (2/5)로 올라간다', async () => {
+    verifyPin.mockRejectedValue({ response: { status: 401 } })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper) // 시트를 새로 열고 첫 번째로 틀림 -> (1/5)
+
+    // 시트를 닫지 않은 채로 같은 시트에서 다시 6자리를 입력한다(재오픈하면 횟수가 리셋되므로
+    // 시작 버튼을 다시 누르지 않는다).
+    const digitButtons = wrapper.findAll('.keypad-key').filter((b) => /^[0-9]$/.test(b.text()))
+    for (let i = 0; i < 6; i++) {
+      await digitButtons[i].trigger('click')
+    }
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('PIN 번호가 틀립니다. 5회 불일치 시 30초 간 PIN 인증하실 수 없습니다.(2/5)')
+  })
+
+  it('PIN이 423(잠금)으로 실패하면 잠금 문구를 보여주고 횟수를 리셋한다', async () => {
+    verifyPin.mockRejectedValue({ response: { status: 423 } })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    expect(wrapper.text()).toContain('PIN 번호 5회 불일치로 30초 간 PIN 인증하실 수 없습니다.')
+    expect(createPaymentTokenApi).not.toHaveBeenCalled()
+  })
+
+  it('PIN 시트를 다시 열면 실패 횟수가 초기화된다', async () => {
+    verifyPin.mockRejectedValueOnce({ response: { status: 401 } })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+    expect(wrapper.text()).toContain('(1/5)')
+
+    // 시트를 닫고 다시 연다.
+    await wrapper.find('.pin-sheet-close').trigger('click')
+    verifyPin.mockRejectedValueOnce({ response: { status: 401 } })
+    await enterPin(wrapper)
+
+    expect(wrapper.text()).toContain('(1/5)')
+    expect(wrapper.text()).not.toContain('(2/5)')
   })
 })
 
