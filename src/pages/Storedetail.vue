@@ -73,7 +73,9 @@
       </template>
     </section>
 
-    <button class="pay-btn" @click="goToPay">결제하기</button>
+    <div class="pay-btn-wrap">
+      <button class="pay-btn" @click="goToPay">결제하기</button>
+    </div>
   </div>
 
   <div v-else class="layout-container">
@@ -154,7 +156,9 @@ const goToPay = () => {
 </script>
 
 <style scoped>
-.layout-container { padding: 18px 18px 40px; }
+/* 하단 결제하기 버튼이 position:fixed로 떠서 더 이상 문서 흐름에 안 잡히니, 스크롤이
+   끝까지 내려가도 마지막 카드가 그 버튼에 가려지지 않도록 바닥 여백을 버튼 높이만큼 넉넉히 둔다. */
+.layout-container { padding: 18px 18px 96px; }
 .page-header { margin-bottom: 14px; }
 
 .store-info { margin-bottom: 22px; }
@@ -215,6 +219,24 @@ const goToPay = () => {
 }
 .reco-rate--none { color: var(--muted, #8f897f); font-weight: 600; }
 
+/* Header.vue/Footer.vue와 같은 left:50%+transform 방식으로 뷰포트 하단에 고정한다.
+   이 화면(/stores/:merchantId)은 App.vue 최상위 라우트라 route-transition-wrap 안에서
+   렌더링되는데, 그 래퍼가 페이지 전환 애니메이션 중(~0.25s)에만 잠깐 transform이 걸려
+   그 순간엔 fixed 기준점이 뷰포트가 아니라 래퍼가 된다 - 같은 구조인 PaymentsList.vue가
+   자기 .layout-container 안에 <Footer/>(역시 position:fixed)를 그대로 두고 있는 것과
+   동일한, 이미 감수되고 있는 제약이다. 전환이 끝나면 정상적으로 뷰포트 기준으로 돌아온다. */
+.pay-btn-wrap {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 440px;
+  box-sizing: border-box;
+  padding: 14px 18px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--page, #f2f4f6);
+  z-index: 1000;
+}
 .pay-btn {
   width: 100%; height: 54px; border-radius: 14px; border: none;
   /* Payments.vue의 결제 CTA(.main-action-btn)와 문구 색을 통일 - 예전엔 배경과 거의 같은
