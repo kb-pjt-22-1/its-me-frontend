@@ -212,7 +212,7 @@ describe('연회비 본전', () => {
 
     expect(slide.get('.be-card-name').text()).toBe('청춘대로 톡톡카드')
     expect(statusBadge.text()).toBe('본전 달성')
-    expect(statusDescription.text()).toBe('4월 12일, 연회비 본전을 뽑았어요')
+    expect(statusDescription.text()).toBe('4월 12일, 연회비 본전을 달성했어요')
     expect(statusBadge.classes()).not.toContain('be-status-badge--pending')
     expect(slide.findAll('.be-stats-row .success-text')).toHaveLength(2)
     expect(slide.find('.be-stats-row .danger-text').exists()).toBe(false)
@@ -226,7 +226,7 @@ describe('연회비 본전', () => {
     })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('아직 연회비 본전 전이에요')
+    expect(wrapper.text()).toContain('아직 연회비 본전 달성 전이에요')
     expect(wrapper.find('.danger-text').exists()).toBe(true)
   })
 

@@ -31,6 +31,10 @@ vi.mock('@/services/cardService', () => ({
   formatBenefit: () => '',
 }))
 
+vi.mock('@/services/recommendationService', () => ({
+  fetchMerchantCardRecommendations: vi.fn(),
+}))
+
 const cardsStoreMock = {
   cards: [
     { userCardId: 1, cardName: '청춘대로 톡톡카드', panLast4: '1234', status: 'ACTIVE', color: '#1f3a5f', isPrimary: true, benefitsInfo: null, currentAmount: 0 },
@@ -65,6 +69,7 @@ vi.mock('@/services/paymentService', () => ({
 
 import Payments from '@/pages/Payments.vue'
 import { verifyPin } from '@/services/paymentAuthService'
+import { fetchMerchantCardRecommendations } from '@/services/recommendationService'
 import {
   createPaymentToken as createPaymentTokenApi,
   completePaymentToken as completePaymentTokenApi,
@@ -102,6 +107,7 @@ beforeEach(() => {
     { userCardId: 1, cardName: '청춘대로 톡톡카드', panLast4: '1234', status: 'ACTIVE', color: '#1f3a5f', isPrimary: true, benefitsInfo: null, currentAmount: 0 },
   ]
   cardsStoreMock.primaryCard = cardsStoreMock.cards[0]
+  fetchMerchantCardRecommendations.mockResolvedValue([])
 })
 
 describe('선택 카드 표시', () => {
@@ -131,6 +137,81 @@ describe('선택 카드 표시', () => {
     const { wrapper } = mountPage()
 
     expect(wrapper.find('.selected-card-last4').exists()).toBe(false)
+  })
+})
+
+describe('매장 추천 카드 표시와 초기 선택', () => {
+  beforeEach(() => {
+    cardsStoreMock.cards = [
+      { userCardId: 1, cardName: '대표 카드', panLast4: '1111', status: 'ACTIVE', color: '#1f3a5f', isPrimary: true, benefitsInfo: null },
+      { userCardId: 2, cardName: '매장 혜택 카드', panLast4: '2222', status: 'ACTIVE', color: '#24211d', isPrimary: false, benefitsInfo: null },
+    ]
+    cardsStoreMock.primaryCard = cardsStoreMock.cards[0]
+  })
+
+  it('일반 결제에서는 추천 API를 호출하거나 추천 테두리와 배지를 표시하지 않는다', async () => {
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    expect(fetchMerchantCardRecommendations).not.toHaveBeenCalled()
+    expect(wrapper.find('.card-slide--recommended').exists()).toBe(false)
+    expect(wrapper.find('.recommended-badge').exists()).toBe(false)
+    expect(wrapper.findAll('.card-slide')[0].attributes('aria-label')).toBe('대표 카드 선택')
+  })
+
+  it('매장 추천 API가 지정한 카드를 첫 번째로 선택하고 추천 UI를 유지한다', async () => {
+    routeMock.query = { merchantId: '7' }
+    fetchMerchantCardRecommendations.mockResolvedValue([
+      { userCardId: 2, recommended: true, performanceMet: true, benefitApplicable: true },
+      { userCardId: 1, recommended: false, performanceMet: false, benefitApplicable: true },
+    ])
+
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    const slides = wrapper.findAll('.card-slide')
+    expect(fetchMerchantCardRecommendations).toHaveBeenCalledWith('7')
+    expect(slides[0].attributes('aria-label')).toBe('매장 혜택 카드 선택')
+    expect(slides[0].classes()).toContain('selected')
+    expect(slides[0].classes()).toContain('card-slide--recommended')
+    expect(slides[0].find('.recommended-badge').text()).toBe('추천')
+
+    await slides[1].trigger('click')
+
+    expect(wrapper.findAll('.card-slide')[0].classes()).toContain('card-slide--recommended')
+    expect(wrapper.findAll('.card-slide')[0].find('.recommended-badge').text()).toBe('추천')
+    expect(wrapper.findAll('.card-slide')[1].classes()).toContain('selected')
+  })
+
+  it('해당 매장에 혜택이 없어 recommended 카드가 없으면 추천 UI를 표시하지 않는다', async () => {
+    routeMock.query = { merchantId: '7' }
+    fetchMerchantCardRecommendations.mockResolvedValue([
+      { userCardId: 1, recommended: false, performanceMet: false, benefitApplicable: false },
+      { userCardId: 2, recommended: false, performanceMet: false, benefitApplicable: false },
+    ])
+
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    expect(wrapper.find('.card-slide--recommended').exists()).toBe(false)
+    expect(wrapper.find('.recommended-badge').exists()).toBe(false)
+  })
+
+  it('매장 상세/지도에서 userCardId를 전달하면 추천 카드와 달라도 전달한 카드를 선택한다', async () => {
+    routeMock.query = { merchantId: '7', userCardId: '1' }
+    fetchMerchantCardRecommendations.mockResolvedValue([
+      { userCardId: 2, recommended: true, performanceMet: true, benefitApplicable: true },
+      { userCardId: 1, recommended: false, performanceMet: true, benefitApplicable: true },
+    ])
+
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    const slides = wrapper.findAll('.card-slide')
+    expect(slides[0].attributes('aria-label')).toBe('매장 혜택 카드 선택')
+    expect(slides[0].classes()).toContain('card-slide--recommended')
+    expect(slides[1].attributes('aria-label')).toBe('대표 카드 선택')
+    expect(slides[1].classes()).toContain('selected')
   })
 })
 
@@ -228,6 +309,90 @@ describe('바코드 발급/렌더링', () => {
 
     expect(wrapper.text()).toContain('(1/5)')
     expect(wrapper.text()).not.toContain('(2/5)')
+  })
+})
+
+describe('인증 후 카드 변경', () => {
+  beforeEach(() => {
+    cardsStoreMock.cards = [
+      { userCardId: 1, cardName: '대표 카드', panLast4: '1111', status: 'ACTIVE', color: '#1f3a5f', isPrimary: true, benefitsInfo: null },
+      { userCardId: 2, cardName: '두 번째 카드', panLast4: '2222', status: 'ACTIVE', color: '#24211d', isPrimary: false, benefitsInfo: null },
+    ]
+    cardsStoreMock.primaryCard = cardsStoreMock.cards[0]
+  })
+
+  it('기존 토큰을 취소하고 새 카드 userCardId로 바코드를 재발급한다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi
+      .mockResolvedValueOnce({ paymentTokenId: 'tok-1', tokenValue: 'FIRST' })
+      .mockResolvedValueOnce({ paymentTokenId: 'tok-2', tokenValue: 'SECOND' })
+    cancelPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', status: 'CANCELED' })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+    await wrapper.findAll('.card-slide')[1].trigger('click')
+    await flushPromises()
+
+    expect(cancelPaymentTokenApi).toHaveBeenCalledWith('tok-1')
+    expect(createPaymentTokenApi).toHaveBeenNthCalledWith(2, 2, null)
+    expect(JsBarcode).toHaveBeenLastCalledWith(expect.anything(), 'SECOND', expect.anything())
+    expect(wrapper.findAll('.card-slide')[1].classes()).toContain('selected')
+  })
+
+  it('재발급 요청이 끝날 때까지 슬라이드를 잠가 중복 카드 변경을 막는다', async () => {
+    let resolveReplacement
+    const replacement = new Promise((resolve) => { resolveReplacement = resolve })
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi
+      .mockResolvedValueOnce({ paymentTokenId: 'tok-1', tokenValue: 'FIRST' })
+      .mockImplementationOnce(() => replacement)
+    cancelPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', status: 'CANCELED' })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+    await wrapper.findAll('.card-slide')[1].trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.card-slider').classes()).toContain('is-locked')
+    expect(wrapper.findAll('.card-slide').every((slide) => slide.attributes('disabled') !== undefined)).toBe(true)
+    expect(createPaymentTokenApi).toHaveBeenCalledTimes(2)
+
+    resolveReplacement({ paymentTokenId: 'tok-2', tokenValue: 'SECOND' })
+    await flushPromises()
+
+    expect(wrapper.find('.card-slider').classes()).not.toContain('is-locked')
+    expect(createPaymentTokenApi).toHaveBeenCalledTimes(2)
+  })
+
+  it('첫 토큰 발급 중 매장 추천 카드가 늦게 선택되면 추천 카드 토큰으로 교체한다', async () => {
+    let resolveRecommendations
+    let resolveInitialToken
+    routeMock.query = { merchantId: '7' }
+    fetchMerchantCardRecommendations.mockImplementation(() => new Promise((resolve) => {
+      resolveRecommendations = resolve
+    }))
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveInitialToken = resolve }))
+      .mockResolvedValueOnce({ paymentTokenId: 'tok-2', tokenValue: 'SECOND' })
+    cancelPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', status: 'CANCELED' })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+    expect(createPaymentTokenApi).toHaveBeenNthCalledWith(1, 1, 7)
+
+    resolveRecommendations([
+      { userCardId: 2, recommended: true, performanceMet: true, benefitApplicable: true },
+      { userCardId: 1, recommended: false, performanceMet: false, benefitApplicable: true },
+    ])
+    await flushPromises()
+    resolveInitialToken({ paymentTokenId: 'tok-1', tokenValue: 'FIRST' })
+    await flushPromises()
+
+    expect(cancelPaymentTokenApi).toHaveBeenCalledWith('tok-1')
+    expect(createPaymentTokenApi).toHaveBeenNthCalledWith(2, 2, 7)
+    expect(wrapper.findAll('.card-slide')[0].attributes('aria-label')).toBe('두 번째 카드 선택')
+    expect(wrapper.findAll('.card-slide')[0].classes()).toContain('selected')
   })
 })
 

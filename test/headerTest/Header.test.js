@@ -15,6 +15,7 @@ vi.mock('@/services/notificationService', () => ({
 
 import Header from '@/layouts/menu/Header.vue'
 import { useBookmarksStore } from '@/stores/bookmarks'
+import { useNotificationsStore } from '@/stores/notifications'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -38,6 +39,20 @@ describe('Header.vue - 알림 버튼', () => {
     await wrapper.find('button[aria-label="알림"]').trigger('click')
 
     expect(pushMock).toHaveBeenCalledWith('/notifications')
+  })
+
+  it('알림과 북마크의 빨간 점에 동일한 공통 스타일 클래스를 적용한다', async () => {
+    const notificationsStore = useNotificationsStore()
+    const bookmarksStore = useBookmarksStore()
+    notificationsStore.notifications = [{ notificationId: 1, read: false }]
+    bookmarksStore.hasNewBookmark = true
+    const wrapper = mount(Header)
+    await wrapper.vm.$nextTick()
+
+    const dots = wrapper.findAll('.header-notification-dot')
+    expect(dots).toHaveLength(2)
+    expect(dots[0].classes()).toContain('unread-badge')
+    expect(dots[1].classes()).toContain('bookmark-notification-dot')
   })
 })
 

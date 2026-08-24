@@ -1363,6 +1363,24 @@ describe('주변 제휴 매장 바텀시트 3단계 drag/snap', () => {
     expect(sheet.attributes('data-position')).toBe('collapsed')
   })
 
+  it('현재 노출된 시트 높이에 맞춰 sheet-body 높이를 collapsed/middle/expanded마다 계산한다', async () => {
+    const wrapper = await mountSizedSheet()
+    const body = wrapper.find('.sheet-body')
+    const handle = wrapper.find('.sheet-handle-area')
+
+    expect(body.attributes('style')).toContain('height: 0px')
+
+    await handle.trigger('click')
+    expect(wrapper.find('.store-sheet').attributes('data-position')).toBe('middle')
+    expect(body.attributes('style')).toContain('height: 170px')
+
+    await handle.trigger('pointerdown', { clientY: 400, pointerId: 6 })
+    await handle.trigger('pointermove', { clientY: 80, pointerId: 6 })
+    await handle.trigger('pointerup', { clientY: 80, pointerId: 6 })
+    expect(wrapper.find('.store-sheet').attributes('data-position')).toBe('expanded')
+    expect(body.attributes('style')).toContain('height: 330px')
+  })
+
   it('시트가 middle/expanded로 올라가면 재검색/내 위치 버튼도 같은 만큼 위로 따라 올라간다', async () => {
     const wrapper = await mountSizedSheet()
     const handle = wrapper.find('.sheet-handle-area')
@@ -1418,14 +1436,31 @@ describe('주변 제휴 매장 바텀시트 3단계 drag/snap', () => {
   it('sheet-body는 drag 대상이 아니고 스크롤 가능 상태를 유지한다', async () => {
     const wrapper = await mountSizedSheet()
     const body = wrapper.find('.sheet-body')
+    await wrapper.find('.sheet-handle-area').trigger('click')
     body.element.scrollTop = 120
 
     await body.trigger('pointerdown', { clientY: 300, pointerId: 3 })
     await body.trigger('pointermove', { clientY: 100, pointerId: 3 })
     await body.trigger('pointerup', { clientY: 100, pointerId: 3 })
 
-    expect(wrapper.find('.store-sheet').attributes('data-position')).toBe('collapsed')
+    expect(wrapper.find('.store-sheet').attributes('data-position')).toBe('middle')
     expect(body.element.scrollTop).toBe(120)
+  })
+
+  it('매장 상세 주소는 고정 헤더가 아닌 middle 상태의 스크롤 본문 안에 있다', async () => {
+    const wrapper = await mountSizedSheet([{ ...CAFE_MERCHANT, address: '서울시 중구 테스트로 1' }])
+
+    await wrapper.find('.sheet-item').trigger('click')
+    const body = wrapper.find('.sheet-body')
+    body.element.scrollTop = 80
+    await body.trigger('pointerdown', { clientY: 300, pointerId: 7 })
+    await body.trigger('pointermove', { clientY: 100, pointerId: 7 })
+    await body.trigger('pointerup', { clientY: 100, pointerId: 7 })
+
+    expect(wrapper.find('.store-sheet').attributes('data-position')).toBe('middle')
+    expect(wrapper.find('.sheet-handle-area').find('.store-address').exists()).toBe(false)
+    expect(body.find('.store-address').text()).toBe('서울시 중구 테스트로 1')
+    expect(body.element.scrollTop).toBe(80)
   })
 
   it('정렬 버튼에서 시작한 포인터는 sheet drag로 처리되지 않고 기존 클릭이 동작한다', async () => {

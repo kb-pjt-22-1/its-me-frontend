@@ -7,7 +7,7 @@
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
           <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
         </svg>
-        <span v-if="notificationsStore.unreadCount > 0" class="unread-badge" aria-hidden="true"></span>
+        <span v-if="notificationsStore.unreadCount > 0" class="header-notification-dot unread-badge" aria-hidden="true"></span>
       </button>
       <button type="button" class="icon-btn bookmark-header-btn" aria-label="북마크" @click="goToBookmarks">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -15,7 +15,7 @@
         </svg>
         <span
           v-if="bookmarksStore.hasNewBookmark"
-          class="bookmark-notification-dot"
+          class="header-notification-dot bookmark-notification-dot"
           aria-hidden="true"
         ></span>
       </button>
@@ -126,20 +126,7 @@ const goToMenu = () => {
   position: relative;
 }
 
-.bookmark-notification-dot {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 4px;
-  height: 4px;
-  box-sizing: content-box;
-  border: 1.5px solid #ffffff;
-  border-radius: 50%;
-  background: #e5484d;
-  pointer-events: none;
-}
-
-.unread-badge {
+.header-notification-dot {
   position: absolute;
   top: 6px;
   right: 6px;
