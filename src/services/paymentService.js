@@ -6,24 +6,6 @@ export async function createPaymentToken(userCardId, merchantId = null) {
   return data
 }
 
-/** 결제 가능 카드 조회 [GET /api/v1/cards] */
-export async function fetchPayableCards() {
-  const { data } = await api.get('/v1/cards')
-  return data
-}
-
-/** 추천 결제 카드 조회 [GET /api/v1/recommend?merchantId=&amount=] */
-export async function fetchRecommendedCard(merchantId, amount) {
-  const { data } = await api.get('/v1/recommend', { params: { merchantId, amount } })
-  return data
-}
-
-/** 결제 토큰 상태 조회 [GET /api/v1/payment-tokens/{paymentTokenId}] */
-export async function fetchPaymentTokenStatus(paymentTokenId) {
-  const { data } = await api.get(`/v1/payment-tokens/${paymentTokenId}`)
-  return data
-}
-
 /**
  * 결제 완료 처리 [POST /api/v1/payment-tokens/{paymentTokenId}/complete]
  * 요청 바디 없음 - 실제 매장 스캔이 불가능한 구조라 가맹점/금액은 서버가 데모용으로

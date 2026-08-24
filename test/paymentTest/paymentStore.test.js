@@ -3,16 +3,10 @@ import { createPinia, setActivePinia } from 'pinia'
 
 vi.mock('@/services/paymentService', () => ({
   createPaymentToken: vi.fn(),
-  fetchPayableCards: vi.fn(),
-  fetchRecommendedCard: vi.fn(),
-  fetchPaymentTokenStatus: vi.fn(),
   completePaymentToken: vi.fn(),
   cancelPaymentToken: vi.fn(),
   fetchPaymentHistory: vi.fn(),
   fetchPaymentDetail: vi.fn(),
-}))
-vi.mock('@/services/paymentAuthService', () => ({
-  verifyPin: vi.fn(),
 }))
 
 import { usePaymentStore } from '@/stores/payment'
