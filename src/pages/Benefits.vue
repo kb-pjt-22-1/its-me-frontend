@@ -148,7 +148,6 @@
       <div class="available-heading">
         <div class="section-header">
           <h3 class="section-title">이번 달 받을 수 있는 혜택</h3>
-          <button type="button" class="link-btn">전체 카드</button>
         </div>
 
         <p class="section-sub muted-text">
