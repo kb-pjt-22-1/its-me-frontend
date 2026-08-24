@@ -97,32 +97,38 @@ describe('카드 번호 표시', () => {
   })
 })
 
-// 진행률(실적인정금액/progress-fill/목표 X원)은 이번 달 사용액(currentAmount) 기준 -
-// 아직 진행 중인 달의 실적이 다음 구간까지 얼마나 남았는지 보여주는 용도라 그대로 둔다.
+// 진행률(실적인정금액/progress-fill/목표 X원)과 구간 이름표(.tier-label) 모두 이번 달
+// 사용액(currentAmount) 기준 - 아직 진행 중인 달의 실적이 어느 구간까지 도달했고 다음
+// 구간까지 얼마나 남았는지 보여주는 용도다. 예전엔 .tier-label만 전월 실적(previousMonthAmount)
+// 기준으로 계산돼서, 이번 달 결제를 테스트해 currentAmount가 구간을 넘어도 진행 바만
+// 커질 뿐 구간 이름표는 안 바뀌는(0구간 -> 1구간) 버그가 있었다.
 describe('이번 달 이용실적 진행률 (currentAmount 기준)', () => {
   it('다음 구간까지 남은 목표 금액을 표시한다', async () => {
     const { wrapper } = await mountPage({ currentAmount: 60000, previousMonthAmount: 0 })
     const recognizedAmount = wrapper.find('.recognized-amount').text()
 
+    expect(wrapper.find('.tier-label').text()).toBe('0구간')
     expect(recognizedAmount).toContain('실적인정금액')
     expect(recognizedAmount).toContain('60,000원')
     expect(recognizedAmount).toContain('목표 100,000원')
     expect(wrapper.find('.progress-fill').attributes('style')).toContain('width: 60%')
   })
 
-  it('한 구간을 넘으면 다음 구간의 최소 금액을 목표로 잡는다', async () => {
+  it('한 구간을 넘으면 구간 이름표가 바뀌고 다음 구간의 최소 금액을 목표로 잡는다', async () => {
     const { wrapper } = await mountPage({ currentAmount: 100000, previousMonthAmount: 0 })
     const recognizedAmount = wrapper.find('.recognized-amount').text()
 
+    expect(wrapper.find('.tier-label').text()).toBe('1구간')
     expect(recognizedAmount).toContain('실적인정금액')
     expect(recognizedAmount).toContain('100,000원')
     expect(recognizedAmount).toContain('목표 200,000원')
     expect(wrapper.find('.progress-fill').attributes('style')).toContain('width: 50%')
   })
 
-  it('최고 구간까지 채우면 최고 구간 달성 문구와 100% 진행률을 표시한다', async () => {
+  it('최고 구간까지 채우면 구간 이름표도 최고 구간을 가리키고 최고 구간 달성 문구와 100% 진행률을 표시한다', async () => {
     const { wrapper } = await mountPage({ currentAmount: 250000, previousMonthAmount: 0 })
 
+    expect(wrapper.find('.tier-label').text()).toBe('2구간')
     expect(wrapper.text()).toContain('최고 구간 달성')
     expect(wrapper.text()).not.toContain('/ 목표')
     expect(wrapper.find('.progress-fill').attributes('style')).toContain('width: 100%')
@@ -140,7 +146,6 @@ describe('이번 달 혜택 (previousMonthAmount/previousPerformanceMet 기준)'
       previousRemainingAmount: 100000,
     })
 
-    expect(wrapper.find('.tier-label').text()).toBe('0구간')
     expect(wrapper.find('.previous-performance-status').text()).toContain('전월 이용실적')
     expect(wrapper.find('.previous-performance-status').text()).toContain('0원')
     expect(wrapper.find('.performance-status-badge').text()).toBe('실적 미충족')
@@ -152,7 +157,6 @@ describe('이번 달 혜택 (previousMonthAmount/previousPerformanceMet 기준)'
   it('전월 실적이 구간 기준을 채우면 그 구간의 혜택을 표시한다', async () => {
     const { wrapper } = await mountPage({ previousMonthAmount: 100000, previousPerformanceMet: true })
 
-    expect(wrapper.find('.tier-label').text()).toBe('1구간')
     expect(wrapper.find('.benefits-header .section-label').text()).toBe('이번 달 혜택 · 1구간')
     expect(wrapper.find('.previous-performance-status').text()).toContain('100,000원')
     expect(wrapper.find('.performance-status-badge').text()).toBe('실적 충족')
@@ -167,7 +171,6 @@ describe('이번 달 혜택 (previousMonthAmount/previousPerformanceMet 기준)'
       previousPerformanceMet: false,
     })
 
-    expect(wrapper.find('.tier-label').text()).toBe('0구간')
     expect(wrapper.text()).toContain('전월 이용실적을 충족하지 못했어요')
     expect(wrapper.find('.benefit-row').exists()).toBe(false)
     // 진행률 표시는 currentAmount 기준 그대로라 100%로 보인다 - 이 둘이 서로 다른 기준을
