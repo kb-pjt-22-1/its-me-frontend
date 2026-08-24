@@ -16,3 +16,12 @@ export async function getNotifications() {
 export async function markNotificationRead(notificationId) {
   await api.patch(`/users/me/notifications/${notificationId}/read`)
 }
+
+/**
+ * 현재 위치를 보고한다. POST /notifications/location
+ * 백엔드는 이 좌표를 저장하지 않고, 그 순간 "저장한 매장 근처 도착" 판단에만 쓴다
+ * (반경 안에 들어오면 푸시 알림 발송 - NearbyBookmarkedMerchantPushHandler).
+ */
+export async function reportLocation(latitude, longitude) {
+  await api.post('/notifications/location', { latitude, longitude })
+}

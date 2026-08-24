@@ -264,6 +264,7 @@ import { usePaymentStore } from '@/stores/payment'
 import { getBrandImage } from '@/utils/brandImages'
 import { getCardImage } from '@/utils/cardImages'
 import { toDataUri } from '@/utils/imageDataUri'
+import { distanceMeters } from '@/utils/geo'
 import { fetchRecommendedNearbyMerchants, fetchMerchantList } from '@/services/merchantsService'
 import { fetchMerchantCardRecommendations } from '@/services/recommendationService'
 import { useToast } from '@/composables/useToast'
@@ -390,17 +391,6 @@ function onSheetHandleClick(event) {
 // 'distance' | 'benefit' - '실적순'은 아직 매장 응답에 실적 관련 숫자 데이터가 없어 보류.
 const sortMode = ref('distance')
 const myLocation = ref(null) // { lat, lng }
-
-// 두 좌표 사이 거리(m). 별도 API 없이 바텀시트를 boundsMerchants로 정렬하기 위해 씁니다.
-function distanceMeters(lat1, lng1, lat2, lng2) {
-  const toRad = (deg) => (deg * Math.PI) / 180
-  const dLat = toRad(lat2 - lat1)
-  const dLng = toRad(lng2 - lng1)
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
-  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
 
 // 바텀시트("주변 제휴 매장")는 별도 /nearby 호출 없이, 지도 화면(bounds)에서
 // 이미 받아온 매장을 그대로 재사용합니다 - merchants(검색어/카테고리 칩 필터가 적용된 결과,
