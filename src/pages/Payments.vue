@@ -485,8 +485,7 @@ onBeforeRouteLeave(() => {
 .payment-box { flex:none; width:100%; height:calc(100% - 32px); margin:8px 0 24px; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; padding:0 0 18px; border-radius:22px; }
 .payment-content { flex:1; min-height:0; display:flex; flex-direction:column; }
 .payment-box--ready { cursor:pointer; }
-.payment-ready,.barcode-payment { flex:1; min-height:0; display:flex; flex-direction:column; }
-.card-stage,.barcode-stage,.payment-state { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; }
+.card-stage { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; }
 .loading-text { padding:20px; text-align:center; font-size:.9rem; }
 
 .card-slider { --slide-width:min(66vw,250px); width:100%; display:flex; align-items:center; gap:18px; overflow-x:auto; padding:13px calc((100% - var(--slide-width))/2) 16px; box-sizing:border-box; scroll-padding-inline:calc((100% - var(--slide-width))/2); scroll-snap-type:x mandatory; scrollbar-width:none; overscroll-behavior-x:contain; }

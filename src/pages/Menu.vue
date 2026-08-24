@@ -159,8 +159,7 @@ const handleWithdraw = async () => {
 
 .menu-section { margin-bottom: 20px; }
 
-.section-title,
-.menu-section-title {
+.section-title {
   font-size: 0.9rem;
   color: var(--muted, #8f897f);
   margin-bottom: 10px;
