@@ -55,11 +55,14 @@
   width: 100%;
   max-width: 440px;  /* main.css의 .page-container, Header와 동일 */
   background-color: var(--surface, #ffffff);
-  border-top: 1px solid var(--line, #e7e4de);
+  border: none;
+  border-radius: 0;
   display: flex;
   align-items: flex-end;
+  padding-top: 4px;
   padding-bottom: env(safe-area-inset-bottom, 8px);
   box-sizing: border-box;
+  overflow: hidden;
   z-index: 1000;
 }
 

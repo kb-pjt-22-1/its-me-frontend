@@ -5,12 +5,13 @@ vi.mock('@/api', () => ({
     get: vi.fn(),
     post: vi.fn(),
     put: vi.fn(),
+    patch: vi.fn(),
     delete: vi.fn(),
   },
 }))
 
 import api from '@/api/index.js'
-import { registerPin, updatePin } from '@/services/memberService.js'
+import { registerPin, updatePin, updateFcmToken, withdraw } from '@/services/memberService.js'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -47,5 +48,39 @@ describe('updatePin', () => {
     api.put.mockRejectedValueOnce(error)
 
     await expect(updatePin('000000', '592841')).rejects.toBe(error)
+  })
+})
+
+describe('updateFcmToken', () => {
+  it('fcmToken을 body로 PATCH /users/me/fcm-token을 호출한다', async () => {
+    api.patch.mockResolvedValueOnce({})
+
+    await updateFcmToken('token-abc-123')
+
+    expect(api.patch).toHaveBeenCalledWith('/users/me/fcm-token', { fcmToken: 'token-abc-123' })
+  })
+
+  it('실패하면 예외를 그대로 던진다(호출부가 조용히 삼킨다)', async () => {
+    const error = { response: { status: 400, data: { message: 'fcmToken is invalid' } } }
+    api.patch.mockRejectedValueOnce(error)
+
+    await expect(updateFcmToken('')).rejects.toBe(error)
+  })
+})
+
+describe('withdraw', () => {
+  it('confirmed=true를 쿼리 파라미터로 DELETE /users/me를 호출한다', async () => {
+    api.delete.mockResolvedValueOnce({})
+
+    await withdraw()
+
+    expect(api.delete).toHaveBeenCalledWith('/users/me', { params: { confirmed: true } })
+  })
+
+  it('실패하면 예외를 그대로 던진다(호출부가 에러 토스트를 띄운다)', async () => {
+    const error = { response: { status: 400, data: { message: 'withdrawal confirmation flag is required' } } }
+    api.delete.mockRejectedValueOnce(error)
+
+    await expect(withdraw()).rejects.toBe(error)
   })
 })

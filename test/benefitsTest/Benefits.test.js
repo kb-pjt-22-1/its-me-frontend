@@ -2,8 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
+let routeHash = ''
+const routerPushMock = vi.fn()
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ hash: routeHash }),
+  useRouter: () => ({ push: routerPushMock }),
+}))
+
 import Benefits from '@/pages/Benefits.vue'
 import { useBenefitsStore } from '@/stores/benefits'
+import { useMerchantsStore } from '@/stores/merchants'
 
 function makeCard(overrides = {}) {
   return {
@@ -73,6 +81,7 @@ function makeBenefitLimits() {
 function mountPage(stateOverrides = {}) {
   setActivePinia(createPinia())
   const benefitsStore = useBenefitsStore()
+  const merchantsStore = useMerchantsStore()
 
   benefitsStore.$patch({
     reportMonthLabel: '8월',
@@ -89,8 +98,9 @@ function mountPage(stateOverrides = {}) {
   vi.spyOn(benefitsStore, 'fetchBreakEven').mockResolvedValue()
   vi.spyOn(benefitsStore, 'fetchAiCoaching').mockResolvedValue()
   vi.spyOn(benefitsStore, 'fetchLimits').mockResolvedValue()
+  vi.spyOn(merchantsStore, 'fetchCategories').mockResolvedValue()
 
-  return { wrapper: mount(Benefits), benefitsStore }
+  return { wrapper: mount(Benefits), benefitsStore, merchantsStore }
 }
 
 beforeEach(() => {
@@ -98,6 +108,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-08-15T12:00:00+09:00'))
   window.console.error = vi.fn()
+  routeHash = ''
 })
 
 afterEach(() => {
@@ -107,14 +118,15 @@ afterEach(() => {
 // ---------------------------------------------------------------------
 // 초기 로딩 / 액션 호출
 // ---------------------------------------------------------------------
-it('mount 시 fetchReport/fetchBreakEven/fetchAiCoaching/fetchLimits를 각각 한 번씩 호출한다', async () => {
-  const { benefitsStore } = mountPage()
+it('mount 시 혜택 데이터와 카테고리를 각각 한 번씩 불러온다', async () => {
+  const { benefitsStore, merchantsStore } = mountPage()
   await flushPromises()
 
   expect(benefitsStore.fetchReport).toHaveBeenCalledTimes(1)
   expect(benefitsStore.fetchBreakEven).toHaveBeenCalledTimes(1)
   expect(benefitsStore.fetchAiCoaching).toHaveBeenCalledTimes(1)
   expect(benefitsStore.fetchLimits).toHaveBeenCalledTimes(1)
+  expect(merchantsStore.fetchCategories).toHaveBeenCalledTimes(1)
 })
 
 it('로딩 상태면 로딩 문구를 보여준다', () => {
@@ -194,10 +206,16 @@ describe('연회비 본전', () => {
     const { wrapper } = mountPage({ breakevenCards: [makeCard({ isBreakEven: true, netBenefit: 3400 })] })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('청춘대로 톡톡카드')
-    expect(wrapper.text()).toContain('본전 달성 4월 12일')
-    expect(wrapper.find('.success-text').exists()).toBe(true)
-    expect(wrapper.find('.danger-text').exists()).toBe(false)
+    const slide = wrapper.get('.breakeven-slide')
+    const statusBadge = slide.get('.be-status-badge')
+    const statusDescription = slide.get('.be-status-title')
+
+    expect(slide.get('.be-card-name').text()).toBe('청춘대로 톡톡카드')
+    expect(statusBadge.text()).toBe('본전 달성')
+    expect(statusDescription.text()).toBe('4월 12일, 연회비 본전을 뽑았어요')
+    expect(statusBadge.classes()).not.toContain('be-status-badge--pending')
+    expect(slide.findAll('.be-stats-row .success-text')).toHaveLength(2)
+    expect(slide.find('.be-stats-row .danger-text').exists()).toBe(false)
   })
 
   it('본전 전이면 빨강 클래스를 붙인다', async () => {
@@ -226,14 +244,17 @@ describe('연회비 본전', () => {
     expect(wrapper.text()).toContain('연회비 본전 정보를 불러오지 못했어요')
   })
 
-  it('카드가 1장이면 슬라이더 화살표가 안 보인다', async () => {
+  it('카드가 1장이면 카드 한 장을 표시하고 슬라이더 화살표는 없다', async () => {
     const { wrapper } = mountPage({ breakevenCards: [makeCard()] })
     await flushPromises()
 
+    expect(wrapper.findAll('.breakeven-slide')).toHaveLength(1)
+    expect(wrapper.get('.be-card-name').text()).toBe('청춘대로 톡톡카드')
+    expect(wrapper.find('button[aria-label="이전 카드"]').exists()).toBe(false)
     expect(wrapper.find('button[aria-label="다음 카드"]').exists()).toBe(false)
   })
 
-  it('카드가 2장 이상이면 슬라이더 화살표가 보이고, 첫 카드에서는 이전 화살표가 비활성화된다', async () => {
+  it('카드가 2장 이상이면 가로 슬라이드에 모든 카드를 표시하고 화살표는 없다', async () => {
     const { wrapper } = mountPage({
       breakevenCards: [
         makeCard({ userCardId: 1, cardName: '첫번째카드' }),
@@ -242,13 +263,12 @@ describe('연회비 본전', () => {
     })
     await flushPromises()
 
-    const prevButton = wrapper.find('button[aria-label="이전 카드"]')
-    const nextButton = wrapper.find('button[aria-label="다음 카드"]')
-
-    expect(prevButton.exists()).toBe(true)
-    expect(nextButton.exists()).toBe(true)
-    expect(prevButton.attributes('disabled')).toBeDefined()
-    expect(nextButton.attributes('disabled')).toBeUndefined()
+    const slides = wrapper.findAll('.breakeven-slide')
+    expect(slides).toHaveLength(2)
+    expect(slides.map((slide) => slide.get('.be-card-name').text())).toEqual(['첫번째카드', '두번째카드'])
+    expect(slides.every((slide) => slide.get('.be-card-owner').text() === '1234')).toBe(true)
+    expect(wrapper.find('button[aria-label="이전 카드"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="다음 카드"]').exists()).toBe(false)
   })
 })
 
@@ -345,16 +365,17 @@ describe('이번 달 받을 수 있는 혜택', () => {
   it('같은 categoryCode가 여러 카드/혜택으로 중복되어도 key 중복 없이 모두 렌더링한다', () => {
     const { wrapper } = mountPage({
       benefitLimits: [
-        makeBenefitLimitItem({ key: '1-CAFE-혜택A', userCardId: 1, cardName: '청춘대로 톡톡카드', serviceName: '카페 5% 청구할인', category: '카페', categoryCode: 'CAFE' }),
-        makeBenefitLimitItem({ key: '2-CAFE-혜택B', userCardId: 2, cardName: '가온 올포인트 체크카드', serviceName: '카페 10% 적립', category: '카페', categoryCode: 'CAFE' }),
+        makeBenefitLimitItem({ key: '1-CAFE-혜택A', userCardId: 1, category: '카페', categoryCode: 'CAFE', used: 1000, limit: 5000, remaining: 4000 }),
+        makeBenefitLimitItem({ key: '2-CAFE-혜택B', userCardId: 2, category: '카페', categoryCode: 'CAFE', used: 2500, limit: 10000, remaining: 7500 }),
       ],
     })
 
-    expect(wrapper.findAll('.benefit-usage-item')).toHaveLength(2)
-    expect(wrapper.text()).toContain('청춘대로 톡톡카드')
-    expect(wrapper.text()).toContain('가온 올포인트 체크카드')
-    expect(wrapper.text()).toContain('카페 5% 청구할인')
-    expect(wrapper.text()).toContain('카페 10% 적립')
+    const items = wrapper.findAll('.benefit-usage-item')
+    expect(items).toHaveLength(2)
+    expect(items[0].text()).toContain('1,000원 사용 / 총 5,000원')
+    expect(items[0].text()).toContain('남은 혜택 4,000원')
+    expect(items[1].text()).toContain('2,500원 사용 / 총 10,000원')
+    expect(items[1].text()).toContain('남은 혜택 7,500원')
   })
 
   it('amountLimit이 null이면(한도 없음) "무제한"으로 표시하고 진행률/남은 금액 계산에서 NaN이 나지 않는다', () => {
@@ -386,5 +407,121 @@ describe('이번 달 받을 수 있는 혜택', () => {
       ],
     })
     expect(wrapperNoCount.text()).not.toContain('회 사용')
+  })
+
+  it('"이 혜택 사용하기"를 누르면 그 카테고리 코드를 쿼리로 담아 지도 화면으로 이동한다', async () => {
+    const { wrapper } = mountPage({
+      benefitLimits: [makeBenefitLimitItem({ key: '1-CAFE-혜택', categoryCode: 'CAFE' })],
+    })
+
+    const useButton = wrapper.findAll('button').find((b) => b.text().includes('이 혜택 사용하기'))
+    await useButton.trigger('click')
+
+    expect(routerPushMock).toHaveBeenCalledWith({ path: '/map', query: { categoryCode: 'CAFE' } })
+  })
+})
+
+// ---------------------------------------------------------------------
+// 홈 화면 "이번 달에 사라지는 혜택" 카드에서 /benefits#available로 진입했을 때 스크롤
+// ---------------------------------------------------------------------
+describe('해시로 진입 시 스크롤', () => {
+  // document.querySelector로 대상을 찾으므로, 실제 document에 붙여야(attachTo) 검증 가능하다.
+  // 다른 테스트에 영향 안 주도록 매번 unmount로 정리한다.
+  function mountAttached() {
+    setActivePinia(createPinia())
+    const benefitsStore = useBenefitsStore()
+    const merchantsStore = useMerchantsStore()
+
+    benefitsStore.$patch({
+      reportMonthLabel: '8월',
+      totalBenefit: 42500,
+      deltaVsLastMonth: 7200,
+      categoryBreakdown: makeCategoryBreakdown(),
+      breakevenCards: [makeCard()],
+      aiTips: makeAiTips(),
+      benefitLimits: makeBenefitLimits(),
+    })
+
+    vi.spyOn(benefitsStore, 'fetchReport').mockResolvedValue()
+    vi.spyOn(benefitsStore, 'fetchBreakEven').mockResolvedValue()
+    vi.spyOn(benefitsStore, 'fetchAiCoaching').mockResolvedValue()
+    vi.spyOn(benefitsStore, 'fetchLimits').mockResolvedValue()
+    vi.spyOn(merchantsStore, 'fetchCategories').mockResolvedValue()
+
+    return mount(Benefits, { attachTo: document.body })
+  }
+
+  it('#available로 들어오면 데이터 로딩이 끝난 뒤 해당 섹션으로 스크롤한다', async () => {
+    routeHash = '#available'
+    const scrollIntoViewSpy = vi.fn()
+    // JSDOM은 scrollIntoView를 구현하지 않아 기본적으로 없다.
+    window.Element.prototype.scrollIntoView = scrollIntoViewSpy
+
+    // fetchLimits를 통째로 mockResolvedValue()로 바꾸면 실제 액션 안의
+    // this.limitsLoading = true/false 전환 자체가 안 돌아서, "로딩 중엔 스크롤 안 하고
+    // 끝난 뒤에 스크롤한다"는 걸 검증할 수 없다. 로딩 상태를 직접 제어할 수 있도록
+    // pending 프로미스로 흉내낸다.
+    let resolveLimits
+    setActivePinia(createPinia())
+    const benefitsStore = useBenefitsStore()
+    const merchantsStore = useMerchantsStore()
+    benefitsStore.$patch({
+      reportMonthLabel: '8월',
+      totalBenefit: 42500,
+      deltaVsLastMonth: 7200,
+      categoryBreakdown: makeCategoryBreakdown(),
+      breakevenCards: [makeCard()],
+      aiTips: makeAiTips(),
+    })
+    vi.spyOn(benefitsStore, 'fetchReport').mockResolvedValue()
+    vi.spyOn(benefitsStore, 'fetchBreakEven').mockResolvedValue()
+    vi.spyOn(benefitsStore, 'fetchAiCoaching').mockResolvedValue()
+    vi.spyOn(merchantsStore, 'fetchCategories').mockResolvedValue()
+    vi.spyOn(benefitsStore, 'fetchLimits').mockImplementation(() => {
+      benefitsStore.limitsLoading = true
+      return new Promise((resolve) => {
+        resolveLimits = () => {
+          benefitsStore.benefitLimits = makeBenefitLimits()
+          benefitsStore.limitsLoading = false
+          resolve()
+        }
+      })
+    })
+
+    const wrapper = mount(Benefits, { attachTo: document.body })
+    await flushPromises()
+
+    // 로딩 중엔 아직 스크롤하면 안 된다 (핵심 회귀 포인트)
+    expect(scrollIntoViewSpy).not.toHaveBeenCalled()
+
+    resolveLimits()
+    await flushPromises()
+
+    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+    wrapper.unmount()
+  })
+
+  it('이미 로딩이 끝난 상태(캐시)로 들어오면 바로 스크롤한다', async () => {
+    routeHash = '#available'
+    const scrollIntoViewSpy = vi.fn()
+    window.Element.prototype.scrollIntoView = scrollIntoViewSpy
+
+    const wrapper = mountAttached()
+    await flushPromises()
+
+    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+    wrapper.unmount()
+  })
+
+  it('해시가 없으면 스크롤하지 않는다', async () => {
+    routeHash = ''
+    const scrollIntoViewSpy = vi.fn()
+    window.Element.prototype.scrollIntoView = scrollIntoViewSpy
+
+    const wrapper = mountAttached()
+    await flushPromises()
+
+    expect(scrollIntoViewSpy).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 })

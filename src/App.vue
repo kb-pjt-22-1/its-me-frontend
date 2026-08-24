@@ -10,16 +10,16 @@
     </div>
 
     <template v-else>
-      <main class="page-container app-page has-bottom-nav">
+      <main class="page-container app-page" :class="{ 'has-bottom-nav': hasBottomNav }">
         <!-- 최상위 라우트(예: 탭 화면들 <-> /menu, /member-profile, /payments 등)가
-             바뀔 때만 전체 화면이 슬라이드됩니다. 탭 사이 이동은 DefaultLayout.vue의
+             바뀔 때만 전체 화면이 방향에 맞춰 슬라이드됩니다. 탭 사이 이동은 DefaultLayout.vue의
              내부 router-view가 담당하므로 여기서는 안 움직입니다 -
              route.matched[0]가 탭 라우트끼리는 전부 '/'로 같기 때문입니다.
              Menu.vue/PaymentsList.vue가 더 이상 자기 루트를 position:fixed로 직접
              뷰포트에 붙이지 않고 이 래퍼를 꽉 채우는 방식으로 바뀌어서(각 페이지
              파일의 .layout-container 주석 참고), 이제 슬라이드가 제대로 그려진다. -->
         <router-view v-slot="{ Component, route }">
-          <transition name="page-slide">
+          <transition :name="pageTransitionName">
             <!-- app-route-scroll은 DefaultLayout('/') 라우트에는 안 붙인다 - 그 안의
                  .main-content가 이미 position:fixed + overflow-y:auto로 스크롤을
                  직접 담당하는데, 조상에 또 overflow-y:auto를 걸면 main.css 상단
@@ -48,31 +48,47 @@
 // Header/NavBar는 '/' 하위 라우트에서 DefaultLayout이 직접 렌더링합니다.
 // 세션 복원은 라우터 가드(router/index.js)가 첫 라우팅 전에 처리하므로 여기서 하지 않습니다.
 // 메뉴는 예전엔 여기서 SidebarMenu를 오버레이로 띄웠는데, /menu 라우트 페이지로 바뀌었습니다.
-import { onMounted, watch } from 'vue';
+import { computed, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
 import { useBookmarksStore } from '@/stores/bookmarks';
 import { usePaymentStore } from '@/stores/payment';
+import { useNotificationsStore } from '@/stores/notifications';
 import ToastHost from '@/components/common/ToastHost.vue';
 import ConfirmDialogHost from '@/components/common/ConfirmDialogHost.vue';
+import { getPageTransitionName } from '@/router';
+import { useLocationReporting } from '@/composables/useLocationReporting';
 
 const authStore = useAuthStore();
 const cardsStore = useCardsStore();
 const merchantsStore = useMerchantsStore();
 const bookmarksStore = useBookmarksStore();
 const paymentStore = usePaymentStore();
+const notificationsStore = useNotificationsStore();
+const locationReporting = useLocationReporting();
+const route = useRoute();
+const pageTransitionName = computed(() => getPageTransitionName());
+const hasBottomNav = computed(() => route.name !== 'onboarding');
 
 function fetchAllUserData() {
   cardsStore.fetchCards();
   merchantsStore.fetchMerchants();
   bookmarksStore.fetchBookmarks();
   paymentStore.fetchHistory();
+  notificationsStore.fetchNotifications();
 }
 
 onMounted(() => {
   // main.js/라우터 가드에서 세션 복원이 끝난 뒤 이 컴포넌트가 뜨므로, 이미 로그인 상태일 수 있습니다.
-  if (authStore.isAuthenticated) fetchAllUserData();
+  if (authStore.isAuthenticated) {
+    fetchAllUserData();
+    // 세션 복원(자동 로그인)은 stores/auth.js의 login/signUp을 안 거쳐서
+    // registerFcmToken이 자동으로 안 불린다 - 웹 SDK엔 토큰 갱신 콜백이 없어서, 앱을 다시
+    // 열 때마다 여기서 한 번 더 확인해야 그 사이 브라우저가 조용히 갱신한 토큰을 놓치지 않는다.
+    authStore.registerFcmToken();
+  }
 });
 
 // 앱이 이미 떠있는 상태에서 방금 로그인에 성공한 경우 - isAuthenticated가
@@ -80,8 +96,30 @@ onMounted(() => {
 watch(
   () => authStore.isAuthenticated,
   (isAuth, wasAuth) => {
-    if (isAuth && !wasAuth) fetchAllUserData();
+    if (!isAuth || wasAuth) return;
+    fetchAllUserData();
+
+    // 방금 회원가입으로 로그인된 경우, KB 카드 자동 연동이 백엔드에서 비동기로 처리되므로
+    // 위 fetchAllUserData() 시점엔 아직 안 끝났을 수 있다 - 한 번 더 늦게 불러와 보정한다.
+    if (authStore.justSignedUp) {
+      authStore.justSignedUp = false;
+      setTimeout(() => cardsStore.fetchCards(), 3000);
+    }
   }
+);
+
+// 북마크한 매장 근처 도착 알림용 위치 보고 - 로그인 상태이고 북마크가 하나라도 있을 때만
+// 감시한다(북마크가 없으면 알림도 없으니 위치를 계속 물어볼 이유가 없다). 로그아웃하거나
+// 북마크를 전부 지우면 즉시 멈춘다. immediate로 둬서 이미 로그인된 채로 앱이 열린
+// 경우(세션 복원)와, fetchAllUserData()가 북마크를 늦게 불러와 개수가 나중에 채워지는
+// 경우를 모두 반응형으로 잡는다.
+watch(
+  () => [authStore.isAuthenticated, bookmarksStore.bookmarks.length],
+  ([isAuth, count]) => {
+    if (isAuth && count > 0) locationReporting.start();
+    else locationReporting.stop();
+  },
+  { immediate: true }
 );
 </script>
 
@@ -96,7 +134,7 @@ body, html {
   padding: 0;
   width: 100%;
   height: 100%;
-  background-color: #f7f7f5;
+  background-color: var(--page, #f2f4f6);
 }
 
 #app {

@@ -4,7 +4,6 @@ import { setActivePinia, createPinia } from 'pinia'
 vi.mock('@/services/authService', () => ({
   loginRequest: vi.fn(),
   logoutRequest: vi.fn(),
-  devLoginRequest: vi.fn(),
   signUpRequest: vi.fn(),
   refreshTokenRequest: vi.fn(),
   fetchProfile: vi.fn(),
@@ -19,12 +18,23 @@ vi.mock('@/utils/tokenStorage', () => ({
   clearAuthStorage: vi.fn(),
 }))
 
+vi.mock('@/services/pushNotificationService', () => ({
+  getFcmToken: vi.fn(),
+  listenForegroundMessages: vi.fn(),
+}))
+
+vi.mock('@/services/memberService', () => ({
+  updateFcmToken: vi.fn(),
+}))
+
 // stores/auth.js는 bootstrapSession()의 중복 호출을 막으려고 모듈 스코프에 Promise를
 // 들고 있다(let bootstrapPromise). 테스트마다 그 상태가 이전 테스트에 오염되지 않도록
 // 매번 모듈 레지스트리를 초기화하고 스토어/목을 새로 import한다.
 let useAuthStore
 let authService
 let tokenStorage
+let pushNotificationService
+let memberService
 
 beforeEach(async () => {
   vi.resetModules()
@@ -32,6 +42,8 @@ beforeEach(async () => {
   setActivePinia(createPinia())
   authService = await import('@/services/authService')
   tokenStorage = await import('@/utils/tokenStorage')
+  pushNotificationService = await import('@/services/pushNotificationService')
+  memberService = await import('@/services/memberService')
   ;({ useAuthStore } = await import('@/stores/auth'))
 })
 
@@ -163,6 +175,18 @@ describe('login', () => {
     expect(tokenStorage.setTokens).toHaveBeenCalledWith({ accessToken: 'access-1', refreshToken: 'refresh-1' })
   })
 
+  it('성공하면 FCM 토큰 등록도 시도한다', async () => {
+    authService.loginRequest.mockResolvedValue({
+      accessToken: 'access-1', refreshToken: 'refresh-1',
+      user: { userId: 1, loginId: 'tester', name: '홍길동' },
+    })
+
+    const store = useAuthStore()
+    await store.login('tester', 'Test1234!')
+
+    expect(pushNotificationService.getFcmToken).toHaveBeenCalled()
+  })
+
   it('실패하면 서버 메시지를 errorMessage에 담고 false를 반환한다', async () => {
     authService.loginRequest.mockRejectedValue({ response: { data: { message: 'invalid login id or password' } } })
 
@@ -184,50 +208,18 @@ describe('login', () => {
   })
 })
 
-describe('devLogin', () => {
-  it('성공하면 세션을 반영하고 true를 반환한다', async () => {
-    authService.devLoginRequest.mockResolvedValue({
-      accessToken: 'dev-access',
-      refreshToken: 'dev-refresh',
-      user: { userId: 3, loginId: 'dev1', name: '개발자1' },
-    })
-
-    const store = useAuthStore()
-    const result = await store.devLogin(1)
-
-    expect(authService.devLoginRequest).toHaveBeenCalledWith(1)
-    expect(result).toBe(true)
-    expect(store.isAuthenticated).toBe(true)
-  })
-
-  it('비활성화(404) 등으로 실패하면 전용 에러 문구를 담는다', async () => {
-    authService.devLoginRequest.mockRejectedValue(new Error())
-
-    const store = useAuthStore()
-    const result = await store.devLogin(1)
-
-    expect(result).toBe(false)
-    expect(store.errorMessage).toBe('개발자 로그인에 실패했습니다.')
-  })
-
-  it('서버가 메시지를 내려주면 그 메시지를 우선한다', async () => {
-    authService.devLoginRequest.mockRejectedValue({ response: { data: { message: 'dev login slot out of range' } } })
-
-    const store = useAuthStore()
-    await store.devLogin(99)
-
-    expect(store.errorMessage).toBe('dev login slot out of range')
-  })
-})
-
 describe('signUp', () => {
-  it('성공하면 true를 반환하고(자동 로그인은 안 한다) 상태를 안 건드린다', async () => {
-    authService.signUpRequest.mockResolvedValue({ userId: 5, loginId: 'newuser' })
+  it('성공하면 로그인 응답과 동일하게 세션을 적용하고 true를 반환한다', async () => {
+    authService.signUpRequest.mockResolvedValue({
+      accessToken: 'access-new', refreshToken: 'refresh-new',
+      user: { userId: 5, loginId: 'newuser', name: 'newuser' },
+    })
 
     const store = useAuthStore()
     const result = await store.signUp({
       loginId: 'newuser',
       password: 'Test1234!',
+      pin: '481027',
       verificationToken: 'verify-token-1',
       fcmToken: 'fcm-1',
     })
@@ -235,30 +227,63 @@ describe('signUp', () => {
     expect(authService.signUpRequest).toHaveBeenCalledWith({
       loginId: 'newuser',
       password: 'Test1234!',
+      pin: '481027',
       verificationToken: 'verify-token-1',
       fcmToken: 'fcm-1',
     })
     expect(result).toBe(true)
-    expect(store.isAuthenticated).toBe(false)
+    expect(store.isAuthenticated).toBe(true)
+    expect(store.accessToken).toBe('access-new')
+    expect(store.justSignedUp).toBe(true)
   })
 
-  it('실패하면 서버 메시지를 errorMessage에 담고 false를 반환한다', async () => {
-    authService.signUpRequest.mockRejectedValue({ response: { data: { message: 'login id already in use' } } })
+  it('실패하면 서버 메시지/상태코드를 담고 false를 반환한다', async () => {
+    authService.signUpRequest.mockRejectedValue({ response: { status: 409, data: { message: 'login id already in use' } } })
 
     const store = useAuthStore()
-    const result = await store.signUp({ loginId: 'dup', password: 'Test1234!' })
+    const result = await store.signUp({ loginId: 'dup', password: 'Test1234!', pin: '481027' })
 
     expect(result).toBe(false)
     expect(store.errorMessage).toBe('login id already in use')
+    expect(store.errorStatus).toBe(409)
+    expect(store.isAuthenticated).toBe(false)
   })
 
   it('서버 메시지도 err.message도 없으면 기본 문구로 대체한다', async () => {
     authService.signUpRequest.mockRejectedValue(new Error())
 
     const store = useAuthStore()
-    await store.signUp({ loginId: 'dup', password: 'Test1234!' })
+    await store.signUp({ loginId: 'dup', password: 'Test1234!', pin: '481027' })
 
     expect(store.errorMessage).toBe('회원가입에 실패했습니다.')
+  })
+})
+
+describe('registerFcmToken', () => {
+  it('토큰을 받으면 백엔드에 등록한다', async () => {
+    pushNotificationService.getFcmToken.mockResolvedValue('fcm-token-1')
+
+    const store = useAuthStore()
+    await store.registerFcmToken()
+
+    expect(memberService.updateFcmToken).toHaveBeenCalledWith('fcm-token-1')
+  })
+
+  it('토큰이 null이면 백엔드를 호출하지 않는다', async () => {
+    pushNotificationService.getFcmToken.mockResolvedValue(null)
+
+    const store = useAuthStore()
+    await store.registerFcmToken()
+
+    expect(memberService.updateFcmToken).not.toHaveBeenCalled()
+  })
+
+  it('등록에 실패해도 예외를 던지지 않는다', async () => {
+    pushNotificationService.getFcmToken.mockResolvedValue('fcm-token-1')
+    memberService.updateFcmToken.mockRejectedValue(new Error('network error'))
+
+    const store = useAuthStore()
+    await expect(store.registerFcmToken()).resolves.toBeUndefined()
   })
 })
 

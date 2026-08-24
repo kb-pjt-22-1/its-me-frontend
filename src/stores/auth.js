@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import {
   loginRequest,
   logoutRequest,
-  devLoginRequest,
   signUpRequest,
   refreshTokenRequest,
   fetchProfile,
@@ -15,6 +14,8 @@ import {
   setStoredUser,
   clearAuthStorage,
 } from '@/utils/tokenStorage'
+import { getFcmToken, listenForegroundMessages } from '@/services/pushNotificationService'
+import { updateFcmToken } from '@/services/memberService'
 
 // 자동 로그인 판정은 앱 실행당 한 번이면 충분하다. 라우터 가드가 라우팅마다 부르므로
 // 진행 중인 Promise를 들고 재사용한다. 스토어 state에 두면 Pinia가 reactive로 감싸
@@ -28,7 +29,9 @@ export const useAuthStore = defineStore('auth', {
     refreshToken: null,
     isLoading: false,
     errorMessage: '',
+    errorStatus: null,     // 마지막 실패 응답의 HTTP 상태코드 - 호출부가 상태코드별로 분기해야 할 때 씀(예: Signup.vue의 401 처리)
     isBootstrapped: false, // 자동 로그인 판정이 끝났는가 (끝나기 전엔 화면을 그리지 않는다)
+    justSignedUp: false,   // 방금 회원가입으로 로그인됐는가 - App.vue가 카드 지연 재조회 트리거로 쓰고 즉시 리셋하는 1회성 신호
   }),
 
   getters: {
@@ -109,48 +112,58 @@ export const useAuthStore = defineStore('auth', {
     async login(loginId, password) {
       this.isLoading = true
       this.errorMessage = ''
+      this.errorStatus = null
       try {
         const session = await loginRequest(loginId, password)
         this.applySession(session)
+        this.registerFcmToken() // 응답을 기다리지 않는다 - 실패해도 로그인 자체는 성공이다
         return true
       } catch (err) {
         this.errorMessage = err.response?.data?.message || err.message || '로그인에 실패했습니다.'
+        this.errorStatus = err.response?.status ?? null
         return false
       } finally {
         this.isLoading = false
       }
     },
 
-    // 개발용 자동 로그인. 비밀번호 없이 slot(1~10)만으로 dev{slot} 계정 토큰을 받아온다.
-    // 백엔드의 dev-login.enabled가 꺼져 있으면 404가 나며 아래 catch로 떨어진다.
-    async devLogin(slot) {
+    // 회원가입 응답이 로그인 응답과 동일한 모양(토큰 포함)이라 login()과 같은 패턴으로
+    // 처리한다 - 가입 즉시 세션이 적용되고, 재로그인 화면을 거치지 않는다.
+    async signUp({ loginId, password, pin, verificationToken, fcmToken }) {
       this.isLoading = true
       this.errorMessage = ''
+      this.errorStatus = null
       try {
-        const session = await devLoginRequest(slot)
+        const session = await signUpRequest({ loginId, password, pin, verificationToken, fcmToken })
         this.applySession(session)
-        return true
-      } catch (err) {
-        this.errorMessage = err.response?.data?.message || err.message || '개발자 로그인에 실패했습니다.'
-        return false
-      } finally {
-        this.isLoading = false
-      }
-    },
-
-    // 회원가입은 UserResponseDto만 돌아오고 토큰이 없다 - 가입 후 자동 로그인은 안 되고,
-    // 방금 만든 아이디/비밀번호로 다시 /login을 호출해야 한다.
-    async signUp({ loginId, password, verificationToken, fcmToken }) {
-      this.isLoading = true
-      this.errorMessage = ''
-      try {
-        await signUpRequest({ loginId, password, verificationToken, fcmToken })
+        this.justSignedUp = true
+        this.registerFcmToken()
         return true
       } catch (err) {
         this.errorMessage = err.response?.data?.message || err.message || '회원가입에 실패했습니다.'
+        this.errorStatus = err.response?.status ?? null
         return false
       } finally {
         this.isLoading = false
+      }
+    },
+
+    /**
+     * 로그인 성공 직후 호출: 알림 권한을 확인/요청해 FCM 등록 토큰을 받아 백엔드에 저장하고
+     * [PATCH /users/me/fcm-token], 포그라운드 메시지 리스너를 붙인다. 웹 SDK엔 네이티브
+     * onNewToken 같은 갱신 콜백이 없어서, "갱신될 때마다"의 웹 대응은 로그인/세션 복원마다
+     * 다시 조회하는 것이다(App.vue에서도 세션 복원 시 호출 - main 참고). 권한 거부·미지원
+     * 브라우저·설정값 없음 등은 전부 getFcmToken()이 null로 돌려주므로 여기서는 있을 때만
+     * 등록한다. 실패해도 로그인 흐름에 영향을 주면 안 되므로 예외를 던지지 않는다.
+     */
+    async registerFcmToken() {
+      try {
+        const token = await getFcmToken()
+        if (!token) return
+        await updateFcmToken(token)
+        listenForegroundMessages()
+      } catch (err) {
+        console.error('[auth store] FCM 토큰 등록 실패', err.message)
       }
     },
 

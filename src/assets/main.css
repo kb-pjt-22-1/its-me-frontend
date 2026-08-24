@@ -87,24 +87,30 @@
   overscroll-behavior-y: contain;
 }
 
-/* 탭 전환(DefaultLayout.vue 내부, 홈/지도/결제/혜택/카드/북마크) - 좌우 슬라이드.
-   이 페이지들은 전부 자기 루트가 position:fixed가 아니라(static/relative)
-   래퍼의 transform을 그대로 잘 따라온다. */
-.page-slide-enter-active,
-.page-slide-leave-active {
+/* 계층형 화면의 진입/복귀 방향은 history position으로 구분한다. */
+.page-slide-forward-enter-active,
+.page-slide-forward-leave-active,
+.page-slide-back-enter-active,
+.page-slide-back-leave-active {
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.page-slide-enter-from { transform: translateX(100%); }
-.page-slide-leave-to { transform: translateX(-100%); }
 
-/* 최상위 라우트 전환(App.vue, 탭 화면 <-> /menu·/payments·/member-profile 등) -
-   페이드. Menu.vue/PaymentsList.vue는 자기 루트가 position:fixed라서 슬라이드로
-   시도했더니(transform을 준 래퍼 안에 fixed 자식을 넣는 방식) 애니메이션 구간에
-   화면이 아예 안 그려지고 끝난 뒤에야 툭 나타나는 문제가 있었다 - will-change로
-   레이어를 미리 승격시켜봐도 동일했다. 정확한 원인은 특정하지 못했지만
-   position:fixed 루트 + transform 조합 자체를 피하면(=슬라이드 대신 페이드)
-   이 문제가 구조적으로 발생할 수 없다. opacity는 위치/컨테이닝 블록과
-   무관하게 항상 정상 동작한다. */
+.page-slide-forward-enter-active,
+.page-slide-back-leave-active {
+  z-index: 2;
+}
+
+.page-slide-forward-leave-active,
+.page-slide-back-enter-active {
+  z-index: 1;
+}
+
+.page-slide-forward-enter-from { transform: translateX(100%); }
+.page-slide-forward-leave-to { transform: translateX(-100%); }
+.page-slide-back-enter-from { transform: translateX(-100%); }
+.page-slide-back-leave-to { transform: translateX(100%); }
+
+/* DefaultLayout 안의 하단 탭 화면끼리는 Header/Footer를 고정한 채 짧게 페이드한다. */
 .page-fade-enter-active,
 .page-fade-leave-active {
   transition: opacity 0.2s ease;
@@ -113,8 +119,19 @@
 .page-fade-leave-to {
   opacity: 0;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-slide-forward-enter-active,
+  .page-slide-forward-leave-active,
+  .page-slide-back-enter-active,
+  .page-slide-back-leave-active,
+  .page-fade-enter-active,
+  .page-fade-leave-active {
+    transition: none;
+  }
+}
 .page-content { padding: 0 18px 24px; }
-.surface-card { background: var(--surface); border-radius: 20px; box-shadow: 0 8px 25px rgba(55, 48, 39, .06); }
+.surface-card { background: var(--surface, #ffffff); border: 1px solid #f2f2f2; border-radius: 20px; box-shadow: 0 6px 20px rgba(36, 33, 29, 0.09); }
 
 @media (min-width: 700px) {
   .mobile-shell { margin: 24px auto; min-height: calc(100vh - 48px); border-radius: 18px; overflow: hidden; }
@@ -191,7 +208,7 @@
   font-size: 11px;
   font-weight: 600;
 }
-.pill--mint { color: var(--green, #00a878); background: #ebf7f3; }
+.pill--mint { color: #3a977c; background: #ebf7f3; }
 .pill--gold { color: var(--gold, #b67a00); background: var(--gold-bg, #fff6dd); }
 .pill--muted { color: var(--muted, #8f897f); background: var(--inactive, #f0efec); }
 .pill--danger { color: var(--danger, #d94343); background: #fde7e6; }
@@ -206,11 +223,11 @@
 .progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #ffbc00, #ffd84d);
+  background: linear-gradient(90deg, #ffbe49, #ffd978);
   transition: width 0.4s;
 }
 .progress-fill--met {
-  background: linear-gradient(90deg, #00c48c, #00a878);
+  background: linear-gradient(90deg, #ffbe49, #ffd978);
 }
 
 .info-strip {
@@ -232,7 +249,7 @@
 }
 
 .danger-text { color: var(--danger, #d94343); font-weight: 700; }
-.success-text { color: var(--green, #00a878); font-weight: 700; }
+.success-text { color: #3a977c; font-weight: 700; }
 .muted-text { color: var(--muted, #8f897f); }
 
 .toggle-switch {

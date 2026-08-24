@@ -17,7 +17,9 @@ import {
   fetchMerchantDetail,
   fetchMerchantCategories,
   fetchMerchantBrands,
+  sortCategories,
 } from '@/services/merchantsService.js'
+import { getCategoryPinIcon } from '@/utils/categoryPinIcons.js'
 
 const rawMerchant = {
   merchantId: 5,
@@ -28,7 +30,6 @@ const rawMerchant = {
   address: '서울시 강남구',
   latitude: 37.5,
   longitude: 127.0,
-  phone: '02-000-0000',
 }
 
 const normalizedMerchant = {
@@ -40,7 +41,6 @@ const normalizedMerchant = {
   address: '서울시 강남구',
   lat: 37.5,
   lng: 127.0,
-  phone: '02-000-0000',
 }
 
 beforeEach(() => {
@@ -53,8 +53,16 @@ describe('fetchMerchantList', () => {
 
     const result = await fetchMerchantList()
 
-    expect(api.get).toHaveBeenCalledWith('/v1/merchants')
+    expect(api.get).toHaveBeenCalledWith('/v1/merchants', { params: { categoryCode: undefined } })
     expect(result).toEqual([normalizedMerchant])
+  })
+
+  it('categoryCode를 넘기면 그대로 params에 포함한다', async () => {
+    api.get.mockResolvedValueOnce({ data: [rawMerchant] })
+
+    await fetchMerchantList('5812')
+
+    expect(api.get).toHaveBeenCalledWith('/v1/merchants', { params: { categoryCode: '5812' } })
   })
 })
 
@@ -64,8 +72,10 @@ describe('fetchRecommendedNearbyMerchants', () => {
       data: [{
         ...rawMerchant,
         benefitAvailable: true,
-        benefitSummary: '이번 달 확정 100원',
-        recommendedCardName: '테스트카드',
+        // benefitSummary/recommendedCardName은 최상위가 아니라 recommendedCards[0]에 온다
+        // (total 기준 1순위 카드) - 예전엔 최상위 필드를 읽어서 항상 undefined였다.
+        recommendedCards: [{ userCardId: 1, cardName: '테스트카드', benefitSummary: '이번 달 확정 100원', discountAmount: 500 }],
+        typicalPaymentAmount: 10000,
       }],
     })
 
@@ -90,7 +100,43 @@ describe('fetchRecommendedNearbyMerchants', () => {
       recommended: true,
       benefitSummary: '이번 달 확정 100원',
       recommendedCardName: '테스트카드',
+      discountAmount: 500,
+      typicalPaymentAmount: 10000,
     }])
+  })
+
+  it('추천 카드가 없어 benefitAvailable=false면 typicalPaymentAmount가 없어도(null) 정상 처리한다', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [{
+        ...rawMerchant,
+        benefitAvailable: false,
+        recommendedCards: [],
+        typicalPaymentAmount: null,
+      }],
+    })
+
+    const [result] = await fetchRecommendedNearbyMerchants(
+      { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 },
+      { lat: 37.5, lng: 127.1 },
+    )
+
+    expect(result.typicalPaymentAmount).toBeNull()
+    expect(result.benefitSummary).toBeNull()
+    expect(result.recommendedCardName).toBeNull()
+    expect(result.discountAmount).toBeNull()
+  })
+
+  it('typicalPaymentAmount 필드가 응답에 아예 없으면 null로 정규화한다', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [{ ...rawMerchant, benefitAvailable: false }],
+    })
+
+    const [result] = await fetchRecommendedNearbyMerchants(
+      { swLat: 37.4, swLng: 127.0, neLat: 37.6, neLng: 127.2 },
+      { lat: 37.5, lng: 127.1 },
+    )
+
+    expect(result.typicalPaymentAmount).toBeNull()
   })
 
   it('categoryCode를 넘기면 그대로 params에 포함한다', async () => {
@@ -123,8 +169,8 @@ describe('fetchTodayRecommendedMerchants', () => {
         ...rawMerchant,
         distanceMeters: 250,
         benefitAvailable: true,
-        benefitSummary: '이번 달 확정 100원',
-        recommendedCardName: '테스트카드',
+        recommendedCards: [{ userCardId: 1, cardName: '테스트카드', benefitSummary: '이번 달 확정 100원', discountAmount: 500 }],
+        typicalPaymentAmount: 10000,
       }],
     })
 
@@ -139,7 +185,19 @@ describe('fetchTodayRecommendedMerchants', () => {
       recommended: true,
       benefitSummary: '이번 달 확정 100원',
       recommendedCardName: '테스트카드',
+      discountAmount: 500,
+      typicalPaymentAmount: 10000,
     }])
+  })
+
+  it('추천 카드가 없으면 typicalPaymentAmount를 null로 정규화한다', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [{ ...rawMerchant, distanceMeters: 250, benefitAvailable: false }],
+    })
+
+    const [result] = await fetchTodayRecommendedMerchants(37.5, 127.0, '5812')
+
+    expect(result.typicalPaymentAmount).toBeNull()
   })
 })
 
@@ -155,14 +213,86 @@ describe('fetchMerchantDetail', () => {
 })
 
 describe('fetchMerchantCategories', () => {
-  it('카테고리 목록을 그대로 반환한다', async () => {
-    const categories = [{ categoryCode: '5812', categoryName: '음식점', categoryIcon: 'x' }]
+  it('카테고리 목록을 조회하고, 백엔드 categoryIcon(더미 CDN URL)은 로컬 아이콘으로 덮어쓴다', async () => {
+    const categories = [{ categoryCode: '5812', categoryName: '음식점', categoryIcon: 'https://cdn.benepay.com/icons/food.svg' }]
     api.get.mockResolvedValueOnce({ data: categories })
 
     const result = await fetchMerchantCategories()
 
     expect(api.get).toHaveBeenCalledWith('/v1/merchant-categories')
-    expect(result).toEqual(categories)
+    expect(result).toEqual([{ ...categories[0], categoryIcon: getCategoryPinIcon('5812') }])
+  })
+
+  it('자주 쓰는 카테고리(음식점/카페/편의점)가 앞으로 오도록 응답 순서를 재정렬한다', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [
+        { categoryCode: 'GAS', categoryName: '주유소' },
+        { categoryCode: 'CVS', categoryName: '편의점' },
+        { categoryCode: 'FOOD', categoryName: '음식점' },
+        { categoryCode: 'CAFE', categoryName: '카페' },
+      ],
+    })
+
+    const result = await fetchMerchantCategories()
+
+    expect(result.map((c) => c.categoryName)).toEqual(['음식점', '카페', '편의점', '주유소'])
+  })
+
+  it('정렬 기준 목록에 없는 카테고리는 원래 순서 그대로 맨 뒤에 붙는다', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [
+        { categoryCode: 'NEW2', categoryName: '새카테고리2' },
+        { categoryCode: 'CAFE', categoryName: '카페' },
+        { categoryCode: 'NEW1', categoryName: '새카테고리1' },
+      ],
+    })
+
+    const result = await fetchMerchantCategories()
+
+    expect(result.map((c) => c.categoryName)).toEqual(['카페', '새카테고리2', '새카테고리1'])
+  })
+})
+
+// sortCategories: 정렬 로직을 rankFn으로 분리해둔 이유(나중에 결제 빈도 기반 개인화 정렬을
+// 끼워 넣을 자리) 자체를 검증한다 - 기본 정렬과 무관한 커스텀 rankFn이 실제로 먹히는지 확인.
+describe('sortCategories', () => {
+  it('rankFn을 넘기지 않으면 DEFAULT_CATEGORY_ORDER(음식점/카페/편의점 우선) 기준으로 정렬한다', () => {
+    const categories = [
+      { categoryCode: 'CVS', categoryName: '편의점' },
+      { categoryCode: 'FOOD', categoryName: '음식점' },
+      { categoryCode: 'CAFE', categoryName: '카페' },
+    ]
+
+    const result = sortCategories(categories)
+
+    expect(result.map((c) => c.categoryName)).toEqual(['음식점', '카페', '편의점'])
+  })
+
+  it('커스텀 rankFn(예: 결제 빈도)을 넘기면 그 기준으로 정렬한다 - 개인화 정렬의 확장 지점', () => {
+    const categories = [
+      { categoryCode: 'FOOD', categoryName: '음식점' },
+      { categoryCode: 'CAFE', categoryName: '카페' },
+      { categoryCode: 'CVS', categoryName: '편의점' },
+    ]
+    // 결제 빈도가 높을수록 앞에 오도록: 편의점 10회 > 카페 3회 > 음식점 1회
+    const frequencyByCode = { CVS: 10, CAFE: 3, FOOD: 1 }
+    const byFrequency = (c) => -(frequencyByCode[c.categoryCode] ?? 0)
+
+    const result = sortCategories(categories, byFrequency)
+
+    expect(result.map((c) => c.categoryName)).toEqual(['편의점', '카페', '음식점'])
+  })
+
+  it('원본 배열을 변형하지 않는다', () => {
+    const categories = [
+      { categoryCode: 'CVS', categoryName: '편의점' },
+      { categoryCode: 'FOOD', categoryName: '음식점' },
+    ]
+    const original = [...categories]
+
+    sortCategories(categories)
+
+    expect(categories).toEqual(original)
   })
 })
 

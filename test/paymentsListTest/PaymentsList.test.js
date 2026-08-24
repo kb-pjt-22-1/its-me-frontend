@@ -8,38 +8,32 @@ vi.mock('vue-router', () => ({
 }))
 
 import PaymentsList from '@/pages/PaymentsList.vue'
+import PaymentDetailSheet from '@/components/payment/PaymentDetailSheet.vue'
 import { usePaymentStore } from '@/stores/payment'
-import { useMerchantsStore } from '@/stores/merchants'
 
 const baseItem = {
   paymentId: 1,
-  merchantId: 1,
+  merchantName: '스타벅스',
+  categoryCode: '5812',
   finalAmount: 5000,
   discountAmount: 500,
   paymentTime: '2026-08-05T13:30:00',
   cardName: '가온카드',
 }
 
-function mountPage({
-  history = [],
-  isLoading = false,
-  merchants = [{ id: 1, name: '스타벅스', categoryCode: '5812' }],
-} = {}) {
+function mountPage({ history = [], isLoading = false } = {}) {
   setActivePinia(createPinia())
   const paymentStore = usePaymentStore()
-  const merchantsStore = useMerchantsStore()
 
-  paymentStore.history = history
-  paymentStore.isLoading = isLoading
-  paymentStore.fetchHistory = vi.fn()
-  merchantsStore.merchants = merchants
-  merchantsStore.fetchMerchants = vi.fn()
+  paymentStore.monthlyHistory = history
+  paymentStore.isMonthlyLoading = isLoading
+  paymentStore.fetchMonthlyHistory = vi.fn()
 
   const wrapper = mount(PaymentsList, {
-    global: { stubs: { Footer: true } },
+    global: { stubs: { Footer: true, PaymentDetailSheet: true } },
   })
 
-  return { wrapper, paymentStore, merchantsStore }
+  return { wrapper, paymentStore }
 }
 
 beforeEach(() => {
@@ -62,16 +56,33 @@ describe('로딩/빈 상태', () => {
 })
 
 describe('결제 내역 정규화', () => {
-  it('merchantsStore에서 매장 이름을 채워 넣는다', () => {
+  it('응답의 매장명을 그대로 보여준다', () => {
     const { wrapper } = mountPage({ history: [{ ...baseItem }] })
 
     expect(wrapper.text()).toContain('스타벅스')
   })
 
-  it('매칭되는 매장이 없으면 "알 수 없는 매장"을 보여준다', () => {
-    const { wrapper } = mountPage({ history: [{ ...baseItem, merchantId: 999 }] })
+  it('매장명이 없으면 "알 수 없는 매장"을 보여준다', () => {
+    const { wrapper } = mountPage({ history: [{ ...baseItem, merchantName: undefined }] })
 
     expect(wrapper.text()).toContain('알 수 없는 매장')
+  })
+
+  it('카테고리 아이콘 없이 결제금액과 할인금액을 현재 형식으로 보여준다', () => {
+    const { wrapper } = mountPage({ history: [{ ...baseItem }] })
+    const item = wrapper.find('.history-item')
+
+    expect(item.find('.item-icon').exists()).toBe(false)
+    expect(item.find('.price').text()).toBe('5,000원')
+    expect(item.find('.price').text()).not.toBe('-5,000원')
+    expect(item.find('.benefit').text()).toBe('500원 할인')
+    expect(item.find('.benefit').text()).not.toBe('할인 500원')
+  })
+
+  it('할인금액이 0이면 할인 문구를 표시하지 않는다', () => {
+    const { wrapper } = mountPage({ history: [{ ...baseItem, discountAmount: 0 }] })
+
+    expect(wrapper.find('.history-item .benefit').exists()).toBe(false)
   })
 
   it('paymentTime이 없으면 paidAt을 대신 쓴다', () => {
@@ -116,52 +127,49 @@ describe('결제 내역 정규화', () => {
   })
 })
 
-describe('매장 목록 프리페치', () => {
-  it('매장 목록이 이미 있으면 다시 불러오지 않는다', () => {
-    const { merchantsStore } = mountPage({ merchants: [{ id: 1, name: '스타벅스' }] })
-
-    expect(merchantsStore.fetchMerchants).not.toHaveBeenCalled()
-  })
-
-  it('매장 목록이 비어 있으면 새로 불러온다', () => {
-    const { merchantsStore } = mountPage({ merchants: [] })
-
-    expect(merchantsStore.fetchMerchants).toHaveBeenCalledTimes(1)
-  })
-})
-
 describe('상호작용', () => {
-  it('내역을 클릭하면 결제 상세 화면으로 이동한다', async () => {
+  it('내역을 클릭하면 선택한 결제 ID로 상세 시트를 열고 라우팅하지 않는다', async () => {
     const { wrapper } = mountPage({ history: [{ ...baseItem, paymentId: 42 }] })
+    const detailSheet = wrapper.getComponent(PaymentDetailSheet)
+
+    expect(detailSheet.props('open')).toBe(false)
+    expect(detailSheet.props('paymentId')).toBe(null)
 
     await wrapper.find('.history-item').trigger('click')
 
-    expect(pushMock).toHaveBeenCalledWith('/payments/42')
+    expect(detailSheet.props('open')).toBe(true)
+    expect(detailSheet.props('paymentId')).toBe(42)
+    expect(pushMock).not.toHaveBeenCalled()
   })
 
-  it('다음 달 화살표를 누르면 다음 달 데이터를 다시 조회한다', async () => {
+  it('이번 달을 보고 있으면 다음 달 버튼이 비활성화되고, 눌러도 추가로 조회하지 않는다', async () => {
     const { wrapper, paymentStore } = mountPage()
-    const now = new Date()
-    const nextMonth = now.getMonth() + 2 > 12
-      ? { y: now.getFullYear() + 1, m: 1 }
-      : { y: now.getFullYear(), m: now.getMonth() + 2 }
-    const expected = `${nextMonth.y}${String(nextMonth.m).padStart(2, '0')}`
+    const callsAfterMount = paymentStore.fetchMonthlyHistory.mock.calls.length
+    const nextBtn = wrapper.find('.date-arrow[aria-label="다음 달"]')
 
-    await wrapper.find('.date-arrow[aria-label="다음 달"]').trigger('click')
+    expect(nextBtn.attributes('disabled')).toBeDefined()
 
-    expect(paymentStore.fetchHistory).toHaveBeenLastCalledWith({ yearMonth: expected })
+    await nextBtn.trigger('click')
+
+    expect(paymentStore.fetchMonthlyHistory.mock.calls.length).toBe(callsAfterMount)
   })
 
-  it('다음 달 화살표를 12번 누르면 1년 뒤 같은 달로 이동한다 (12월→1월 롤오버 포함)', async () => {
+  it('과거 달에서 다음 달을 여러 번 눌러도 이번 달을 넘어서 이동하지 않는다', async () => {
     const { wrapper, paymentStore } = mountPage()
     const now = new Date()
 
     for (let i = 0; i < 12; i++) {
+      await wrapper.find('.date-arrow[aria-label="이전 달"]').trigger('click')
+    }
+
+    // 12번이면 정확히 이번 달, 그 이상(15번)을 눌러도 넘어가지 못해야 한다.
+    for (let i = 0; i < 15; i++) {
       await wrapper.find('.date-arrow[aria-label="다음 달"]').trigger('click')
     }
 
-    const expected = `${now.getFullYear() + 1}${String(now.getMonth() + 1).padStart(2, '0')}`
-    expect(paymentStore.fetchHistory).toHaveBeenLastCalledWith({ yearMonth: expected })
+    const expected = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+    expect(paymentStore.fetchMonthlyHistory).toHaveBeenLastCalledWith({ yearMonth: expected })
+    expect(wrapper.find('.date-arrow[aria-label="다음 달"]').attributes('disabled')).toBeDefined()
   })
 
   it('이전 달 화살표를 12번 누르면 1년 전 같은 달로 이동한다 (1월→12월 롤오버 포함)', async () => {
@@ -173,6 +181,6 @@ describe('상호작용', () => {
     }
 
     const expected = `${now.getFullYear() - 1}${String(now.getMonth() + 1).padStart(2, '0')}`
-    expect(paymentStore.fetchHistory).toHaveBeenLastCalledWith({ yearMonth: expected })
+    expect(paymentStore.fetchMonthlyHistory).toHaveBeenLastCalledWith({ yearMonth: expected })
   })
 })

@@ -7,39 +7,45 @@
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </button>
-        <h2>메뉴</h2>
+        <h2>마이페이지</h2>
         <div class="right-placeholder"></div>
       </header>
 
       <div class="profile-card">
         <h3>{{ userName }}님, 반가워요</h3>
-        <p>이번 달 혜택 {{ monthlyBenefit.toLocaleString() }}원</p>
+        <p>이번 달 받은 혜택 {{ monthlyBenefit.toLocaleString() }}원</p>
+      </div>
+
+      <div class="menu-section">
+        <p class="section-title">이용 내역</p>
+
+        <router-link to="/payments" class="menu-item">
+          결제 내역 &gt;
+        </router-link>
       </div>
 
       <div class="menu-section">
         <p class="section-title">계정 및 보안</p>
-        <router-link to="/payments" class="menu-item">
-          결제 내역 &gt;
-        </router-link>
+
         <router-link to="/pin-setting" class="menu-item">
           간편 비밀번호(PIN) 설정 &gt;
         </router-link>
+
         <router-link to="/member-profile" class="menu-item">
           개인정보 및 보안 &gt;
         </router-link>
       </div>
 
       <div class="menu-section">
-        <p class="menu-section-title">서비스</p>
-        <div class="menu-item">고객센터 &gt;</div>
-        <div class="menu-item">공지사항 &gt;</div>
-        <div class="menu-item">이용약관 &gt;</div>
-        <div class="menu-item">개인정보처리방침 &gt;</div>
+        <p class="section-title">고객지원</p>
+          <div class="menu-item">고객센터 &gt;</div>
+          <div class="menu-item">공지사항 &gt;</div>
+          <div class="menu-item">약관 및 정책 &gt;</div>
       </div>
 
       <div class="footer-actions">
         <button class="logout-btn" @click="handleLogout">로그아웃</button>
-        <button class="withdraw-btn danger-text">회원 탈퇴</button>
+        <button class="withdraw-btn danger-text" @click="handleWithdraw">회원 탈퇴</button>
       </div>
     </div>
 
@@ -53,10 +59,15 @@ import { useRouter } from 'vue-router';
 import Footer from '@/layouts/menu/Footer.vue';
 import { useAuthStore } from '@/stores/auth';
 import { usePaymentStore } from '@/stores/payment';
+import { useConfirmDialog } from '@/composables/useConfirmDialog';
+import { useToast } from '@/composables/useToast';
+import { withdraw } from '@/services/memberService';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const paymentStore = usePaymentStore();
+const confirmDialog = useConfirmDialog();
+const toast = useToast();
 
 const userName = computed(() => authStore.userName);
 
@@ -82,6 +93,28 @@ onMounted(() => {
 const handleLogout = async () => {
   await authStore.logout();
   router.push('/login');
+};
+
+const handleWithdraw = async () => {
+  const confirmed = await confirmDialog.confirm('정말로 탈퇴 하시겠습니까?', {
+    confirmText: '예',
+    cancelText: '아니오',
+    danger: true,
+  });
+  if (!confirmed) return;
+
+  try {
+    await withdraw();
+    // 백엔드가 이미 이 세션의 access/refresh 토큰을 무효화했으므로, 서버 로그아웃 호출 없이
+    // 로컬 저장소만 정리한다(authStore.logout()은 서버 로그아웃 API를 한 번 더 부르는데,
+    // 이미 블랙리스트된 토큰이라 의미 없는 401만 발생시킨다).
+    authStore.clearSession();
+    toast.success('탈퇴가 완료됐어요.');
+    router.push('/login');
+  } catch (err) {
+    console.error('회원 탈퇴 실패', err.message);
+    toast.error('회원 탈퇴에 실패했어요. 다시 시도해주세요.');
+  }
 };
 </script>
 
@@ -117,7 +150,7 @@ const handleLogout = async () => {
 .profile-card {
   background: var(--dark, #545045);
   color: #ffffff;
-  padding: 20px;
+  padding: 17px 20px;
   border-radius: 17px;
   margin: 6px 0 20px;
 }
@@ -143,7 +176,7 @@ const handleLogout = async () => {
 }
 
 .footer-actions {
-  margin-top: 40px;
+  margin-top: 30px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -155,6 +188,7 @@ const handleLogout = async () => {
   padding: 15px;
   border: 1px solid var(--line, #e7e4de);
   background: var(--surface, #ffffff);
+  box-shadow: 0 3px 12px rgba(46, 42, 36, 0.08);
   border-radius: 12px;
   color: var(--charcoal, #24211d);
 }

@@ -36,8 +36,7 @@ function handleCancel() {
 </script>
 
 <style scoped>
-/* PortOneVerifyModal.vue의 .modal-backdrop/.modal-card와 동일한 배경/카드 스타일 -
-   기존 모달과 시각적으로 통일한다. */
+/* 앱 전역 모달의 배경/카드 스타일 컨벤션(반투명 어두운 배경 + 흰 카드)과 통일한다. */
 .confirm-backdrop {
   position: fixed;
   inset: 0;

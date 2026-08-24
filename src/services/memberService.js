@@ -49,3 +49,21 @@ export async function registerPin(pin) {
 export async function updatePin(currentPin, newPin) {
   await api.put('/users/me/pin', { currentPin, newPin })
 }
+
+/**
+ * 로그인한 기기의 FCM 등록 토큰을 저장한다. "저장한 매장 근처 도착 알림"이 이 토큰으로
+ * 푸시를 받는다 - 유저당 토큰 1개만 저장되며, 가장 최근 호출한 기기 값으로 덮어써진다.
+ * 빈 문자열/255자 초과는 400, 미인증은 401.
+ */
+export async function updateFcmToken(fcmToken) {
+  await api.patch('/users/me/fcm-token', { fcmToken })
+}
+
+/**
+ * 회원 탈퇴. DELETE /users/me?confirmed=true - confirmed 없이 호출하면 백엔드가 400으로
+ * 거부한다(WithdrawalNotConfirmedException). 성공하면 백엔드가 이 요청의 accessToken을
+ * 블랙리스트에 넣고 refreshToken도 폐기하므로, 호출부가 로컬 세션도 함께 정리해야 한다.
+ */
+export async function withdraw() {
+  await api.delete('/users/me', { params: { confirmed: true } })
+}

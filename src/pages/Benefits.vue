@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <!-- AI 혜택 코치 [POST /api/v1/benefits/coaching] -->
+    <!-- AI 혜택 코치 [GET /api/v1/benefits/coaching] -->
     <section class="surface-card ai-card">
       <span class="pill pill--gold ai-badge">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"></path></svg>
@@ -56,51 +56,48 @@
                   <polyline points="15 18 9 12 15 6"></polyline>
                 </svg>
               </button>
-              <p class="report-label">{{ reportMonthLabel }} 혜택 리포트</p>
+              <p class="report-label">{{ reportMonthLabel }}</p>
               <button type="button" class="month-nav-btn" aria-label="다음 달" :disabled="isCurrentMonth" @click="goToNextMonth">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
               </button>
-              <span
-                class="report-delta"
-                :class="deltaVsLastMonth >= 0 ? 'success-text' : 'danger-text'"
-              >
-                {{ deltaVsLastMonth >= 0 ? '▲' : '▼' }} 지난달보다 {{ deltaVsLastMonth >= 0 ? '+' : '' }}{{ deltaVsLastMonth.toLocaleString() }}원
-              </span>
+              <div class="report-delta-wrap">
+                <span
+                    class="report-delta"
+                    :class="deltaVsLastMonth >= 0 ? 'success-text' : 'danger-text'"
+                >
+                  {{ deltaVsLastMonth >= 0 ? '▲' : '▼' }}
+                  지난달보다 {{ deltaVsLastMonth >= 0 ? '+' : '' }}{{ deltaVsLastMonth.toLocaleString() }}원
+                </span>
+                <p class="report-sub muted-text">할인 및 적립 포함</p>
+              </div>
             </div>
-
-            <p class="report-sub muted-text">할인 및 적립 포함</p>
           </div>
 
-          <p class="report-caption muted-text">{{ reportMonthLabel }}에 받은 혜택</p>
           <p class="report-total">{{ totalBenefit.toLocaleString() }}원</p>
 
-          <div v-if="categoryBreakdown.length === 0" class="benefit-usage-empty muted-text">
-            {{ reportMonthLabel }}에 받은 혜택이 아직 없어요.
+          <div v-if="reportCategories.length === 0" class="benefit-usage-empty muted-text">
+            받은 혜택이 아직 없어요.
           </div>
 
           <template v-else>
-            <div class="donut-row" :class="{ 'donut-row--collapsed': !showFullBreakdown }">
-              <svg
-                viewBox="0 0 120 120"
-                class="donut-chart"
-                :class="{ 'donut-chart--large': !showFullBreakdown }"
-              >
+            <div class="donut-row">
+              <svg viewBox="0 0 120 120" class="donut-chart">
                 <circle
-                  v-for="(seg, i) in donutSegments"
-                  :key="i"
-                  cx="60" cy="60" r="45"
-                  fill="none"
-                  :stroke="seg.color"
-                  stroke-width="16"
-                  :stroke-dasharray="`${seg.length} ${circumference - seg.length}`"
-                  :stroke-dashoffset="seg.offset"
-                  transform="rotate(-90 60 60)"
-                  class="donut-segment"
-                  @mouseenter="activeSegment = seg.cat"
-                  @mouseleave="activeSegment = null"
-                  @click="activeSegment = activeSegment === seg.cat ? null : seg.cat"
+                    v-for="(seg, i) in donutSegments"
+                    :key="i"
+                    cx="60" cy="60" r="45"
+                    fill="none"
+                    :stroke="seg.color"
+                    stroke-width="16"
+                    :stroke-dasharray="`${seg.length} ${circumference - seg.length}`"
+                    :stroke-dashoffset="seg.offset"
+                    transform="rotate(-90 60 60)"
+                    class="donut-segment"
+                    @mouseenter="activeSegment = seg.cat"
+                    @mouseleave="activeSegment = null"
+                    @click="activeSegment = activeSegment === seg.cat ? null : seg.cat"
                 />
 
                 <template v-if="activeSegment">
@@ -108,7 +105,7 @@
                     {{ activeSegment.name }}
                   </text>
                   <text x="60" y="72" text-anchor="middle" class="donut-center-label">
-                    {{ activeSegment.amount.toLocaleString() }}원 · {{ activeSegment.percent }}%
+                    {{ activeSegment.amount.toLocaleString() }}원 · {{ activeSegment.percentLabel }}
                   </text>
                 </template>
                 <template v-else>
@@ -117,31 +114,29 @@
                 </template>
               </svg>
 
-              <ul v-if="showFullBreakdown" class="donut-legend">
+              <ul class="donut-legend">
                 <li
-                  v-for="cat in categoryBreakdown"
-                  :key="cat.categoryCode"
-                  :class="{ active: activeSegment === cat }"
-                  @mouseenter="activeSegment = cat"
-                  @mouseleave="activeSegment = null"
+                    v-for="cat in reportCategories"
+                    :key="cat.categoryCode"
+                    :class="{ active: activeSegment === cat }"
+                    @mouseenter="activeSegment = cat"
+                    @mouseleave="activeSegment = null"
                 >
                   <span class="legend-dot" :style="{ background: cat.color }"></span>
                   <span class="legend-name">{{ cat.name }}</span>
-                  <span class="legend-percent">{{ cat.percent }}%</span>
+                  <span class="legend-percent">{{ cat.percentLabel }}</span>
                   <span class="legend-amount muted-text">{{ cat.amount.toLocaleString() }}원</span>
                 </li>
               </ul>
             </div>
 
-            <p v-if="!showFullBreakdown" class="report-summary muted-text">
-              {{ topTwoCategoriesLabel }}
-            </p>
-
-            <button type="button" class="expand-btn" @click="showFullBreakdown = !showFullBreakdown; activeSegment = null">
-              {{ showFullBreakdown ? '간단히 보기' : '전체 구성 보기' }}
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="{ flipped: showFullBreakdown }">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
+            <button
+                v-if="positiveCategoryBreakdown.length > 5"
+                type="button"
+                class="report-expand-btn"
+                @click="toggleReportExpanded"
+            >
+              {{ reportExpanded ? '간단히 보기' : '전체 구성 보기' }}
             </button>
           </template>
         </template>
@@ -149,14 +144,19 @@
     </section>
 
     <!-- 이번 달 받을 수 있는 혜택 [GET /api/v1/benefits/limits] -->
-    <section class="available-section">
-      <div class="section-header">
-        <h3 class="section-title">이번 달 받을 수 있는 혜택</h3>
-        <button type="button" class="link-btn">전체 카드</button>
+    <section id="available" class="available-section">
+      <div class="available-heading">
+        <div class="section-header">
+          <h3 class="section-title">이번 달 받을 수 있는 혜택</h3>
+          <button type="button" class="link-btn">전체 카드</button>
+        </div>
+
+        <p class="section-sub muted-text">
+          보유한 전체 카드의 카테고리별 혜택 현황이에요.
+        </p>
       </div>
 
       <div class="surface-card available-card">
-        <p class="section-sub muted-text">보유한 전체 카드의 카테고리별 혜택 현황이에요.</p>
 
         <div v-if="limitsLoading" class="benefit-usage-loading muted-text">불러오는 중...</div>
 
@@ -172,18 +172,32 @@
         <template v-else>
           <div class="benefit-usage-list">
             <div v-for="item in visibleAvailableBenefits" :key="item.key" class="benefit-usage-item">
-              <span class="usage-icon">{{ item.icon }}</span>
+              <span class="usage-icon">
+                <img
+                    v-if="getBenefitCategoryIcon(item.categoryCode)"
+                    :src="getBenefitCategoryIcon(item.categoryCode)"
+                    :alt="`${item.category} 아이콘`"
+                    class="usage-category-icon"
+                />
+              </span>
               <div class="usage-main">
                 <div class="usage-top-row">
                   <strong>{{ item.category }}</strong>
-                  <button type="button" class="usage-link">이 혜택 사용하기 &gt;</button>
+                  <button type="button" class="usage-link" @click="goToBenefitMap(item.categoryCode)">이 혜택 사용하기 &gt;</button>
                 </div>
-                <p class="usage-sub muted-text">{{ item.cardName }} · {{ item.serviceName }}</p>
-                <p class="usage-desc muted-text">{{ item.used.toLocaleString() }}원 사용 / {{ limitLabel(item) }}</p>
+                <div class="usage-summary-row">
+                  <p class="usage-desc muted-text">
+                    {{ item.used.toLocaleString() }}원 사용 / {{ limitLabel(item) }}
+                  </p>
+
+                  <p class="usage-remaining muted-text">
+                    {{ remainingLabel(item) }}
+                  </p>
+                </div>
+
                 <div class="progress-track">
                   <div class="progress-fill" :style="{ width: usagePercent(item) + '%' }"></div>
                 </div>
-                <p class="usage-remaining muted-text">{{ remainingLabel(item) }}</p>
                 <p v-if="item.countLimit != null" class="usage-count muted-text">{{ item.usedCount }}/{{ item.countLimit }}회 사용</p>
               </div>
             </div>
@@ -205,29 +219,6 @@
         <h3 class="section-title">카드별 연회비 본전</h3>
       </div>
 
-      <div v-if="breakevenCards.length > 1" class="card-nav-row">
-        <button type="button"
-          class="month-nav-btn"
-          aria-label="이전 카드"
-          :disabled="activeCardIndex === 0"
-          @click="scrollToCard(activeCardIndex - 1)"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <polyline points="15 18 9 12 15 6"></polyline>
-          </svg>
-        </button>
-        <button type="button"
-          class="month-nav-btn"
-          aria-label="다음 카드"
-          :disabled="activeCardIndex === breakevenCards.length - 1"
-          @click="scrollToCard(activeCardIndex + 1)"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </button>
-      </div>
-
       <div v-if="breakevenLoading" class="surface-card benefit-usage-loading muted-text">불러오는 중...</div>
 
       <div v-else-if="breakevenError" class="surface-card benefit-usage-empty muted-text">
@@ -240,42 +231,68 @@
       </div>
 
       <template v-else>
-        <div ref="sliderRef" class="breakeven-slider" @scroll="onSliderScroll">
+        <div class="breakeven-slider" :class="{ 'breakeven-slider--single': breakevenCards.length === 1 }">
           <div v-for="card in breakevenCards" :key="card.userCardId" class="surface-card breakeven-card breakeven-slide">
-            <div class="be-card-visual" :style="{ background: card.color }">
-              <div class="be-card-top">
-                <div>
-                  <p class="be-card-name">{{ card.cardName }}</p>
-                  <p class="be-card-owner">···· {{ card.panLast4 }}</p>
-                </div>
-                <span class="be-card-icon">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
-                    <rect x="2" y="5" width="20" height="14" rx="3"></rect>
-                    <line x1="2" y1="10" x2="22" y2="10"></line>
+            <div class="be-card-header">
+              <div class="be-card-thumb">
+                <img
+                    v-if="getCardImage(card)"
+                    :src="getCardImage(card)"
+                    :alt="`${card.cardName} 이미지`"
+                    class="be-card-image"
+                />
+                <span v-else class="be-card-fallback" :style="{ background: card.color }">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8">
+                    <rect x="3" y="6" width="18" height="12" rx="2"></rect>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
                   </svg>
                 </span>
               </div>
+
+              <div class="be-card-info">
+                <p class="be-card-name">{{ card.cardName }}</p>
+                <p class="be-card-owner">{{ card.panLast4 }}</p>
+              </div>
             </div>
 
-            <div class="be-status" :class="card.isBreakEven ? 'be-status--met' : 'be-status--pending'">
-              <p class="be-status-title">
-                {{ card.isBreakEven ? `본전 달성 ${card.breakEvenDateLabel}, 연회비 본전을 뽑았어요` : '아직 연회비 본전 전이에요' }}
-              </p>
+            <div class="be-divider"></div>
+
+            <div class="be-status">
+              <div class="be-status-line">
+                <span
+                    class="be-status-badge"
+                    :class="{ 'be-status-badge--pending': !card.isBreakEven }"
+                >
+                  {{ card.isBreakEven ? '본전 달성' : '본전 달성 전' }}
+                </span>
+
+                <p class="be-status-title">
+                  {{ card.isBreakEven
+                    ? `${card.breakEvenDateLabel}, 연회비 본전을 뽑았어요`
+                    : '아직 연회비 본전 전이에요' }}
+                </p>
+              </div>
+
               <p class="be-status-desc muted-text">
                 {{ card.isBreakEven
-                  ? `현재까지 연회비보다 ${(card.cumulativeBenefit - card.annualFee).toLocaleString()}원 더 받았어요`
-                  : `연회비까지 ${(card.annualFee - card.cumulativeBenefit).toLocaleString()}원 남았어요` }}
+                  ? `현재까지 연회비보다 ${(card.cumulativeBenefit - card.annualFee).toLocaleString()}원 더 받았어요.`
+                  : `연회비까지 ${(card.annualFee - card.cumulativeBenefit).toLocaleString()}원 남았어요.` }}
               </p>
             </div>
 
             <div class="be-stats-row">
-              <div><span class="be-stat-label muted-text">연회비</span><strong>{{ card.annualFee.toLocaleString() }}원</strong></div>
+              <div>
+                <span class="be-stat-label muted-text">연회비</span>
+                <strong>{{ card.annualFee.toLocaleString() }}원</strong>
+              </div>
+
               <div>
                 <span class="be-stat-label muted-text">누적 혜택</span>
                 <strong :class="card.isBreakEven ? 'success-text' : 'danger-text'">
                   {{ card.cumulativeBenefit.toLocaleString() }}원
                 </strong>
               </div>
+
               <div>
                 <span class="be-stat-label muted-text">순혜택</span>
                 <strong :class="card.netBenefit >= 0 ? 'success-text' : 'danger-text'">
@@ -285,34 +302,74 @@
             </div>
 
             <svg viewBox="0 0 300 160" class="be-chart">
-              <!-- 그래프 전체를 5등분하는 연한 그리드선 4개 (연회비/데이터 값과 무관하게 고정 위치) -->
               <line
-                v-for="(gy, i) in gridLineYs()" :key="i"
-                x1="0" :y1="gy" x2="300" :y2="gy"
-                stroke="var(--line, #e7e4de)" stroke-width="1"
+                  v-for="value in gridValues(card)"
+                  :key="value"
+                  :x1="CHART_LEFT"
+                  :y1="scaleY(value, card)"
+                  x2="290"
+                  :y2="scaleY(value, card)"
+                  class="be-chart-grid"
               />
 
               <line
-                x1="0" :y1="scaleY(card.annualFee, card)" x2="300" :y2="scaleY(card.annualFee, card)"
-                stroke="var(--muted, #8f897f)" stroke-width="1.5" stroke-dasharray="4 4"
+                  :x1="CHART_LEFT"
+                  :y1="scaleY(card.annualFee, card)"
+                  x2="290"
+                  :y2="scaleY(card.annualFee, card)"
+                  class="be-chart-threshold"
               />
-              <text x="4" :y="scaleY(card.annualFee, card) - 6" class="be-chart-threshold-label">{{ (card.annualFee / 1000) }}k</text>
 
-              <polyline
-                :points="linePoints(card)"
-                fill="none" stroke="var(--orange, #ffbc00)" stroke-width="2.5"
-              />
+              <text x="2" :y="CHART_TOP + 3" class="be-chart-axis-label">
+                {{ formatAxisAmount(chartMax(card)) }}
+              </text>
+              <text x="2" :y="scaleY(card.annualFee, card) + 3" class="be-chart-axis-label">
+                {{ formatAxisAmount(card.annualFee) }}
+              </text>
+              <text x="12" :y="CHART_BOTTOM + 3" class="be-chart-axis-label">0</text>
+
+              <polyline :points="linePoints(card)" class="be-chart-line" />
 
               <circle
-                v-if="card.isBreakEven && card.breakEvenIndex >= 0"
-                :cx="scaleX(card.breakEvenIndex, card)" :cy="scaleY(card.annualFee, card)" r="4"
-                fill="var(--green, #00a878)"
+                  v-for="point in chartPoints(card)"
+                  :key="point.index"
+                  :cx="point.x"
+                  :cy="point.y"
+                  r="3"
+                  class="be-chart-point"
               />
 
+              <template v-if="card.isBreakEven && card.breakEvenIndex >= 0">
+                <circle
+                    :cx="scaleX(card.breakEvenIndex, card)"
+                    :cy="scaleY(card.annualFee, card)"
+                    r="4.5"
+                    class="be-chart-break-point"
+                />
+
+                <text
+                    :x="markerLabelX(card)"
+                    :y="scaleY(card.annualFee, card) - 6"
+                    :text-anchor="markerTextAnchor(card)"
+                    class="be-chart-break-label"
+                >
+                  <tspan class="be-chart-break-label-main">
+                    {{ shortBreakEvenDate(card.breakEvenDateLabel) }} 본전 달성
+                  </tspan>
+                  <tspan dx="5" class="be-chart-break-label-sub">
+                    연회비 {{ card.annualFee.toLocaleString() }}원
+                  </tspan>
+                </text>
+              </template>
+
               <text
-                v-for="(m, i) in card.months" :key="i"
-                :x="scaleX(i, card)" y="156" text-anchor="middle" class="be-chart-month-label"
-              >{{ m }}</text>
+                  v-for="(month, index) in card.months"
+                  :key="month"
+                  :x="scaleX(index, card)"
+                  y="156"
+                  text-anchor="middle"
+                  class="be-chart-month-label"
+              >{{ month }}</text>
             </svg>
           </div>
         </div>
@@ -322,13 +379,19 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import { useRoute, useRouter } from 'vue-router';
 import { useBenefitsStore } from '@/stores/benefits';
+import { getCardImage } from '@/utils/cardImages';
+import { useMerchantsStore } from '@/stores/merchants';
 
+const route = useRoute();
+const router = useRouter();
 const benefitsStore = useBenefitsStore();
 const {
   reportMonthLabel,
+  selectedYearMonth,
   totalBenefit,
   deltaVsLastMonth,
   categoryBreakdown,
@@ -347,14 +410,12 @@ const {
 } = storeToRefs(benefitsStore);
 
 function goToPrevMonth() {
-  showFullBreakdown.value = false;
   activeSegment.value = null;
   benefitsStore.goToPrevMonth();
 }
 
 function goToNextMonth() {
   if (isCurrentMonth.value) return; // 백엔드가 미래 달 조회를 막음
-  showFullBreakdown.value = false;
   activeSegment.value = null;
   benefitsStore.goToNextMonth();
 }
@@ -371,15 +432,52 @@ function loadLimits() {
   benefitsStore.fetchLimits();
 }
 
-const showFullBreakdown = ref(false);
 const activeSegment = ref(null); // 마우스 오버/탭 중인 카테고리 (categoryBreakdown의 항목 그 자체)
+const reportExpanded = ref(false);
 
-const topTwoCategoriesLabel = computed(() => {
-  const sorted = [...categoryBreakdown.value].sort((a, b) => b.percent - a.percent);
-  const [a, b] = sorted;
-  if (!a || !b) return '';
-  const sum = a.percent + b.percent;
-  return `${a.name}와 ${b.name} 혜택이 전체의 ${sum}%를 차지해요.`;
+const positiveCategoryBreakdown = computed(() =>
+  categoryBreakdown.value
+    .filter((cat) => Number(cat.amount) > 0)
+    .sort((a, b) => Number(b.amount) - Number(a.amount))
+);
+
+const groupedCategoryBreakdown = computed(() => {
+  if (reportExpanded.value || positiveCategoryBreakdown.value.length <= 5) {
+    return positiveCategoryBreakdown.value;
+  }
+
+  const topCategories = positiveCategoryBreakdown.value.slice(0, 4);
+  const remainingCategories = positiveCategoryBreakdown.value.slice(4);
+  return [
+    ...topCategories,
+    {
+      categoryCode: 'OTHER',
+      name: '기타',
+      amount: remainingCategories.reduce((sum, cat) => sum + Number(cat.amount), 0),
+      color: remainingCategories[0].color,
+    },
+  ];
+});
+
+const reportCategories = computed(() =>
+  groupedCategoryBreakdown.value.map((cat) => {
+    const percent = totalBenefit.value > 0 ? (Number(cat.amount) / totalBenefit.value) * 100 : 0;
+    return {
+      ...cat,
+      percent,
+      percentLabel: percent > 0 && percent < 1 ? '1%' : `${Math.round(percent)}%`,
+    };
+  })
+);
+
+function toggleReportExpanded() {
+  activeSegment.value = null;
+  reportExpanded.value = !reportExpanded.value;
+}
+
+watch(selectedYearMonth, () => {
+  activeSegment.value = null;
+  reportExpanded.value = false;
 });
 
 // 도넛 차트: SVG stroke-dasharray를 이용한 방식. r=45 기준 원둘레 계산.
@@ -388,7 +486,7 @@ const topTwoCategoriesLabel = computed(() => {
 const circumference = 2 * Math.PI * 45;
 const donutSegments = computed(() => {
   let cursor = 0;
-  return categoryBreakdown.value.map((cat) => {
+  return reportCategories.value.map((cat) => {
     const length = (cat.percent / 100) * circumference;
     const seg = { color: cat.color, length, offset: -cursor, cat };
     cursor += length;
@@ -400,9 +498,28 @@ const donutSegments = computed(() => {
 // 이번 달 받을 수 있는 혜택 (카테고리별 사용/한도) [GET /api/v1/benefits/limits]
 // ---------------------------------------------------------
 const showAllAvailable = ref(false);
-const visibleAvailableBenefits = computed(() =>
-  showAllAvailable.value ? benefitLimits.value : benefitLimits.value.slice(0, 3)
+const sortedAvailableBenefits = computed(() =>
+    [...benefitLimits.value].sort((a, b) => {
+      const remainingRatio = (item) => {
+        if (item.limit == null) return 1;
+        if (item.limit <= 0) return 0;
+        return Math.max(0, (item.remaining ?? 0) / item.limit);
+      };
+
+      return (
+          remainingRatio(b) - remainingRatio(a) ||
+          (b.remaining ?? 0) - (a.remaining ?? 0)
+      );
+    })
 );
+
+const visibleAvailableBenefits = computed(() =>
+    showAllAvailable.value
+        ? sortedAvailableBenefits.value
+        : sortedAvailableBenefits.value.slice(0, 3)
+);
+const merchantsStore = useMerchantsStore();
+const getBenefitCategoryIcon = (categoryCode) => merchantsStore.getCategoryByCode(categoryCode)?.categoryIcon;
 function usagePercent(item) {
   if (!item.limit) return 0; // 한도 없음(null) - 진행률 바는 항상 0%로 둔다
   return Math.min((item.used / item.limit) * 100, 100);
@@ -412,84 +529,106 @@ function limitLabel(item) {
 }
 function remainingLabel(item) {
   if (item.limit == null) return '한도 없이 계속 받을 수 있어요';
-  return `남은 혜택 ${(item.remaining ?? 0).toLocaleString()}원`;
+  const remaining = item.remaining ?? 0;
+  if (remaining <= 0) return '사용 완료';
+  return `남은 혜택 ${remaining.toLocaleString()}원`;
+}
+
+function goToBenefitMap(categoryCode) {
+  router.push({ path: '/map', query: { categoryCode } });
 }
 
 // ---------------------------------------------------------
 // 카드별 연회비 본전 - 슬라이더는 UI 관심사라 컴포넌트에 남겨두고, 데이터는 스토어에서 가져옴
 // (백엔드 BenefitController 주석에도 "응답 배열을 슬라이드 형태로 표시한다"고 명시되어 있음)
 // ---------------------------------------------------------
-const sliderRef = ref(null);
-const activeCardIndex = ref(0);
-
 async function loadBreakEven() {
   await benefitsStore.fetchBreakEven();
-  activeCardIndex.value = 0;
-  nextTick(() => {
-    // jsdom(테스트 환경)엔 Element.prototype.scrollTo가 구현되어 있지 않아서 방어적으로 체크.
-    // 실제 브라우저에선 항상 있으니 동작에 영향 없음.
-    if (sliderRef.value && typeof sliderRef.value.scrollTo === 'function') {
-      sliderRef.value.scrollTo({ left: 0 });
-    }
-  });
 }
 
-// 스와이프로 스크롤했을 때 현재 몇 번째 카드인지 갱신 (점/카운터 표시용)
-function onSliderScroll() {
-  if (!sliderRef.value) return;
-  const el = sliderRef.value;
-  const index = Math.round(el.scrollLeft / el.clientWidth);
-  activeCardIndex.value = Math.min(Math.max(index, 0), breakevenCards.value.length - 1);
-}
+// Y축 라벨이 들어갈 왼쪽 공간과 마지막 월 라벨이 잘리지 않을 오른쪽 공간을 확보한다.
+const CHART_LEFT = 30;
+const CHART_RIGHT = 10;
+const CHART_WIDTH = 300 - CHART_LEFT - CHART_RIGHT;
+const CHART_TOP = 12;
+const CHART_BOTTOM = 136;
+const CHART_HEIGHT = CHART_BOTTOM - CHART_TOP;
 
-// 화살표/점 클릭으로 특정 카드까지 부드럽게 스크롤
-function scrollToCard(index) {
-  if (!sliderRef.value) return;
-  const clamped = Math.min(Math.max(index, 0), breakevenCards.value.length - 1);
-  if (typeof sliderRef.value.scrollTo === 'function') {
-    sliderRef.value.scrollTo({ left: clamped * sliderRef.value.clientWidth, behavior: 'smooth' });
-  }
-  activeCardIndex.value = clamped;
-}
-
-// 라인차트 좌표 변환 (0~300 x, 0~160 y, 위쪽 여백 10px)
-// 좌우 여백(14px)을 둬서 첫/마지막 달 라벨이 text-anchor=middle 때문에
-// 차트 가장자리(x=0, x=300)에서 잘리는 걸 방지
-const CHART_LEFT = 14;
-const CHART_WIDTH = 272; // 300 - 14*2
-// 데이터가 있는 달 수만큼 항상 전체 폭(왼쪽 끝~오른쪽 끝)에 맞춰 늘려서 배치.
-// 즉 1월(달 1개)뿐이면 가운데 한 점, 2월까지면 1월=왼쪽 끝/2월=오른쪽 끝,
-// 3월 이후로 달이 늘어날수록 그 늘어난 마지막 달이 항상 오른쪽 끝에 오도록 함.
 function scaleX(index, card) {
   if (card.months.length <= 1) {
-    return CHART_LEFT + CHART_WIDTH / 2; // 데이터가 1개월치뿐이면 가운데 고정
+    return CHART_LEFT + CHART_WIDTH / 2;
   }
+
   const step = CHART_WIDTH / (card.months.length - 1);
   return CHART_LEFT + index * step;
 }
-// 차트 상단 여백(10px)과 데이터 영역 높이. scaleY/gridLineYs가 같은 값을 쓰도록 상수로 공유
-// (viewBox 300x160, 아래쪽 10px는 월 라벨용으로 비움)
-const CHART_TOP = 10;
-const CHART_HEIGHT = 140;
+
+function chartMax(card) {
+  const values = card.monthlyValues
+      .filter((value) => value != null)
+      .map(Number);
+
+  const highestValue = Math.max(...values, card.annualFee, 1);
+  const roundedHighestValue = Math.ceil(highestValue / 5000) * 5000;
+  return Math.max(card.annualFee * 2, roundedHighestValue);
+}
 
 function scaleY(value, card) {
-  const highestDataValue = Math.max(...card.monthlyValues.filter((v) => v != null), card.annualFee, 1);
-  // 연회비 기준선이 차트 세로 중간쯤에 오도록, 연회비의 2배를 기본 상단 여백으로 확보.
-  // 누적 혜택이 연회비를 많이 넘어서면(연회비*2 초과) 그때는 데이터가 기준이 되어
-  // 기준선이 위로 올라감 - 그래야 큰 값도 잘리지 않고 다 보임.
-  const maxValue = Math.max(highestDataValue * 1.1, card.annualFee * 2);
-  return CHART_TOP + CHART_HEIGHT - (value / maxValue) * CHART_HEIGHT;
+  const maxValue = chartMax(card);
+  return CHART_TOP + CHART_HEIGHT - (Number(value) / maxValue) * CHART_HEIGHT;
 }
-// 그래프 전체를 5등분하는 연한 그리드선 4개의 y좌표 (데이터/연회비값과 무관하게 항상 고정)
-function gridLineYs() {
-  return [1, 2, 3, 4].map((n) => CHART_TOP + (CHART_HEIGHT * n) / 5);
+
+function gridValues(card) {
+  const maxValue = chartMax(card);
+
+  return [0, 0.25, 0.5, 0.75, 1]
+      .map((ratio) => maxValue * ratio)
+      .filter((value) => Math.abs(value - card.annualFee) > 1);
 }
+
 function linePoints(card) {
-  // 아직 안 지난 달(monthlyValues가 null)은 선을 안 그리고, 실제 데이터가 있는 지점까지만 이음
   return card.monthlyValues
-    .map((v, i) => (v == null ? null : `${scaleX(i, card)},${scaleY(v, card)}`))
-    .filter((p) => p !== null)
-    .join(' ');
+      .map((value, index) => {
+        if (value == null) return null;
+        return `${scaleX(index, card)},${scaleY(value, card)}`;
+      })
+      .filter(Boolean)
+      .join(' ');
+}
+
+function chartPoints(card) {
+  return card.monthlyValues
+      .map((value, index) => {
+        if (value == null) return null;
+
+        return {
+          index,
+          x: scaleX(index, card),
+          y: scaleY(value, card),
+        };
+      })
+      .filter(Boolean);
+}
+
+function formatAxisAmount(value) {
+  if (value < 1000) return Math.round(value).toLocaleString();
+
+  const amount = value / 1000;
+  return `${Number.isInteger(amount) ? amount : amount.toFixed(1)}k`;
+}
+
+function shortBreakEvenDate(label) {
+  const matched = label?.match(/(\d+)월\s*(\d+)일/);
+  return matched ? `${matched[1]}/${matched[2]}` : label;
+}
+
+function markerLabelX(card) {
+  const x = scaleX(card.breakEvenIndex, card);
+  return x <= 165 ? x + 7 : x - 7;
+}
+
+function markerTextAnchor(card) {
+  return scaleX(card.breakEvenIndex, card) <= 165 ? 'start' : 'end';
 }
 
 onMounted(() => {
@@ -497,6 +636,34 @@ onMounted(() => {
   loadBreakEven();
   loadAiCoaching();
   loadLimits();
+  merchantsStore.fetchCategories();
+
+  // 홈 화면 "이번 달에 사라지는 혜택" 카드에서 /benefits#available로 들어온 경우 스크롤한다.
+  // #available 섹션 자체는 로딩 상태와 무관하게 항상 렌더링돼 있어서(내부 리스트만
+  // 로딩/에러/데이터로 바뀜), DOM에 엘리먼트가 존재하는지로는 "데이터가 다 들어왔는지"를
+  // 알 수 없다 - 데이터가 오기 전에 스크롤하면 이후 리스트가 그려지며 레이아웃이 늘어나서
+  // 사용자가 기대한 위치보다 위쪽에서 멈추게 된다. 그래서 DOM 존재 여부가 아니라 스토어의
+  // 실제 로딩 상태(limitsLoading)를 기준으로, 로딩이 끝난 뒤 다음 tick(리스트가 그려진 뒤)에
+  // 스크롤한다.
+  if (route.hash === '#available') {
+    const scrollToAvailable = () => {
+      nextTick(() => {
+        document.querySelector('#available')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    };
+
+    if (limitsLoading.value) {
+      const stopWatch = watch(limitsLoading, (loading) => {
+        if (!loading) {
+          stopWatch();
+          scrollToAvailable();
+        }
+      });
+    } else {
+      // 캐시된 데이터가 있어 이미 로딩이 끝난 상태로 진입한 경우
+      scrollToAvailable();
+    }
+  }
 });
 </script>
 
@@ -504,65 +671,88 @@ onMounted(() => {
 /* base.css에 --green/--danger 변수는 있지만 success-text/danger-text 클래스 자체가
    전역 어디에도 정의되어 있지 않아서, 이 컴포넌트 안에서 직접 정의함
    (KB_SUCCESS #00a878 / KB_ERROR #d94343 - base.css :root 기준) */
-.success-text { color: var(--green, #00a878); }
+.success-text { color: #3a977c; }
 .danger-text { color: var(--danger, #d94343); }
 
 .page {
-  padding: 18px 18px 40px;
+  padding: 8px 16px 24px;
 }
 
 /* AI 혜택 코치 */
-.ai-card { padding: 20px; margin-bottom: 16px; }
-.ai-badge {
-  display: inline-flex; align-items: center; gap: 5px;
-  margin-bottom: 10px;
-}
-.ai-title { margin: 0 0 8px; font-size: 17px; color: var(--charcoal, #24211d); }
-.ai-intro { margin: 0 0 16px; font-size: 12.5px; line-height: 1.6; }
+.ai-card {position: relative; padding: 20px; margin-bottom: 16px;}
 
-.ai-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.ai-badge {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+}
+.ai-title {
+  margin: 0 0 8px;
+  color: var(--charcoal, #24211d);
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 700;
+}
+.ai-intro { margin: 0 0 12px; font-size: 12.5px; line-height: 1.6; }
+
+.ai-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
 .ai-tips li { display: flex; gap: 10px; align-items: flex-start; }
 .ai-tip-num {
-  width: 20px; height: 20px; border-radius: 50%; background: var(--orange, #ffbc00);
+  width: 20px; height: 20px; border-radius: 50%; background: #ffbe49;
   color: #171717; font-size: 11px; font-weight: 800; display: grid; place-items: center;
   flex: 0 0 auto; margin-top: 1px;
 }
 .ai-tip-headline { margin: 0 0 3px; font-size: 13px; font-weight: 700; color: var(--charcoal, #24211d); line-height: 1.5; }
 .ai-tip-detail { margin: 0; font-size: 11.5px; }
 
-/* 상단 이전/다음 화살표 (연회비 본전 카드용) */
-.card-nav-row { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 6px; }
-
 /* 월간 리포트 - breakeven-section이랑 완전히 같은 구조: 바깥 <section>에
    flex + gap:14px를 줘서 "제목 -> 카드" 간격을 카드별 연회비 본전과 동일하게 맞춤.
    전에는 이 바깥 section이 없어서 .section-header의 margin-bottom(4px, 다른 섹션과 공유)을
    그대로 썼던 게 간격이 달랐던 원인이었음. */
-.report-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px; }
-.report-card { padding: 22px; }
-.report-top { margin-bottom: 10px; }
+.report-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px; }
+.report-card {
+  height: auto;
+  min-height: 0;
+  padding: 13px 22px;
+}
+.report-card .report-top { margin-bottom: 0; }
 .report-month-nav { display: flex; align-items: center; gap: 8px; }
 .report-label { margin: 0; font-size: 13px; font-weight: 700; color: var(--charcoal, #24211d); }
-.month-nav-btn {
-  border: 1px solid var(--line, #e7e4de); background: var(--surface, #ffffff); padding: 0;
+.report-month-nav .month-nav-btn {
+  border: none; background: transparent; padding: 0;
   width: 26px; height: 26px; flex: 0 0 auto; cursor: pointer;
   color: var(--charcoal, #24211d); display: grid; place-items: center;
-  border-radius: 50%; transition: background 150ms ease, border-color 150ms ease, opacity 150ms ease;
-  box-shadow: 0 1px 2px rgba(36, 33, 29, .06);
+  border-radius: 0; transition: opacity 150ms ease;
+  box-shadow: none;
 }
-.month-nav-btn:hover:not(:disabled) { background: var(--page, #f7f7f5); border-color: var(--muted, #8f897f); }
-.month-nav-btn:disabled { opacity: .35; cursor: not-allowed; }
+.report-month-nav .month-nav-btn:disabled { opacity: .35; cursor: not-allowed; }
 /* 지난달 대비 증감 배지도 이제 report-top 안, 화살표 옆 줄에 있어서 오른쪽 끝으로 밀어줌 */
-.report-delta { margin-left: auto; font-size: 12px; font-weight: 700; white-space: nowrap; }
-.report-sub { margin: 6px 0 0; font-size: 11px; }
+.report-delta-wrap {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  transform: translateY(6px);
+}
 
-/* "할인 및 적립 포함"과 "OO에 받은 혜택"이 마진 0끼리 붙어있던 문제 - 여기서 간격 줌 */
-.report-caption { margin: 14px 0 4px; font-size: 12px; }
-.report-total { margin: 0 0 18px; font-size: 26px; font-weight: 800; color: var(--charcoal, #24211d); }
+.report-delta {margin-left: 0;font-size: 12px;font-weight: 700;white-space: nowrap;}
 
-.donut-row { display: flex; align-items: center; gap: 18px; margin-bottom: 14px; }
-.donut-row--collapsed { justify-content: center; }
-.donut-chart { width: 120px; height: 120px; flex: 0 0 auto; transition: width 200ms ease, height 200ms ease; }
-.donut-chart--large { width: 190px; height: 190px; }
+.report-card .report-sub { margin: 0; font-size: 11px; }
+
+.report-card .report-total {
+  margin: 0 0 1px;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--charcoal, #24211d);
+}
+
+.report-card .donut-row { display: flex; align-items: center; gap: 18px; margin-bottom: 0; }
+.donut-chart { width: 120px; height: 120px; flex: 0 0 auto; }
 .donut-segment { cursor: pointer; transition: opacity 150ms ease; }
 .donut-segment:hover { opacity: .85; }
 .donut-center-amount { font-size: 15px; font-weight: 800; fill: var(--charcoal, #24211d); }
@@ -580,24 +770,37 @@ onMounted(() => {
 .legend-percent { color: var(--charcoal, #24211d); font-weight: 700; flex: 0 0 auto; }
 .legend-amount { margin-left: auto; font-size: 11px; }
 
-.report-summary { margin: 0 0 14px; font-size: 12px; text-align: center; }
+.report-expand-btn {
+  width: 100%; margin-top: 12px; padding: 11px 0 1px; border: none; border-top: 1px solid rgba(231, 228, 222, .7);
+  background: none; box-shadow: none; color: var(--muted, #8f897f); font-size: 12px; font-weight: 700; cursor: pointer;
+}
 
 .expand-btn {
   width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px;
   border: none; background: none; color: var(--muted, #8f897f); font-size: 12px; font-weight: 700;
   padding: 6px 0; cursor: pointer;
 }
-.expand-btn svg { transition: transform 150ms ease; }
-.expand-btn svg.flipped { transform: rotate(180deg); }
 
 /* 이번 달 받을 수 있는 혜택 */
 /* 이번 달 받을 수 있는 혜택 - report-section/breakeven-section이랑 같은 구조:
    제목은 흰 박스 밖에, gap:14px로 박스랑 간격 통일 */
-.available-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 26px; }
+.available-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; }
+.section-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .available-card { padding: 20px; }
-.section-header { display: flex; justify-content: space-between; align-items: center; }
-.section-header h3 { margin: 0; font-size: 15px; color: var(--charcoal, #24211d); }
-.section-sub { margin: 0 0 14px; font-size: 11.5px; }
+.section-header h3,
+.section-title {
+  color: var(--charcoal, #24211d);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+}
+.available-heading { display: flex; flex-direction: column; gap: 2px; }
+.section-sub { margin: 0; font-size: 11.5px; }
 .link-btn { border: none; background: none; color: var(--muted, #8f897f); font-size: 12px; font-weight: 700; cursor: pointer; }
 
 .benefit-usage-loading,
@@ -609,13 +812,19 @@ onMounted(() => {
   width: 38px; height: 38px; border-radius: 10px; background: var(--page, #f7f7f5);
   display: grid; place-items: center; font-size: 1.1rem; flex: 0 0 auto;
 }
+.usage-category-icon { width: 32px; height: 32px; object-fit: contain; }
 .usage-main { flex: 1; min-width: 0; }
 .usage-top-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
 .usage-top-row strong { font-size: 13.5px; color: var(--charcoal, #24211d); }
-.usage-link { border: none; background: none; color: var(--orange-deep, #e6aa00); font-size: 11px; font-weight: 700; cursor: pointer; padding: 0; }
-.usage-sub { margin: 0 0 4px; font-size: 10.5px; }
-.usage-desc { margin: 0 0 6px; font-size: 11.5px; }
-.usage-remaining { margin: 6px 0 0; font-size: 11px; }
+.usage-link { border: none; background: none; color: #625b50; font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; }.usage-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.usage-desc, .usage-remaining { margin: 0; font-size: 11px; white-space: nowrap; }
+.usage-remaining.muted-text {
+  color: #3a977c;
+  font-weight: 600;
+}
+.available-card .progress-fill {
+  background: linear-gradient(90deg, #f4b942 0%, #ffd66b 100%);
+}
 .usage-count { margin: 2px 0 0; font-size: 11px; }
 
 /* 카드별 연회비 본전 */
@@ -624,50 +833,168 @@ onMounted(() => {
 
 .breakeven-slider {
   display: flex;
+  gap: 14px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  margin: 0 -18px;
-  padding: 0 18px;
+  margin: 0;
+  padding: 0;
 }
-.breakeven-slider::-webkit-scrollbar { display: none; }
+.breakeven-slider--single .breakeven-slide { flex-basis: 100%;}
+
+.breakeven-slider::-webkit-scrollbar { display: none;}
+
 .breakeven-slide {
-  flex: 0 0 100%;
+  /* 카드 폭을 줄여 오른쪽 다음 카드가 보이게 함 */
+  flex: 0 0 calc(100% - 25px);
+  margin-right: 0;
+  box-sizing: border-box;
   scroll-snap-align: start;
-  margin-right: 14px;
 }
-.breakeven-slide:last-child { margin-right: 0; }
 
-.breakeven-card { padding: 18px; }
-.be-card-visual {
-  border-radius: 14px; padding: 16px; color: #ffffff; margin-bottom: 14px;
-  min-height: 90px; display: flex; flex-direction: column; justify-content: flex-start;
+.breakeven-card { padding: 16px; }
+
+.be-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.be-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
-.be-card-icon {
-  width: 26px; height: 18px; border-radius: 4px; background: rgba(255,255,255,.18);
-  display: grid; place-items: center; flex: 0 0 auto;
+
+.be-card-thumb {
+  width: 60px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
 }
-.be-card-name { margin: 0 0 2px; font-size: 13.5px; font-weight: 700; }
-.be-card-owner { margin: 0; font-size: 10.5px; opacity: .8; }
 
-.be-status { border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
-.be-status--met { background: #e0f8ef; }
-.be-status--pending { background: var(--page, #f7f7f5); }
-.be-status-title { margin: 0 0 3px; font-size: 12.5px; font-weight: 700; color: var(--charcoal, #24211d); }
-.be-status-desc { margin: 0; font-size: 11px; }
+.be-card-image {
+  display: block;
+  width: 60px;
+  height: 40px;
+  object-fit: contain;
+}
 
-.be-stats-row { display: flex; justify-content: space-between; margin-bottom: 16px; }
-.be-stats-row > div { display: flex; flex-direction: column; gap: 4px; }
+.be-card-fallback {
+  width: 46px;
+  height: 40px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+}
+
+.be-card-info { min-width: 0; }
+.be-card-name {
+  margin: 0 0 5px;
+  color: var(--charcoal, #24211d);
+  font-size: 14px;
+  font-weight: 700;
+}
+.be-card-owner {
+  margin: 0;
+  color: var(--muted, #8f897f);
+  font-size: 11px;
+}
+
+.be-divider {
+  height: 1px;
+  margin: 14px 0 12px;
+  background: var(--line, #e7e4de);
+}
+
+.be-status { margin-bottom: 12px; }
+.be-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.be-status-badge {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: #e0f8ef;
+  color: #3a977c;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.be-status-badge--pending {
+  background: #f1f1ef;
+  color: var(--muted, #8f897f);
+}
+.be-status-title {
+  margin: 0;
+  color: var(--charcoal, #24211d);
+  font-size: 13px;
+  font-weight: 700;
+}
+.be-status-desc {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+}
+
+.be-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 16px;
+  padding: 10px 0;
+  border-radius: 12px;
+  background: var(--page, #f7f7f5);
+}
+.be-stats-row > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+}
+.be-stats-row > div + div { border-left: 1px solid var(--line, #e7e4de); }
 .be-stat-label { font-size: 10.5px; }
-.be-stats-row strong { font-size: 14px; font-weight: 700; color: var(--charcoal, #24211d); }
-/* .success-text/.danger-text(클래스 1개, 명시도 0-1-0)보다 위 .be-stats-row strong
-   (클래스+엘리먼트, 명시도 0-1-1)이 더 세서 색이 안 먹혔음 - 여기서 다시 눌러줌 */
-.be-stats-row strong.success-text { color: var(--green, #00a878); }
+.be-stats-row strong {
+  color: var(--charcoal, #24211d);
+  font-size: 14px;
+  font-weight: 700;
+}
+.be-stats-row strong.success-text { color: #3a977c; }
 .be-stats-row strong.danger-text { color: var(--danger, #d94343); }
 
-.be-chart { width: 100%; height: auto; }
-.be-chart-threshold-label { font-size: 8px; fill: var(--muted, #8f897f); }
-.be-chart-month-label { font-size: 8px; fill: var(--muted, #8f897f); }
+.be-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 8px;
+  overflow: visible;
+}
+.be-chart-grid {
+  stroke: var(--line, #e7e4de);
+  stroke-width: 1;
+}
+.be-chart-threshold {
+  stroke: #5e5a53;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.be-chart-line {
+  fill: none;
+  stroke: #ffbe49;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.be-chart-point { fill: #ffbe49; }
+.be-chart-break-point { fill: #3a977c; }
+.be-chart-axis-label,
+.be-chart-month-label {
+  fill: var(--muted, #8f897f);
+  font-size: 8px;
+}
+.be-chart-break-label {
+  font-size: 7.5px;
+  font-weight: 700;
+}
+.be-chart-break-label-main { fill: #3a977c; }
+.be-chart-break-label-sub {
+  fill: var(--muted, #8f897f);
+  font-weight: 500;
+}
 </style>

@@ -1,125 +1,197 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
-const routerMock = { push: vi.fn() }
-vi.mock('vue-router', () => ({
-  useRouter: () => routerMock,
+const routeMock = { query: {} }
+const routerMock = { replace: vi.fn().mockResolvedValue() }
+vi.mock('vue-router', () => ({ useRoute: () => routeMock, useRouter: () => routerMock }))
+const { toastError, toastSuccess, toastInfo, confirmMock } = vi.hoisted(() => ({
+  toastError: vi.fn(), toastSuccess: vi.fn(), toastInfo: vi.fn(), confirmMock: vi.fn(() => true),
 }))
+vi.mock('@/composables/useToast', () => ({ useToast: () => ({ error: toastError, success: toastSuccess, info: toastInfo }) }))
+vi.mock('@/composables/useConfirmDialog', () => ({ useConfirmDialog: () => ({ confirm: confirmMock }) }))
 
 import Cards from '@/pages/Cards.vue'
 import { useCardsStore } from '@/stores/cards'
 
-function mountPage(cards) {
+const tiers = (category) => ({ performanceTiers: [
+  { tierName: '0구간', minimumSpending: 0, benefits: [] },
+  { tierName: '1구간', minimumSpending: 100000, benefits: [{ categoryName: category, discountRate: 10 }] },
+] })
+const makeCard = (id, overrides = {}) => ({
+  userCardId: id, cardName: `카드${id}`, panLast4: `000${id}`, status: 'ACTIVE', annualFee: id * 10000,
+  currentAmount: id * 50000, previousMonthAmount: 100000, recommendationEnabled: true, isPrimary: false,
+  benefitsInfo: tiers(`혜택${id}`), ...overrides,
+})
+
+async function mountPage(cards, query = {}) {
+  routeMock.query = query
   setActivePinia(createPinia())
-  const cardsStore = useCardsStore()
-  cardsStore.cards = cards
-  vi.spyOn(cardsStore, 'fetchCards').mockResolvedValue()
+  const store = useCardsStore()
+  store.cards = cards
+  const fetchCards = vi.spyOn(store, 'fetchCards').mockResolvedValue(cards)
+  const fetchDetail = vi.spyOn(store, 'fetchCardFullDetail')
   const wrapper = mount(Cards)
-  return { wrapper, cardsStore }
+  await flushPromises()
+  return { wrapper, store, fetchCards, fetchDetail }
 }
 
-beforeEach(() => {
-  vi.clearAllMocks()
-})
+beforeEach(() => { vi.clearAllMocks(); routeMock.query = {}; routerMock.replace.mockResolvedValue(); confirmMock.mockResolvedValue(true) })
 
-describe('카드 목록 전월 실적', () => {
-  it('현재월 금액이 아닌 전월 실적 금액과 달성률을 표시한다', () => {
-    const { wrapper } = mountPage([
-      {
-        userCardId: 1,
-        cardName: '굿데이올림카드',
-        status: 'ACTIVE',
-        targetAmount: 300000,
-        currentAmount: 0,
-        previousMonthAmount: 150000,
-        previousRemainingAmount: 150000,
-        previousAchievementRate: 50,
-        previousPerformanceMet: false,
-      },
+describe('카드 기본 선택과 URL', () => {
+  it('주 사용 카드를 기본 선택하고 목록 데이터가 있으면 목록을 재조회하지 않는다', async () => {
+    const { wrapper, fetchCards } = await mountPage([makeCard(1), makeCard(2, { isPrimary: true })])
+    expect(wrapper.find('.selected-heading').text()).toContain('카드2')
+    expect(wrapper.findAll('.card-slide').map((slide) => slide.attributes('aria-label'))).toEqual([
+      '카드2, 1/2',
+      '카드1, 2/2',
     ])
-
-    expect(wrapper.text()).toContain('전월 실적 미달')
-    expect(wrapper.text()).toContain('실적 충족까지 150,000원')
-    expect(wrapper.find('.progress-fill').attributes('style')).toContain('width: 50%')
+    expect(fetchCards).not.toHaveBeenCalled()
+    expect(routerMock.replace).toHaveBeenCalledWith({ name: 'cards', query: { userCardId: '2' } })
   })
 
-  it('백엔드의 전월 performanceMet 값으로 충족 여부를 표시한다', () => {
-    const { wrapper } = mountPage([
-      {
-        userCardId: 2,
-        cardName: '마이핏카드',
-        status: 'ACTIVE',
-        targetAmount: 300000,
-        currentAmount: 0,
-        previousMonthAmount: 300000,
-        previousRemainingAmount: 0,
-        previousAchievementRate: 100,
-        previousPerformanceMet: true,
-      },
-    ])
-
-    expect(wrapper.text()).toContain('전월 실적 충족')
-    expect(wrapper.text()).toContain('혜택 적용 중')
-    expect(wrapper.find('.progress-fill').classes()).toContain('progress-fill--met')
-    expect(wrapper.find('.progress-fill').attributes('style')).toContain('width: 100%')
+  it('주 사용 카드가 없으면 첫 카드를 선택한다', async () => {
+    const { wrapper } = await mountPage([makeCard(1), makeCard(2)])
+    expect(wrapper.find('.selected-heading').text()).toContain('카드1')
   })
 
-  it('전월 실적 정보가 없으면 로딩 문구를 표시한다', () => {
-    const { wrapper } = mountPage([
-      {
-        userCardId: 3,
-        cardName: '체크체크 체크카드',
-        status: 'ACTIVE',
-        targetAmount: 300000,
-        currentAmount: 100000,
-      },
-    ])
-
-    expect(wrapper.text()).toContain('실적 정보를 불러오는 중...')
-    expect(wrapper.find('.progress-fill').exists()).toBe(false)
+  it('유효한 query 카드를 우선하고 유효하지 않으면 주 사용 카드로 대체한다', async () => {
+    let page = await mountPage([makeCard(1, { isPrimary: true }), makeCard(2)], { userCardId: '2' })
+    expect(page.wrapper.find('.selected-heading').text()).toContain('카드2')
+    page.wrapper.unmount()
+    page = await mountPage([makeCard(1, { isPrimary: true }), makeCard(2)], { userCardId: '999' })
+    expect(page.wrapper.find('.selected-heading').text()).toContain('카드1')
   })
 })
 
-describe('카드 상태 문구 매핑', () => {
-  it('SUSPENDED, EXPIRED, UNLINKED를 한글 문구로 표시한다', () => {
-    const { wrapper } = mountPage([
-      { userCardId: 4, cardName: 'A카드', status: 'SUSPENDED' },
-      { userCardId: 5, cardName: 'B카드', status: 'EXPIRED' },
-      { userCardId: 6, cardName: 'C카드', status: 'UNLINKED' },
-    ])
-
-    expect(wrapper.text()).toContain('정지됨')
-    expect(wrapper.text()).toContain('만료')
-    expect(wrapper.text()).toContain('연동 해제')
+describe('선택 카드 반응과 액션', () => {
+  it('인디케이터 선택 시 제목·마지막4자리·연회비·실적·혜택과 URL을 함께 바꾼다', async () => {
+    const { wrapper } = await mountPage([makeCard(1), makeCard(2)])
+    await wrapper.findAll('.indicator')[1].trigger('click'); await flushPromises()
+    expect(wrapper.find('.selected-heading').text()).toContain('카드2')
+    expect(wrapper.find('.selected-heading').text()).toContain('0002')
+    expect(wrapper.text()).toContain('20,000원')
+    expect(wrapper.text()).toContain('100,000원')
+    expect(wrapper.text()).toContain('혜택2')
+    expect(routerMock.replace).toHaveBeenLastCalledWith({ name: 'cards', query: { userCardId: '2' } })
   })
 
-  it('매핑되지 않은 상태값은 원본 그대로 표시한다', () => {
-    const { wrapper } = mountPage([
-      { userCardId: 7, cardName: 'D카드', status: 'SOME_UNKNOWN_STATUS' },
-    ])
+  it('상세 조회는 선택할 때 요청하지만 캐시된 카드는 서비스 재호출 없이 재사용한다', async () => {
+    const { wrapper, fetchDetail } = await mountPage([makeCard(1), makeCard(2)])
+    await wrapper.findAll('.indicator')[1].trigger('click'); await flushPromises()
+    await wrapper.findAll('.indicator')[0].trigger('click'); await flushPromises()
+    expect(fetchDetail).toHaveBeenCalledWith(1)
+    expect(fetchDetail).toHaveBeenCalledWith(2)
+    expect(wrapper.text()).toContain('혜택1')
+  })
 
-    expect(wrapper.text()).toContain('SOME_UNKNOWN_STATUS')
+  it('빠른 전환 뒤 이전 카드 응답이 늦게 와도 현재 카드 화면을 덮어쓰지 않는다', async () => {
+    const first = makeCard(1), second = makeCard(2)
+    const { wrapper, store } = await mountPage([first, second])
+    const resolvers = {}
+    vi.spyOn(store, 'fetchCardFullDetail').mockImplementation((id) => new Promise((resolve) => { resolvers[id] = () => { store.getById(id).benefitsInfo = tiers(`늦은혜택${id}`); resolve(store.getById(id)) } }))
+
+    // 마운트 요청은 기존 spy로 끝났으므로, 두 카드를 캐시 미완료로 되돌려 경쟁 요청을 만든다.
+    store.getById(1).benefitsInfo = undefined
+    store.getById(2).benefitsInfo = undefined
+    await wrapper.findAll('.indicator')[1].trigger('click'); await flushPromises()
+    await wrapper.findAll('.indicator')[0].trigger('click'); await flushPromises()
+    await wrapper.findAll('.indicator')[1].trigger('click'); await flushPromises()
+    resolvers[2](); await flushPromises()
+    resolvers[1](); await flushPromises()
+
+    expect(wrapper.find('.selected-heading').text()).toContain('카드2')
+    expect(wrapper.text()).toContain('늦은혜택2')
+    expect(wrapper.text()).not.toContain('늦은혜택1')
+  })
+
+  it('대표카드 설정 직후 선택과 URL을 유지하면서 첫 번째로 이동하고 나머지 상대 순서를 보존한다', async () => {
+    const { wrapper, store } = await mountPage([makeCard(1), makeCard(2), makeCard(3)])
+    await wrapper.findAll('.indicator')[2].trigger('click'); await flushPromises()
+    const toggle = vi.spyOn(store, 'toggleRecommendation').mockResolvedValue()
+    const primary = vi.spyOn(store, 'setPrimary').mockImplementation(async (id) => store.cards.forEach((c) => { c.isPrimary = c.userCardId === id }))
+    await wrapper.find('.recommendation-toggle').trigger('click')
+    await wrapper.find('.set-primary-btn').trigger('click'); await flushPromises()
+    expect(toggle).toHaveBeenCalledWith(3); expect(primary).toHaveBeenCalledWith(3)
+    expect(store.cards.map((c) => c.userCardId)).toEqual([1, 2, 3])
+    expect(wrapper.findAll('.card-slide').map((slide) => slide.attributes('aria-label'))).toEqual([
+      '카드3, 1/3',
+      '카드1, 2/3',
+      '카드2, 3/3',
+    ])
+    expect(wrapper.find('.card-slide--selected').attributes('aria-label')).toBe('카드3, 1/3')
+    expect(wrapper.findAll('.indicator')[0].classes()).toContain('indicator--active')
+    expect(wrapper.find('.selected-heading').text()).toContain('카드3')
+    expect(routerMock.replace).toHaveBeenLastCalledWith({ name: 'cards', query: { userCardId: '3' } })
+  })
+
+  it('대표카드 설정 실패 시 순서를 바꾸거나 성공 이벤트 후처리를 하지 않는다', async () => {
+    const { wrapper, store } = await mountPage([makeCard(1), makeCard(2)])
+    await wrapper.findAll('.indicator')[1].trigger('click'); await flushPromises()
+    vi.spyOn(store, 'setPrimary').mockRejectedValue(new Error('failed'))
+    routerMock.replace.mockClear()
+
+    await wrapper.find('.set-primary-btn').trigger('click'); await flushPromises()
+
+    expect(wrapper.findAll('.card-slide').map((slide) => slide.attributes('aria-label'))).toEqual([
+      '카드1, 1/2',
+      '카드2, 2/2',
+    ])
+    expect(wrapper.find('.card-slide--selected').attributes('aria-label')).toBe('카드2, 2/2')
+    expect(routerMock.replace).not.toHaveBeenCalled()
+    expect(toastError).toHaveBeenCalledWith('대표 카드 설정에 실패했습니다. 다시 시도해주세요.')
+  })
+
+  it('비활성 카드도 표시하고 상세 요청과 사용 액션을 제한한다', async () => {
+    const { wrapper, fetchDetail } = await mountPage([makeCard(1, { status: 'SUSPENDED' })])
+    expect(wrapper.text()).toContain('정지됨'); expect(wrapper.text()).toContain('사용 불가'); expect(wrapper.text()).toContain('카드사 문의 필요')
+    expect(wrapper.find('.recommendation-toggle').exists()).toBe(false)
+    expect(fetchDetail).not.toHaveBeenCalled()
   })
 })
 
-describe('카드 상세 이동', () => {
-  it('사용 가능한 카드를 누르면 상세 화면으로 이동한다', async () => {
-    const { wrapper } = mountPage([
-      {
-        userCardId: 8,
-        cardName: '굿데이올림카드',
-        status: 'ACTIVE',
-        targetAmount: 300000,
-        previousMonthAmount: 300000,
-        previousRemainingAmount: 0,
-        previousAchievementRate: 100,
-        previousPerformanceMet: true,
-      },
-    ])
+describe('삭제와 자동 연동', () => {
+  it('선택 카드 삭제 후 다음 카드, 마지막 카드 삭제 후 이전 카드를 선택한다', async () => {
+    const { wrapper, store } = await mountPage([makeCard(1), makeCard(2), makeCard(3)])
+    vi.spyOn(store, 'deleteCard').mockImplementation(async (id) => { store.cards = store.cards.filter((c) => c.userCardId !== id) })
+    await wrapper.findAll('.indicator')[1].trigger('click'); await flushPromises()
+    await wrapper.find('.delete-card-btn').trigger('click'); await flushPromises()
+    expect(wrapper.find('.selected-heading').text()).toContain('카드3')
+    await wrapper.find('.delete-card-btn').trigger('click'); await flushPromises()
+    expect(wrapper.find('.selected-heading').text()).toContain('카드1')
+  })
 
-    await wrapper.find('.card-item').trigger('click')
+  it('마지막 카드 삭제 후 빈 상태를 표시한다', async () => {
+    const { wrapper, store } = await mountPage([makeCard(1)])
+    vi.spyOn(store, 'deleteCard').mockImplementation(async () => { store.cards = [] })
+    await wrapper.find('.delete-card-btn').trigger('click'); await flushPromises()
+    expect(wrapper.text()).toContain('등록된 카드가 없어요')
+  })
 
-    expect(routerMock.push).toHaveBeenCalledWith('/cards/8')
+  it('빈 상태의 자동 연동 후 카드를 선택한다', async () => {
+    const { wrapper, store } = await mountPage([])
+    vi.spyOn(store, 'syncCards').mockImplementation(async () => {
+      store.cards = [makeCard(4, { isPrimary: true })]
+      return 1
+    })
+    await wrapper.find('.sync-btn').trigger('click'); await flushPromises()
+    expect(wrapper.find('.selected-heading').text()).toContain('카드4')
+    expect(toastSuccess).toHaveBeenCalledWith('카드 1개를 새로 연동했어요.')
+  })
+
+  it('새로 연동할 카드가 없으면(syncedCount 0) 안내만 띄우고 목록을 재선택하지 않는다', async () => {
+    const { wrapper, store } = await mountPage([])
+    vi.spyOn(store, 'syncCards').mockResolvedValue(0)
+    await wrapper.find('.sync-btn').trigger('click'); await flushPromises()
+    expect(toastInfo).toHaveBeenCalledWith('새로 연동할 카드가 없어요.')
+    expect(toastSuccess).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('등록된 카드가 없어요')
+  })
+
+  it('연동 실패 시 표준 에러 응답의 message를 보여준다', async () => {
+    const { wrapper, store } = await mountPage([])
+    vi.spyOn(store, 'syncCards').mockRejectedValue({ response: { data: { message: '카드사 서버 응답 지연' } } })
+    await wrapper.find('.sync-btn').trigger('click'); await flushPromises()
+    expect(wrapper.find('.sync-error').text()).toBe('카드사 서버 응답 지연')
   })
 })

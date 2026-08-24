@@ -1,4 +1,5 @@
-import {createRouter, createWebHistory} from 'vue-router'
+import {reactive} from 'vue'
+import {createRouter, createWebHistory, START_LOCATION} from 'vue-router'
 import Login from '@/pages/auth/Login.vue'
 import Signup from '@/pages/auth/Signup.vue'
 import Home from '@/pages/Home.vue'
@@ -7,10 +8,48 @@ import Payments from '@/pages/Payments.vue'
 import Cards from '@/pages/Cards.vue'
 import DefaultLayout from '@/layouts/menu/DefaultLayout.vue'
 import {useAuthStore} from '@/stores/auth'
+import {hasCompletedOnboarding} from '@/utils/onboardingStorage'
+
+const TAB_TRANSITION = 'tab'
+const STACK_TRANSITION = 'stack'
+
+export const navigationTransition = reactive({
+    type: 'none',
+    direction: 'forward',
+})
+
+export function resolveNavigationTransition(from, to, fromPosition, toPosition) {
+    if (from === START_LOCATION || fromPosition == null || toPosition == null || fromPosition === toPosition) {
+        return {type: 'none', direction: 'forward'}
+    }
+
+    const direction = toPosition < fromPosition ? 'back' : 'forward'
+    const fromTransition = from.redirectedFrom?.meta?.transition ?? from.meta?.transition
+    const toTransition = to.redirectedFrom?.meta?.transition ?? to.meta?.transition
+    const isStackNavigation = fromTransition === STACK_TRANSITION || toTransition === STACK_TRANSITION
+
+    return {
+        type: isStackNavigation ? 'slide' : 'fade',
+        direction,
+    }
+}
+
+export function getPageTransitionName() {
+    if (navigationTransition.type === 'slide') {
+        return `page-slide-${navigationTransition.direction}`
+    }
+    return navigationTransition.type === 'fade' ? 'page-fade' : ''
+}
 
 const router = createRouter({
     history: createWebHistory(),
     routes: [
+        {
+            path: '/onboarding',
+            name: 'onboarding',
+            component: () => import('@/pages/Onboarding.vue'),
+            meta: {guestOnly: true},
+        },
         // guestOnly: 이미 로그인된 사용자가 들어오면 홈으로 돌려보낸다.
         {path: '/login', name: 'login', component: Login, meta: {guestOnly: true}},
         {path: '/signup', name: 'signup', component: Signup, meta: {guestOnly: true}},
@@ -20,14 +59,14 @@ const router = createRouter({
             path: '/menu',
             name: 'menu',
             component: () => import('@/pages/Menu.vue'),
-            meta: {requiresAuth: true},
+            meta: {requiresAuth: true, transition: STACK_TRANSITION},
         },
         // 메뉴 페이지 '개인정보 및 보안'에서 진입
         {
             path: '/member-profile',
             name: 'member-profile',
             component: () => import('@/pages/auth/MemberProfile.vue'),
-            meta: {requiresAuth: true},
+            meta: {requiresAuth: true, transition: STACK_TRANSITION},
         },
         // 햄버거 메뉴 '간편 비밀번호(PIN) 설정'에서 진입하거나, 회원가입 후 첫 로그인 시
         // Login.vue가 이리로 보낸다. 최초 설정/변경 중 뭘 보여줄지는 Pinsetting.vue가
@@ -36,7 +75,7 @@ const router = createRouter({
             path: '/pin-setting',
             name: 'pin-setting',
             component: () => import('@/pages/Pinsetting.vue'),
-            meta: {requiresAuth: true},
+            meta: {requiresAuth: true, transition: STACK_TRANSITION},
         },
         {
             // 로그인 여부에 따른 분기는 아래 beforeEach 가드가 담당한다.
@@ -47,34 +86,48 @@ const router = createRouter({
             component: DefaultLayout,
             meta: {requiresAuth: true},
             children: [
-                {path: '', name: 'home', component: Home},
-                {path: 'map', name: 'map', component: Map},
-                {path: 'pay', name: 'pay', component: Payments},
+                {path: '', name: 'home', component: Home, meta: {transition: TAB_TRANSITION}},
+                {path: 'map', name: 'map', component: Map, meta: {transition: TAB_TRANSITION}},
+                {path: 'pay', name: 'pay', component: Payments, meta: {transition: TAB_TRANSITION}},
                 // 결제(pay)와 카드(cards) 사이 하단 탭에 들어가는 혜택 화면
-                {path: 'benefits', name: 'benefits', component: () => import('@/pages/Benefits.vue')},
-                {path: 'cards', name: 'cards', component: Cards},
-                {path: 'bookmarks', name: 'bookmarks', component: () => import('@/pages/Bookmarks.vue')},
+                {path: 'benefits', name: 'benefits', component: () => import('@/pages/Benefits.vue'), meta: {transition: TAB_TRANSITION}},
+                {path: 'cards', name: 'cards', component: Cards, meta: {transition: TAB_TRANSITION}},
+                {path: 'bookmarks', name: 'bookmarks', component: () => import('@/pages/Bookmarks.vue'), meta: {transition: STACK_TRANSITION}},
             ],
         },
         {
             path: '/payments',
             name: 'Payments',
             component: () => import('@/pages/PaymentsList.vue'),
-            meta: {requiresAuth: true},
+            meta: {requiresAuth: true, transition: STACK_TRANSITION},
         },
-        // 카드 목록(/cards)에서 카드를 눌렀을 때 들어가는 상세 화면
+        // 결제 내역 목록(/payments)에서 항목을 눌렀을 때 들어가는 상세 화면
+        {
+            path: '/payments/:id',
+            name: 'payment-detail',
+            component: () => import('@/pages/Paymentdetail.vue'),
+            meta: {requiresAuth: true, transition: STACK_TRANSITION},
+        },
+        // 예전 카드 상세 주소와 이름은 홈 등 기존 진입 코드의 하위 호환을 위해 유지한다.
         {
             path: '/cards/:userCardId',
             name: 'card-detail',
-            component: () => import('@/pages/Carddetail.vue'),
-            meta: {requiresAuth: true},
+            redirect: (to) => ({path: '/cards', query: {userCardId: String(to.params.userCardId)}}),
+            meta: {requiresAuth: true, transition: STACK_TRANSITION},
         },
         // 매장 목록/지도에서 매장을 눌렀을 때 들어가는 상세 화면
         {
             path: '/stores/:merchantId',
             name: 'store-detail',
             component: () => import('@/pages/Storedetail.vue'),
-            meta: {requiresAuth: true},
+            meta: {requiresAuth: true, transition: STACK_TRANSITION},
+        },
+        // 헤더 '알림' 아이콘에서 진입하는 알림 목록 화면
+        {
+            path: '/notifications',
+            name: 'notifications',
+            component: () => import('@/pages/Notifications.vue'),
+            meta: {requiresAuth: true, transition: STACK_TRANSITION},
         },
     ],
 })
@@ -85,6 +138,12 @@ router.beforeEach(async (to) => {
     // 새로고침이나 첫 진입이면 저장된 토큰으로 자동 로그인을 먼저 시도한다. 두 번째 호출부터는
     // 이미 끝난 Promise를 그대로 돌려받으므로 라우팅이 느려지지 않는다.
     await authStore.bootstrapSession()
+
+    // 첫 실행의 비로그인 사용자만 온보딩으로 보낸다. 온보딩 자체는 예외로 두어
+    // 자기 자신으로 계속 redirect되는 것을 막고, 완료 저장은 환영 화면의 액션에서만 한다.
+    if (!authStore.isAuthenticated && !hasCompletedOnboarding() && to.name !== 'onboarding') {
+        return {name: 'onboarding'}
+    }
 
     // 토큰이 없거나 모두 만료됐다 - 로그인 화면을 띄운다.
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
@@ -101,6 +160,17 @@ router.beforeEach(async (to) => {
     }
 
     return true
+})
+
+let previousHistoryPosition = window.history.state?.position
+
+router.afterEach((to, from) => {
+    const currentHistoryPosition = window.history.state?.position
+    Object.assign(
+        navigationTransition,
+        resolveNavigationTransition(from, to, previousHistoryPosition, currentHistoryPosition)
+    )
+    previousHistoryPosition = currentHistoryPosition
 })
 
 export default router

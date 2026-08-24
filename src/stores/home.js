@@ -16,11 +16,11 @@ export const useHomeStore = defineStore('home', {
   }),
 
   actions: {
-    async fetchRecommendation() {
+    async fetchRecommendation(lat, lng) {
       this.recommendationLoading = true
       this.recommendationError = false
       try {
-        this.recommendation = await fetchTodayRecommendation()
+        this.recommendation = await fetchTodayRecommendation(lat, lng)
       } catch (e) {
         console.error('[home store] 오늘의 카드 추천 조회 실패', e.message)
         this.recommendationError = true

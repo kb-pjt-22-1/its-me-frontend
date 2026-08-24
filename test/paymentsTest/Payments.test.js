@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import JsBarcode from 'jsbarcode'
@@ -41,10 +41,16 @@ const cardsStoreMock = {
     return this.cards.find((c) => c.userCardId === id)
   },
   fetchCards: vi.fn(),
+  ensureBenefitsLoaded: vi.fn(),
 }
 vi.mock('@/stores/cards', () => ({ useCardsStore: () => cardsStoreMock }))
 
-const merchantsStoreMock = { getByIdWithCategory: () => null }
+const merchantsStoreMock = {
+  categories: [],
+  getByIdWithCategory: () => null,
+  fetchCategories: vi.fn().mockResolvedValue(),
+  fetchMerchantDetail: vi.fn().mockResolvedValue(null),
+}
 vi.mock('@/stores/merchants', () => ({ useMerchantsStore: () => merchantsStoreMock }))
 
 vi.mock('@/services/paymentService', () => ({
@@ -91,6 +97,41 @@ beforeEach(() => {
   vi.clearAllMocks()
   capturedLeaveGuard = null
   routeMock.query = {}
+  merchantsStoreMock.categories = []
+  cardsStoreMock.cards = [
+    { userCardId: 1, cardName: '청춘대로 톡톡카드', panLast4: '1234', status: 'ACTIVE', color: '#1f3a5f', isPrimary: true, benefitsInfo: null, currentAmount: 0 },
+  ]
+  cardsStoreMock.primaryCard = cardsStoreMock.cards[0]
+})
+
+describe('선택 카드 표시', () => {
+  it('선택 카드명 옆에 panLast4의 숫자 마지막 4자리를 표시한다', () => {
+    cardsStoreMock.cards[0].panLast4 = '****-56 7890'
+    const { wrapper } = mountPage()
+
+    expect(wrapper.find('.selected-card-name').text()).toBe('청춘대로 톡톡카드')
+    expect(wrapper.find('.selected-card-last4').text()).toBe('7890')
+  })
+
+  it('카드를 선택하면 카드명과 뒷번호가 함께 변경된다', async () => {
+    cardsStoreMock.cards.push({
+      userCardId: 2, cardName: '두 번째 카드', panLast4: 'card-9876', status: 'ACTIVE',
+      color: '#24211d', isPrimary: false, benefitsInfo: null, currentAmount: 0,
+    })
+    const { wrapper } = mountPage()
+
+    await wrapper.findAll('.card-slide')[1].trigger('click')
+
+    expect(wrapper.find('.selected-card-name').text()).toBe('두 번째 카드')
+    expect(wrapper.find('.selected-card-last4').text()).toBe('9876')
+  })
+
+  it('panLast4가 없으면 번호 영역을 표시하지 않는다', () => {
+    cardsStoreMock.cards[0].panLast4 = null
+    const { wrapper } = mountPage()
+
+    expect(wrapper.find('.selected-card-last4').exists()).toBe(false)
+  })
 })
 
 describe('바코드 발급/렌더링', () => {
@@ -101,13 +142,27 @@ describe('바코드 발급/렌더링', () => {
     const { wrapper } = mountPage()
     await enterPin(wrapper)
 
-    expect(createPaymentTokenApi).toHaveBeenCalledWith(1) // selectedMethodId(대표카드 userCardId)
-    expect(wrapper.text()).toContain('ABC123XYZ')
+    // merchantId 없을 때 undefined가 아니라 null이 넘어가는 이유: store의 createPaymentToken이
+    // merchantId 기본값을 null로 둬서(JSON.stringify가 undefined 필드는 통째로 지워버리는 것과
+    // 달리, null은 요청 바디에 "merchantId": null로 명시적으로 남는다 - 백엔드 선택값 의도를
+    // 더 명확히 드러냄), Payments.vue가 undefined를 넘겨도 기본 매개변수로 치환된다.
+    expect(createPaymentTokenApi).toHaveBeenCalledWith(1, null) // selectedMethodId(대표카드 userCardId), merchantId 없음
     expect(JsBarcode).toHaveBeenCalledWith(
       expect.anything(),
       'ABC123XYZ',
       expect.objectContaining({ format: 'CODE128', displayValue: false })
     )
+  })
+
+  it('매장 상세에서 넘어온 경우(쿼리에 merchantId 있음) 토큰 발급 시 merchantId도 같이 넘긴다', async () => {
+    routeMock.query = { merchantId: '7' }
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    expect(createPaymentTokenApi).toHaveBeenCalledWith(1, 7)
   })
 
   it('토큰 발급에 실패하면 에러 토스트를 띄우고 인증 전 화면으로 되돌린다', async () => {
@@ -122,14 +177,57 @@ describe('바코드 발급/렌더링', () => {
     expect(JsBarcode).not.toHaveBeenCalled()
   })
 
-  it('PIN이 틀리면 토큰을 발급하지 않는다', async () => {
-    verifyPin.mockRejectedValue(new Error('wrong pin'))
+  it('PIN이 틀리면 토큰을 발급하지 않고 (n/5) 횟수를 보여준다', async () => {
+    verifyPin.mockRejectedValue({ response: { status: 401 } })
 
     const { wrapper } = mountPage()
     await enterPin(wrapper)
 
-    expect(wrapper.text()).toContain('비밀번호가 올바르지 않습니다')
+    expect(wrapper.text()).toContain('핀 번호가 틀립니다. (1/5)')
     expect(createPaymentTokenApi).not.toHaveBeenCalled()
+  })
+
+  it('PIN을 두 번째로 틀리면 (2/5)로 올라간다', async () => {
+    verifyPin.mockRejectedValue({ response: { status: 401 } })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper) // 시트를 새로 열고 첫 번째로 틀림 -> (1/5)
+
+    // 시트를 닫지 않은 채로 같은 시트에서 다시 6자리를 입력한다(재오픈하면 횟수가 리셋되므로
+    // 시작 버튼을 다시 누르지 않는다).
+    const digitButtons = wrapper.findAll('.keypad-key').filter((b) => /^[0-9]$/.test(b.text()))
+    for (let i = 0; i < 6; i++) {
+      await digitButtons[i].trigger('click')
+    }
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('핀 번호가 틀립니다. (2/5)')
+  })
+
+  it('PIN이 423(잠금)으로 실패하면 잠금 문구를 보여주고 횟수를 리셋한다', async () => {
+    verifyPin.mockRejectedValue({ response: { status: 423 } })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    expect(wrapper.text()).toContain('핀 번호를 5회 이상 틀렸습니다. 잠시 후 다시 시도해주세요')
+    expect(createPaymentTokenApi).not.toHaveBeenCalled()
+  })
+
+  it('PIN 시트를 다시 열면 실패 횟수가 초기화된다', async () => {
+    verifyPin.mockRejectedValueOnce({ response: { status: 401 } })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+    expect(wrapper.text()).toContain('(1/5)')
+
+    // 시트를 닫고 다시 연다.
+    await wrapper.find('.pin-sheet-close').trigger('click')
+    verifyPin.mockRejectedValueOnce({ response: { status: 401 } })
+    await enterPin(wrapper)
+
+    expect(wrapper.text()).toContain('(1/5)')
+    expect(wrapper.text()).not.toContain('(2/5)')
   })
 })
 
@@ -207,5 +305,142 @@ describe('페이지 이탈 시 토큰 취소', () => {
     await flushPromises()
 
     expect(result).toBe(true)
+  })
+})
+
+describe('매장 정보 조회 (route.query.merchantId)', () => {
+  it('merchantId가 쿼리에 있으면 카테고리와 매장 상세를 받아온다', async () => {
+    routeMock.query = { merchantId: '7' }
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
+
+    mountPage()
+    await flushPromises()
+
+    expect(merchantsStoreMock.fetchCategories).toHaveBeenCalledTimes(1)
+    expect(merchantsStoreMock.fetchMerchantDetail).toHaveBeenCalledWith('7')
+  })
+
+  it('merchantId가 쿼리에 없으면 매장 상세를 조회하지 않는다', async () => {
+    verifyPin.mockResolvedValue()
+
+    mountPage()
+    await flushPromises()
+
+    expect(merchantsStoreMock.fetchMerchantDetail).not.toHaveBeenCalled()
+  })
+
+  it('이미 카테고리를 받아온 상태면 다시 불러오지 않는다', async () => {
+    routeMock.query = { merchantId: '7' }
+    merchantsStoreMock.categories = [{ categoryCode: '5812', categoryName: '음식점' }]
+    verifyPin.mockResolvedValue()
+
+    mountPage()
+    await flushPromises()
+
+    expect(merchantsStoreMock.fetchCategories).not.toHaveBeenCalled()
+  })
+})
+
+describe('바코드 만료 카운트다운 / 재발급', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('발급 직후 expiresAt까지 남은 시간을 mm:ss로 보여준다', async () => {
+    verifyPin.mockResolvedValue()
+    const issuedAt = new Date()
+    createPaymentTokenApi.mockResolvedValue({
+      paymentTokenId: 'tok-1',
+      tokenValue: 'ABC123XYZ',
+      expiresAt: new Date(issuedAt.getTime() + 3 * 60 * 1000).toISOString(),
+    })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    expect(wrapper.text()).toContain('3:00')
+  })
+
+  it('시간이 흐르면 카운트다운이 줄어들고, 만료되면 만료 문구로 바뀐다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi.mockResolvedValue({
+      paymentTokenId: 'tok-1',
+      tokenValue: 'ABC123XYZ',
+      expiresAt: new Date(Date.now() + 5000).toISOString(),
+    })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    expect(wrapper.text()).toContain('0:05')
+
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(wrapper.text()).toContain('0:02')
+
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(wrapper.text()).toContain('바코드가 만료됐어요')
+  })
+
+  it('"다시 발급" 버튼을 누르면 기존 토큰을 취소하고 새 토큰을 발급한다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi
+      .mockResolvedValueOnce({
+        paymentTokenId: 'tok-1',
+        tokenValue: 'ABC123XYZ',
+        expiresAt: new Date(Date.now() + 3000).toISOString(),
+      })
+      .mockResolvedValueOnce({
+        paymentTokenId: 'tok-2',
+        tokenValue: 'NEWTOKEN999',
+        expiresAt: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
+      })
+    cancelPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', status: 'CANCELED' })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+    expect(JsBarcode).toHaveBeenLastCalledWith(expect.anything(), 'ABC123XYZ', expect.anything())
+
+    const reissueButton = wrapper.findAll('button').find((b) => b.text().includes('다시 발급'))
+    await reissueButton.trigger('click')
+    await flushPromises()
+
+    expect(cancelPaymentTokenApi).toHaveBeenCalledWith('tok-1')
+    expect(createPaymentTokenApi).toHaveBeenCalledTimes(2)
+    expect(JsBarcode).toHaveBeenLastCalledWith(expect.anything(), 'NEWTOKEN999', expect.anything())
+    expect(wrapper.text()).toContain('3:00')
+  })
+
+  it('만료된 뒤 재발급해도 정상적으로 새 토큰을 받아온다', async () => {
+    verifyPin.mockResolvedValue()
+    createPaymentTokenApi
+      .mockResolvedValueOnce({
+        paymentTokenId: 'tok-1',
+        tokenValue: 'ABC123XYZ',
+        expiresAt: new Date(Date.now() + 1000).toISOString(),
+      })
+      .mockResolvedValueOnce({
+        paymentTokenId: 'tok-2',
+        tokenValue: 'NEWTOKEN999',
+        expiresAt: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
+      })
+    cancelPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', status: 'CANCELED' })
+
+    const { wrapper } = mountPage()
+    await enterPin(wrapper)
+
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(wrapper.text()).toContain('바코드가 만료됐어요')
+
+    const reissueButton = wrapper.findAll('button').find((b) => b.text().includes('다시 발급'))
+    await reissueButton.trigger('click')
+    await flushPromises()
+
+    expect(JsBarcode).toHaveBeenLastCalledWith(expect.anything(), 'NEWTOKEN999', expect.anything())
+    expect(wrapper.text()).not.toContain('바코드가 만료됐어요')
   })
 })

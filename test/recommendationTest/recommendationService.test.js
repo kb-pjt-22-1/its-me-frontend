@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import api from '@/api'
-import { fetchTodayRecommendation } from '@/services/recommendationService'
+import { fetchTodayRecommendation, fetchMerchantCardRecommendations } from '@/services/recommendationService'
 
 vi.mock('@/api', () => ({
   default: { get: vi.fn() },
@@ -11,15 +11,15 @@ beforeEach(() => {
 })
 
 describe('fetchTodayRecommendation', () => {
-  it('GET /v1/recommendations/today를 호출한다', async () => {
-    api.get.mockResolvedValue({ data: { categoryName: '카페', cardName: '청춘대로 톡톡카드' } })
+  it('GET /v1/recommendations/today를 lat/lng와 함께 호출한다', async () => {
+    api.get.mockResolvedValue({ data: { userCardId: 12, categoryName: '카페', cardName: '청춘대로 톡톡카드' } })
 
-    await fetchTodayRecommendation()
+    await fetchTodayRecommendation(37.5, 127.0)
 
-    expect(api.get).toHaveBeenCalledWith('/v1/recommendations/today')
+    expect(api.get).toHaveBeenCalledWith('/v1/recommendations/today', { params: { lat: 37.5, lng: 127.0 } })
   })
 
-  it('기본 필드명(categoryName/cardName/benefitLabel)을 정규화한다', async () => {
+  it('필드를 정규화해서 반환한다 (nearbyMerchants의 merchantName -> name 매핑 포함)', async () => {
     api.get.mockResolvedValue({
       data: {
         categoryName: '카페',
@@ -32,7 +32,7 @@ describe('fetchTodayRecommendation', () => {
       },
     })
 
-    const result = await fetchTodayRecommendation()
+    const result = await fetchTodayRecommendation(37.5, 127.0)
 
     expect(result).toEqual({
       categoryName: '카페',
@@ -45,35 +45,97 @@ describe('fetchTodayRecommendation', () => {
     })
   })
 
-  it('대체 필드명(recommendedCategoryName/recommendedCardName/benefitDescription/discountLabel)도 인식한다', async () => {
+  it('userCardId가 없으면(빈 추천) null을 반환한다', async () => {
+    api.get.mockResolvedValue({ data: {} })
+
+    const result = await fetchTodayRecommendation(37.5, 127.0)
+
+    expect(result).toBeNull()
+  })
+
+  it('benefitLabel/nearbyMerchants가 없어도 기본값으로 안전하게 정규화한다', async () => {
+    api.get.mockResolvedValue({ data: { userCardId: 12, categoryName: '카페', cardName: '청춘대로 톡톡카드' } })
+
+    const result = await fetchTodayRecommendation(37.5, 127.0)
+
+    expect(result.benefitLabel).toBe('')
+    expect(result.nearbyMerchants).toEqual([])
+  })
+
+  it('categoryName/cardName과 매장별 benefitLabel이 없어도 빈 문자열로 안전하게 정규화한다', async () => {
     api.get.mockResolvedValue({
       data: {
-        recommendedCategoryName: '편의점',
-        recommendedCardName: '굿데이카드',
-        benefitDescription: '5% 적립',
-        nearbyMerchants: [{ merchantId: 2, merchantName: 'GS25 역삼점', distanceMeters: 30, discountLabel: '5% 적립' }],
+        userCardId: 12,
+        nearbyMerchants: [{ merchantId: 1, merchantName: '메가커피 강남점', distanceMeters: 80 }],
       },
     })
 
-    const result = await fetchTodayRecommendation()
+    const result = await fetchTodayRecommendation(37.5, 127.0)
 
-    expect(result.categoryName).toBe('편의점')
-    expect(result.cardName).toBe('굿데이카드')
-    expect(result.benefitLabel).toBe('5% 적립')
-    expect(result.nearbyMerchants[0].benefitLabel).toBe('5% 적립')
+    expect(result.categoryName).toBe('')
+    expect(result.cardName).toBe('')
+    expect(result.nearbyMerchants[0].benefitLabel).toBe('')
+  })
+})
+
+describe('fetchMerchantCardRecommendations', () => {
+  it('GET /v1/recommendations/merchants/{merchantId}/cards를 호출하고 카드 목록을 정규화해서 반환한다', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        cards: [
+          {
+            userCardId: 1,
+            cardName: '청춘대로 톡톡카드',
+            cardImageUrl: 'https://cdn.benepay.com/cards/card-1.png',
+            benefitDescription: '카페 10% 할인',
+            benefitApplicable: true,
+            performanceMet: true,
+            reason: '',
+            recommended: true,
+          },
+          {
+            userCardId: 2,
+            cardName: '굿데이카드',
+            benefitApplicable: false,
+            performanceMet: false,
+            recommended: false,
+          },
+        ],
+      },
+    })
+
+    const result = await fetchMerchantCardRecommendations(40464)
+
+    expect(api.get).toHaveBeenCalledWith('/v1/recommendations/merchants/40464/cards')
+    expect(result).toEqual([
+      {
+        userCardId: 1,
+        cardName: '청춘대로 톡톡카드',
+        cardImageUrl: 'https://cdn.benepay.com/cards/card-1.png',
+        benefitDescription: '카페 10% 할인',
+        benefitApplicable: true,
+        performanceMet: true,
+        reason: '',
+        recommended: true,
+      },
+      {
+        userCardId: 2,
+        cardName: '굿데이카드',
+        cardImageUrl: null,
+        benefitDescription: '',
+        benefitApplicable: false,
+        performanceMet: false,
+        reason: '',
+        recommended: false,
+      },
+    ])
   })
 
-  it('필드가 하나도 없으면 빈 값/빈 배열로 안전하게 정규화한다', async () => {
+  it('cards 필드가 없으면 빈 배열을 반환한다', async () => {
     api.get.mockResolvedValue({ data: {} })
 
-    const result = await fetchTodayRecommendation()
+    const result = await fetchMerchantCardRecommendations(40464)
 
-    expect(result).toEqual({
-      categoryName: '',
-      cardName: '',
-      userCardId: null,
-      benefitLabel: '',
-      nearbyMerchants: [],
-    })
+    expect(result).toEqual([])
   })
 })

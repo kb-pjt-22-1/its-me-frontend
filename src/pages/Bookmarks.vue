@@ -31,8 +31,11 @@
           <div class="store-icon"><img :src="shop.categoryIcon" alt="" /></div>
 
           <div class="card-center">
-            <h3>{{ shop.name }}</h3>
-            <p class="details muted-text">{{ shop.categoryName }} · {{ shop.address }}</p>
+            <div class="store-title-row">
+              <h3>{{ shop.name }}</h3>
+              <span v-if="shop.categoryName" class="store-category">{{ shop.categoryName }}</span>
+            </div>
+            <p v-if="shop.address" class="details muted-text">{{ shop.address }}</p>
             <span v-if="shop.discountLabel" class="pill pill--gold">{{ shop.discountLabel }}</span>
           </div>
 
@@ -66,6 +69,9 @@ const cardsStore = useCardsStore();
 onMounted(() => {
   bookmarksStore.fetchBookmarks();
   if (merchantsStore.merchants.length === 0) merchantsStore.fetchMerchants();
+  // fetchCards()는 실적만 받아오고 benefitsInfo는 안 채운다 - bestDiscountLabel이 그걸로
+  // 매칭하니, 이 페이지가 뜨는 시점에 지금 가진 카드만큼만 받아온다.
+  cardsStore.ensureBenefitsLoaded(cardsStore.cards.map((c) => c.userCardId));
 });
 
 // 보유 카드 중 이 매장 카테고리에 맞는 최고 혜택 찾기
@@ -74,7 +80,7 @@ function bestDiscountLabel(categoryCode) {
   let best = null;
   let bestCardName = '';
   for (const card of cardsStore.cards) {
-    const benefit = findBenefitForCategory(card.benefitsInfo, categoryCode, card.currentAmount ?? 0);
+    const benefit = findBenefitForCategory(card.benefitsInfo, categoryCode, card.previousMonthAmount ?? 0);
     const rate = benefit?.discountRate ?? benefit?.discountAmount ?? -1;
     const bestRate = best?.discountRate ?? best?.discountAmount ?? -1;
     if (benefit && rate > bestRate) {
@@ -114,8 +120,16 @@ const handleRemove = async (merchantId) => {
 </script>
 
 <style scoped>
-.page-container { background-color: var(--page, #f7f7f5); min-height: 100vh; padding: 20px; }
-.page-header { margin-bottom: 20px; }
+.page-container {
+  min-height: 100vh;
+  padding: 0 20px 20px;
+  background-color: var(--page, #f7f7f5);
+}
+
+.page-header {
+  height: 36px;
+  margin-bottom: 8px;
+}
 .page-header h2 { font-size: 1.2rem; }
 
 .loading-text, .empty-text { text-align: center; padding: 60px 0; font-size: 0.9rem; }
@@ -124,14 +138,63 @@ const handleRemove = async (merchantId) => {
 .bookmark-list { display: flex; flex-direction: column; gap: 15px; }
 .store-card { padding: 15px; text-align: left; }
 
-.store-icon {
-  width: 50px; height: 50px; background: var(--inactive, #f0efec); border-radius: 12px;
-  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+:deep(.store-card.btn--box-outline) {
+  padding: 14px 16px;
+  border: 1.5px solid var(--line, #e7e4de);
 }
-.store-icon img { width: 24px; height: 24px; }
+
+.store-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--page, #f7f7f5);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.store-icon img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
 .card-center { flex: 1; min-width: 0; }
-.card-center h3 { margin: 0 0 5px 0; font-size: 1.05rem; color: var(--charcoal, #24211d); }
-.details { font-size: 0.8rem; margin: 0 0 8px 0; }
+.store-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  margin-bottom: 1px;
+}
+
+.store-title-row h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--charcoal, #24211d);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.store-category {
+  flex: 0 0 auto;
+  color: var(--muted, #8f897f);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.details {
+  margin: 0 0 3px;
+  overflow: hidden;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.details:last-child {
+  margin-bottom: 0;
+}
 
 .bookmark-badge {
   width: 32px; height: 32px; border-radius: 9px; background: var(--orange, #ffbc00);

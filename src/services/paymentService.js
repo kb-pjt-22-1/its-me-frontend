@@ -1,8 +1,8 @@
 import api from '@/api'
 
 /** 결제 바코드/QR 생성 [POST /api/v1/payment-tokens] */
-export async function createPaymentToken(userCardId) {
-  const { data } = await api.post('/v1/payment-tokens', { userCardId })
+export async function createPaymentToken(userCardId, merchantId = null) {
+  const { data } = await api.post('/v1/payment-tokens', { userCardId, merchantId })
   return data
 }
 
@@ -48,5 +48,16 @@ export async function cancelPaymentToken(paymentTokenId) {
 /** 결제 내역 [GET /api/v1/payments] */
 export async function fetchPaymentHistory(params) {
   const { data } = await api.get('/v1/payments', { params })
+  return data
+}
+
+/**
+ * 결제 단건 상세 [GET /api/v1/payments/{paymentId}]
+ * 응답(PaymentHistoryResponseDto): paymentId, merchantName, categoryCode, cardName,
+ *   maskedCardNumber, paymentTime, originalAmount, discountAmount, finalAmount,
+ *   paymentStatus, paymentMethod
+ */
+export async function fetchPaymentDetail(paymentId) {
+  const { data } = await api.get(`/v1/payments/${paymentId}`)
   return data
 }

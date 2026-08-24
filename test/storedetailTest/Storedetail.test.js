@@ -7,6 +7,10 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }))
 
+vi.mock('@/services/recommendationService', () => ({
+  fetchMerchantCardRecommendations: vi.fn().mockResolvedValue([]),
+}))
+
 import Storedetail from '@/pages/Storedetail.vue'
 import { useMerchantsStore } from '@/stores/merchants'
 import { useCardsStore } from '@/stores/cards'

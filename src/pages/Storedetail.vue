@@ -21,7 +21,7 @@
 
       <div v-if="bestCard" class="benefit-strip">
         제휴 혜택: 이 매장에서 <strong>{{ bestCard.cardName }}</strong>로 결제하면
-        <strong>{{ formatBenefit(bestMatch) }}</strong>
+        <strong>{{ bestCard.benefitDescription }}</strong>
       </div>
       <div v-else class="benefit-strip benefit-strip--muted">
         보유하신 카드 중 이 매장에 적용되는 혜택이 없어요.
@@ -31,40 +31,50 @@
     <section class="recommend-section">
       <h3 class="section-title">이 매장 추천 카드</h3>
 
-      <Button
-        v-for="row in recommendedCards"
-        :key="row.card.userCardId"
-        variant="box-outline"
-        class="reco-card"
-        :class="{ 'reco-card--best': row.isBest, 'reco-card--selected': selectedCardId === row.card.userCardId }"
-        style="flex-direction: row; align-items: center; min-height: auto;"
-        @click="selectedCardId = row.card.userCardId"
-      >
-        <span v-if="row.isBest" class="reco-badge">추천</span>
-        <div class="reco-top">
-          <span class="reco-icon" :style="{ background: row.card.color || '#24211d' }">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
-              <rect x="2" y="5" width="20" height="14" rx="3"></rect>
-              <line x1="2" y1="10" x2="22" y2="10"></line>
-            </svg>
-          </span>
-          <div class="reco-name-block">
-            <strong>{{ row.card.cardName }}</strong>
-            <p>{{ row.description }}</p>
+      <p v-if="cardComparisonsLoading" class="muted-text">불러오는 중...</p>
+      <p v-else-if="cardComparisonsError" class="muted-text">
+        카드 비교 정보를 불러오지 못했어요.
+        <Button variant="link-muted" size="sm" @click="loadCardComparisons">다시 시도</Button>
+      </p>
+      <p v-else-if="sortedCards.length === 0" class="muted-text">보유하신 카드가 없어요.</p>
+
+      <template v-else>
+        <Button
+          v-for="row in sortedCards"
+          :key="row.userCardId"
+          variant="box-outline"
+          class="reco-card"
+          :class="{ 'reco-card--best': row.recommended, 'reco-card--selected': selectedCardId === row.userCardId }"
+          style="flex-direction: row; align-items: center; min-height: auto;"
+          @click="selectedCardId = row.userCardId"
+        >
+          <span v-if="row.recommended" class="reco-badge">추천</span>
+          <div class="reco-top">
+            <span class="reco-icon">
+              <img v-if="getCardImage(row)" :src="getCardImage(row)" :alt="`${row.cardName} 이미지`" class="reco-icon-img" />
+              <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+                <rect x="2" y="5" width="20" height="14" rx="3"></rect>
+                <line x1="2" y1="10" x2="22" y2="10"></line>
+              </svg>
+            </span>
+            <div class="reco-name-block">
+              <strong>{{ row.cardName }}</strong>
+              <p v-if="row.benefitDescription">{{ row.benefitDescription }}</p>
+            </div>
+            <span class="reco-rate" :class="{ 'reco-rate--none': !row.benefitApplicable }">
+              {{ row.performanceMet ? '혜택 적용 중' : row.benefitApplicable ? '실적 조건 필요' : '혜택 없음' }}
+            </span>
+            <span class="reco-check" :class="{ active: selectedCardId === row.userCardId }">
+              <svg
+                v-if="selectedCardId === row.userCardId"
+                width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"
+              >
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </span>
           </div>
-          <span class="reco-rate" :class="{ 'reco-rate--none': !row.match }">
-            {{ row.match ? formatBenefit(row.match) : '혜택 없음' }}
-          </span>
-          <span class="reco-check" :class="{ active: selectedCardId === row.card.userCardId }">
-            <svg
-              v-if="selectedCardId === row.card.userCardId"
-              width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"
-            >
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          </span>
-        </div>
-      </Button>
+        </Button>
+      </template>
     </section>
 
     <button class="pay-btn" @click="goToPay">결제하기</button>
@@ -78,56 +88,66 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
 import Button from '@/components/common/Button.vue';
-import { findBenefitForCategory, formatBenefit } from '@/services/cardService';
+import { fetchMerchantCardRecommendations } from '@/services/recommendationService';
+import { getCardImage } from '@/utils/cardImages';
 
 const route = useRoute();
 const router = useRouter();
-const cardsStore = useCardsStore();
 const merchantsStore = useMerchantsStore();
 
 onMounted(() => {
   if (merchantsStore.merchants.length === 0) merchantsStore.fetchMerchants();
-  if (cardsStore.cards.length === 0) cardsStore.fetchCards();
 });
 
 const merchant = computed(() => merchantsStore.getByIdWithCategory(route.params.merchantId));
 
-const recommendedCards = computed(() => {
-  if (!merchant.value) return [];
+const cardComparisons = ref([]);
+const cardComparisonsLoading = ref(false);
+const cardComparisonsError = ref(false);
 
-  const rows = cardsStore.cards
-    .filter((card) => card.status === 'ACTIVE')
-    .map((card) => {
-      const match = findBenefitForCategory(card.benefitsInfo, merchant.value.categoryCode, card.currentAmount ?? 0);
-      return {
-        card,
-        match,
-        description: match
-          ? (match.description ?? `${merchant.value.categoryName ?? ''} 업종 혜택 적용 중`)
-          : '이 매장 카테고리에 적용 가능한 혜택이 없어요',
-      };
-    })
-    .sort((a, b) => {
-      const rateA = a.match?.discountRate ?? a.match?.discountAmount ?? -1;
-      const rateB = b.match?.discountRate ?? b.match?.discountAmount ?? -1;
-      return rateB - rateA;
-    });
+async function loadCardComparisons() {
+  if (!merchant.value) return;
+  cardComparisonsLoading.value = true;
+  cardComparisonsError.value = false;
+  try {
+    cardComparisons.value = await fetchMerchantCardRecommendations(merchant.value.id);
+  } catch (err) {
+    console.error('[Storedetail] 카드 비교 조회 실패', err);
+    cardComparisonsError.value = true;
+    cardComparisons.value = [];
+  } finally {
+    cardComparisonsLoading.value = false;
+  }
+}
 
-  return rows.map((row, index) => ({ ...row, isBest: index === 0 && !!row.match }));
+// merchant는 merchantsStore.fetchMerchants()가 끝나야 채워지는 비동기 상태라, merchant가
+// 생기는 시점(최초 로딩 완료 또는 라우트 파라미터 변경)에 맞춰 카드 비교를 새로 불러온다.
+// getByIdWithCategory가 매번 새 객체를 반환하므로 merchant 객체 전체가 아니라 id만 지켜봐서,
+// id가 그대로인데 store가 재계산될 때 중복 요청이 나가지 않게 한다.
+watch(() => merchant.value?.id, (id) => {
+  if (id) loadCardComparisons();
+}, { immediate: true });
+
+// 추천 카드를 맨 위로, 그다음 실적만 채우면 되는 카드, 마지막으로 혜택 자체가 없는 카드 순.
+const sortedCards = computed(() => {
+  return [...cardComparisons.value].sort((a, b) => {
+    if (a.recommended !== b.recommended) return a.recommended ? -1 : 1;
+    if (a.performanceMet !== b.performanceMet) return a.performanceMet ? -1 : 1;
+    if (a.benefitApplicable !== b.benefitApplicable) return a.benefitApplicable ? -1 : 1;
+    return 0;
+  });
 });
 
-const bestCard = computed(() => recommendedCards.value.find((r) => r.isBest)?.card ?? null);
-const bestMatch = computed(() => recommendedCards.value.find((r) => r.isBest)?.match ?? null);
+const bestCard = computed(() => cardComparisons.value.find((c) => c.recommended) ?? null);
 
 const selectedCardId = ref(null);
 watch(
-  recommendedCards,
+  sortedCards,
   (rows) => {
     if (!rows.length || selectedCardId.value !== null) return;
-    selectedCardId.value = (rows.find((r) => r.isBest) ?? rows[0]).card.userCardId;
+    selectedCardId.value = (rows.find((r) => r.recommended) ?? rows[0]).userCardId;
   },
   { immediate: true }
 );
@@ -175,7 +195,8 @@ const goToPay = () => {
   margin-bottom: 12px;
   cursor: pointer;
 }
-.reco-card--best { border: 2px solid var(--orange, #ffbc00) !important; padding: 13px !important; }
+/* --best(추천 배지)는 위 reco-badge 태그만으로 표시하고 테두리는 안 준다 - 실제 결제에 쓸
+   카드를 고르는 --selected 테두리와 같은 색이면 "추천"과 "지금 선택됨"이 헷갈린다. */
 .reco-card--selected { border: 2px solid var(--orange, #ffbc00) !important; padding: 13px !important; background: #fffaf0 !important; }
 
 .reco-check {
@@ -190,16 +211,27 @@ const goToPay = () => {
 }
 
 .reco-top { display: flex; align-items: center; gap: 12px; width: 100%; }
-.reco-icon { width: 40px; height: 26px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 auto; }
+.reco-icon {
+  width: 40px; height: 26px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 auto;
+  background: #24211d; overflow: hidden;
+}
+.reco-icon-img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .reco-name-block { flex: 1; min-width: 0; }
 .reco-name-block strong { display: block; font-size: 13.5px; color: var(--charcoal, #24211d); margin-bottom: 3px; }
 .reco-name-block p { margin: 0; font-size: 11px; color: var(--muted, #8f897f); }
-.reco-rate { font-size: 12.5px; font-weight: 800; color: var(--orange, #d98d00); white-space: nowrap; flex: 0 0 auto; }
+.reco-rate {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #ffbe49;
+  flex: 0 1 auto;
+  max-width: 38%;
+  text-align: right;
+}
 .reco-rate--none { color: var(--muted, #8f897f); font-weight: 600; }
 
 .pay-btn {
   width: 100%; height: 54px; border-radius: 14px; border: none;
-  background: var(--orange, #ffbc00); color: var(--charcoal, #24211d); font-weight: 900; font-size: 15px; cursor: pointer;
+  background: var(--orange, #ffbc00); color: #ffbe49; font-weight: 900; font-size: 15px; cursor: pointer;
 }
 .not-found { padding-top: 60px; text-align: center; }
 </style>
