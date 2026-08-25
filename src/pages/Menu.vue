@@ -38,9 +38,9 @@
 
       <div class="menu-section">
         <p class="section-title">고객지원</p>
-          <div class="menu-item">고객센터 &gt;</div>
-          <div class="menu-item">공지사항 &gt;</div>
-          <div class="menu-item">약관 및 정책 &gt;</div>
+        <div class="menu-item" @click="handleComingSoon">고객센터 &gt;</div>
+        <div class="menu-item" @click="handleComingSoon">공지사항 &gt;</div>
+        <div class="menu-item" @click="handleComingSoon">약관 및 정책 &gt;</div>
       </div>
 
       <div class="footer-actions">
@@ -93,6 +93,12 @@ onMounted(() => {
 const handleLogout = async () => {
   await authStore.logout();
   router.push('/login');
+};
+
+// 고객센터/공지사항/약관 및 정책은 아직 실제 페이지가 없다 - 클릭해도 아무 반응 없이
+// 조용히 넘어가는 대신, 준비 중임을 알린다.
+const handleComingSoon = () => {
+  toast.info('아직 준비 중인 기능이에요.');
 };
 
 const handleWithdraw = async () => {
