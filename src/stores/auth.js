@@ -151,7 +151,7 @@ export const useAuthStore = defineStore('auth', {
         this.registerFcmToken()
         return true
       } catch (err) {
-        this.errorMessage = err.response?.data?.message || err.message || '회원가입에 실패했습니다.'
+        this.errorMessage = resolveAuthErrorMessage(err, '회원가입에 실패했습니다.')
         this.errorStatus = err.response?.status ?? null
         return false
       } finally {
