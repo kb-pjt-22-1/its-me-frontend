@@ -617,7 +617,7 @@ function formatAxisAmount(value) {
 }
 
 function shortBreakEvenDate(label) {
-  const matched = label?.match(/(\d+)월\s*(\d+)일/);
+  const matched = label?.match(/(\d{1,2})월\s*(\d{1,2})일/);
   return matched ? `${matched[1]}/${matched[2]}` : label;
 }
 

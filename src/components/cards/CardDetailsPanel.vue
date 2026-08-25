@@ -5,7 +5,7 @@
 
   <div v-else-if="error" class="detail-state surface-card" role="alert">
     <p>{{ error }}</p>
-    <button class="retry-btn" @click="$emit('retry')">다시 시도</button>
+    <button type="button" class="retry-btn" @click="$emit('retry')">다시 시도</button>
   </div>
 
   <div v-else-if="card" class="card-details">
@@ -125,14 +125,14 @@
       <section class="surface-card recommendation-section">
         <div class="recommendation-row">
           <div><p class="recommendation-title">추천 카드에 포함</p><p class="recommendation-desc muted-text">카드 추천 시 이 카드를 추천 대상에 포함합니다.</p></div>
-          <button class="recommendation-toggle" :class="{ 'recommendation-toggle--on': isRecommendationEnabled }" role="switch" :aria-checked="isRecommendationEnabled" aria-label="추천 카드 포함 여부" @click="handleToggleRecommendation">
+          <button type="button" class="recommendation-toggle" :class="{ 'recommendation-toggle--on': isRecommendationEnabled }" role="switch" :aria-checked="isRecommendationEnabled" aria-label="추천 카드 포함 여부" @click="handleToggleRecommendation">
             <span class="recommendation-toggle-knob"></span>
           </button>
         </div>
       </section>
 
       <div v-if="card.isPrimary" class="primary-badge-row"><span class="primary-badge muted-text">대표 카드</span></div>
-      <button v-else class="set-primary-btn" @click="handleSetPrimary">대표 카드로 설정</button>
+      <button v-else type="button" class="set-primary-btn" @click="handleSetPrimary">대표 카드로 설정</button>
     </template>
 
     <TierBenefitsSheet
