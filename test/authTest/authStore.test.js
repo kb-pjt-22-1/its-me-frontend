@@ -189,13 +189,22 @@ describe('login', () => {
     expect(store.isLoading).toBe(false)
   })
 
-  it('서버 메시지가 없으면 기본 안내 문구를 쓴다', async () => {
-    loginRequest.mockRejectedValueOnce(new Error())
+  it('응답은 왔는데 메시지가 없으면 기본 안내 문구를 쓴다', async () => {
+    loginRequest.mockRejectedValueOnce({ response: { status: 500 } })
     const store = useAuthStore()
 
     await store.login('tester01', 'wrong')
 
     expect(store.errorMessage).toBe('로그인에 실패했습니다.')
+  })
+
+  it('타임아웃/네트워크 오류로 응답 자체를 못 받으면 안내 문구를 통일해서 보여준다', async () => {
+    loginRequest.mockRejectedValueOnce(new Error('timeout of 5000ms exceeded'))
+    const store = useAuthStore()
+
+    await store.login('tester01', 'wrong')
+
+    expect(store.errorMessage).toBe('요청 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.')
   })
 })
 

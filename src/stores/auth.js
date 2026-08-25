@@ -22,6 +22,17 @@ import { updateFcmToken } from '@/services/memberService'
 // 불필요한 추적이 붙어서, 모듈 스코프에 둔다.
 let bootstrapPromise = null
 
+// err.response가 아예 없으면(타임아웃/네트워크 오류 등 서버 응답 자체를 못 받은 경우)
+// axios가 채워주는 err.message("timeout of 5000ms exceeded", "Network Error" 등)는
+// 사용자에게 그대로 보여줄 문구가 아니다 - 백엔드가 타임아웃/일반 서버 오류에 내려주는
+// 안내 문구와 통일해서 보여준다. 응답은 왔는데 메시지만 없는 경우엔 기존처럼 fallback을 쓴다.
+function resolveAuthErrorMessage(err, fallback) {
+  if (!err.response) {
+    return '요청 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.'
+  }
+  return err.response.data?.message || fallback
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,           // { userId, loginId, name }
@@ -119,7 +130,7 @@ export const useAuthStore = defineStore('auth', {
         this.registerFcmToken() // 응답을 기다리지 않는다 - 실패해도 로그인 자체는 성공이다
         return true
       } catch (err) {
-        this.errorMessage = err.response?.data?.message || err.message || '로그인에 실패했습니다.'
+        this.errorMessage = resolveAuthErrorMessage(err, '로그인에 실패했습니다.')
         this.errorStatus = err.response?.status ?? null
         return false
       } finally {
