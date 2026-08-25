@@ -36,6 +36,7 @@
         <button
             v-for="cat in categories"
             :key="cat"
+            type="button"
             class="chip"
             :class="{ active: selectedCategory === cat }"
             @click="onChipClick(cat)"
@@ -46,6 +47,7 @@
     </div>
 
     <button
+        type="button"
         class="research-btn"
         :disabled="merchantsLoading"
         :aria-label="selectedCategory ? `${selectedCategory} 전체 재검색` : '현재 화면에서 재검색'"
@@ -60,6 +62,7 @@
     </button>
 
     <button
+        type="button"
         class="locate-btn"
         :style="{ transform: `translateY(-${sheetFabLift}px)` }"
         @click="recenterToMyLocation"
@@ -104,6 +107,7 @@
               </div>
               <div class="detail-actions">
                 <button
+                    type="button"
                     class="detail-action-btn"
                     :class="{ active: bookmarksStore.isBookmarked(selectedMerchant.id) }"
                     aria-label="북마크"
@@ -113,7 +117,7 @@
                     <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path>
                   </svg>
                 </button>
-                <button class="detail-action-btn" aria-label="닫기" @click.stop="closeMerchantDetail">
+                <button type="button" class="detail-action-btn" aria-label="닫기" @click.stop="closeMerchantDetail">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -125,6 +129,7 @@
           </div>
           <div v-if="!selectedMerchant" class="sort-toggle" @click.stop>
             <button
+                type="button"
                 class="sort-btn"
                 :class="{ active: sortMode === 'distance' }"
                 @click="sortMode = 'distance'"
@@ -132,6 +137,7 @@
               거리순
             </button>
             <button
+                type="button"
                 class="sort-btn"
                 :class="{ active: sortMode === 'benefit' }"
                 @click="sortMode = 'benefit'"
@@ -166,6 +172,7 @@
             <div class="recommend-header">
               <h3 class="section-title">이 매장 추천 카드</h3>
               <button
+                  type="button"
                   class="pay-btn-header"
                   :disabled="!selectedCardId"
                   @click.stop="goToPay"
@@ -177,12 +184,13 @@
             <p v-if="cardComparisonsLoading" class="muted-text">불러오는 중...</p>
             <p v-else-if="cardComparisonsError" class="muted-text">
               카드 비교 정보를 불러오지 못했어요.
-              <button class="link-muted" @click="loadCardComparisons">다시 시도</button>
+              <button type="button" class="link-muted" @click="loadCardComparisons">다시 시도</button>
             </p>
 
             <button
                 v-for="row in sortedCards"
                 :key="row.userCardId"
+                type="button"
                 class="reco-card"
                 :class="{ 'reco-card--best': row.recommended, 'reco-card--selected': selectedCardId === row.userCardId }"
                 @click="selectedCardId = row.userCardId"
@@ -211,7 +219,7 @@
         <template v-else>
           <div v-if="clusterFilterMerchantIds" class="cluster-filter-banner">
             <span>선택한 클러스터의 매장만 보는 중이에요</span>
-            <button @click="clusterFilterMerchantIds = null">전체 보기</button>
+            <button type="button" @click="clusterFilterMerchantIds = null">전체 보기</button>
           </div>
 
           <div v-if="nearbyMerchants.length === 0" class="sheet-empty muted-text">
@@ -222,6 +230,7 @@
             <button
                 v-for="shop in pagedNearbyMerchants"
                 :key="shop.id"
+                type="button"
                 class="sheet-item"
                 @click="selectMerchant(shop.id)"
             >
@@ -247,9 +256,9 @@
             </button>
 
             <div v-if="totalPages > 1" class="sheet-pagination">
-              <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">이전</button>
+              <button type="button" class="page-btn" :disabled="currentPage === 1" @click="currentPage--">이전</button>
               <span class="muted-text page-indicator">{{ currentPage }} / {{ totalPages }}</span>
-              <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">다음</button>
+              <button type="button" class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">다음</button>
             </div>
           </template>
         </template>

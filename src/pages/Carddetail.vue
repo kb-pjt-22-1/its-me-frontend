@@ -1,7 +1,7 @@
 <template>
   <main class="layout-container">
     <header v-if="card" class="page-header">
-      <button class="icon-btn-outline" aria-label="뒤로가기" @click="router.back()">‹</button>
+      <button type="button" class="icon-btn-outline" aria-label="뒤로가기" @click="router.back()">‹</button>
       <h2 class="detail-header-title"><span>{{ card.cardName }}</span><span v-if="cardLast4" class="detail-card-number">{{ cardLast4 }}</span></h2>
       <div class="right-placeholder"></div>
     </header>

@@ -3,20 +3,20 @@
     <div v-if="cardsStore.isLoading && cards.length === 0" class="loading-text muted-text">카드 목록을 불러오는 중...</div>
     <div v-else-if="cards.length === 0" class="empty-state">
       <p class="empty-text muted-text">등록된 카드가 없어요.</p>
-      <button class="sync-btn" :disabled="syncing" @click="handleSync">{{ syncing ? '연동 중...' : '보유 카드 자동 연동' }}</button>
+      <button type="button" class="sync-btn" :disabled="syncing" @click="handleSync">{{ syncing ? '연동 중...' : '보유 카드 자동 연동' }}</button>
       <p v-if="syncError" class="sync-error danger-text">{{ syncError }}</p>
     </div>
     <template v-else>
       <header class="selected-heading" aria-live="polite"><h2>{{ selectedCard?.cardName }}</h2><span v-if="selectedLast4" class="card-last4">{{ selectedLast4 }}</span></header>
-      <div ref="slider" class="card-slider" :class="{ 'card-slider--single': cards.length === 1 }" tabindex="0" aria-label="보유 카드 선택 슬라이더" @scroll="handleScroll" @keydown.left.prevent="selectRelative(-1)" @keydown.right.prevent="selectRelative(1)">
-        <article v-for="(card, index) in cards" :key="card.userCardId" :ref="(el) => setSlideRef(el, index)" class="card-slide" :class="{ 'card-slide--selected': card.userCardId === selectedCardId }" :aria-current="card.userCardId === selectedCardId ? 'true' : undefined" :aria-label="`${card.cardName}, ${index + 1}/${cards.length}`">
+      <div ref="slider" class="card-slider" :class="{ 'card-slider--single': cards.length === 1 }" tabindex="0" role="listbox" aria-orientation="horizontal" aria-label="보유 카드 선택 슬라이더" @scroll="handleScroll" @keydown.left.prevent="selectRelative(-1)" @keydown.right.prevent="selectRelative(1)">
+        <article v-for="(card, index) in cards" :key="card.userCardId" :ref="(el) => setSlideRef(el, index)" class="card-slide" :class="{ 'card-slide--selected': card.userCardId === selectedCardId }" role="option" :aria-selected="card.userCardId === selectedCardId" :aria-current="card.userCardId === selectedCardId ? 'true' : undefined" :aria-label="`${card.cardName}, ${index + 1}/${cards.length}`">
           <div class="slide-badges"><span v-if="card.isPrimary" class="pill pill--mint">대표 카드</span><span v-if="card.status !== 'ACTIVE'" class="pill pill--danger">{{ statusText(card.status) }}</span></div>
           <img v-if="getCardImage(card)" :src="getCardImage(card)" :alt="`${card.cardName} 이미지`" class="card-image" draggable="false" />
           <div v-else class="card-image-fallback">{{ card.cardName }}</div>
         </article>
       </div>
       <nav v-if="cards.length > 1" class="indicators" aria-label="카드 페이지 선택">
-        <button v-for="(card, index) in cards" :key="card.userCardId" class="indicator" :class="{ 'indicator--active': card.userCardId === selectedCardId }" :aria-label="`${index + 1}번째 카드 선택`" :aria-current="card.userCardId === selectedCardId ? 'true' : undefined" @click="selectCard(card.userCardId)"></button>
+        <button v-for="(card, index) in cards" :key="card.userCardId" type="button" class="indicator" :class="{ 'indicator--active': card.userCardId === selectedCardId }" :aria-label="`${index + 1}번째 카드 선택`" :aria-current="card.userCardId === selectedCardId ? 'true' : undefined" @click="selectCard(card.userCardId)"></button>
       </nav>
       <CardDetailsPanel :key="selectedCardId" :card="selectedCard" :loading="detailLoading" :error="detailError" @retry="loadSelectedDetail(true)" @deleted="handleDeleted" @primary-changed="handlePrimaryChanged" />
     </template>

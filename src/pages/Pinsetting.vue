@@ -1,7 +1,7 @@
 <template>
   <div class="pin-page">
     <header class="pin-header">
-      <button class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
+      <button type="button" class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="15 18 9 12 15 6"></polyline>
         </svg>
@@ -15,7 +15,7 @@
 
     <div v-else-if="loadError" class="pin-body">
       <p class="pin-error">{{ loadError }}</p>
-      <button class="retry-btn" @click="loadProfile">다시 시도</button>
+      <button type="button" class="retry-btn" @click="loadProfile">다시 시도</button>
     </div>
 
     <template v-else>
