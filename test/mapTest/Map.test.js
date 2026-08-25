@@ -923,6 +923,53 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     }
   })
 
+  it('첫 마운트에서 GPS를 못 받아 기본 중심(서울시청)으로 떨어져도, 다음 마운트에서 GPS를 다시 시도해서 실제 위치를 쓴다', async () => {
+    const originalGeolocation = navigator.geolocation
+    let callCount = 0
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        // 첫 마운트는 실패시켜(타임아웃과 동일하게 gps=null) 기본 중심으로 떨어지게 하고,
+        // 두 번째 마운트은 성공시켜 실제 위치가 쓰이는지 확인한다.
+        getCurrentPosition: (success, error) => {
+          callCount += 1
+          if (callCount === 1) error({ code: 1 })
+          else success({ coords: { latitude: 37.9999, longitude: 127.9999 } })
+        },
+        watchPosition: () => 1,
+        clearWatch: () => {},
+      },
+    })
+
+    try {
+      // initMap이 매장 핀보다 먼저 만드는 마커라 markerInstances[0]이 "내 위치" 마커고,
+      // 그 position이 곧 initMap에 넘겨진 초기 중심좌표다.
+      const first = createKakaoMock()
+      window.kakao = first.kakao
+      const firstWrapper = mountMapPage()
+      await flushPromises()
+
+      expect(first.markerInstances[0].position).toEqual({ lat: 37.5665, lng: 126.978 }) // 서울시청 기본값
+      // 실제로는 지도가 뜨자마자 카카오맵 SDK가 'idle'을 한 번 쏴서 이 기본 중심이 그대로
+      // mapViewStore.center에 저장된다 - 버그가 재현되려면 이 저장까지 일어나야 한다.
+      first.trigger(first.mapInstance, 'idle')
+      firstWrapper.unmount()
+
+      const second = createKakaoMock()
+      window.kakao = second.kakao
+      mountMapPage()
+      await flushPromises()
+
+      // mapViewStore.center는 첫 마운트에서 이미 서울시청으로 채워져 있지만(idle 이벤트),
+      // hasLocatedOnce가 아직 false라서 이번에도 GPS를 다시 시도해야 하고 이번엔 성공한다 -
+      // 서울시청에 고정돼있으면 이 값이 여전히 서울시청으로 나온다.
+      expect(callCount).toBe(2)
+      expect(second.markerInstances[0].position).toEqual({ lat: 37.9999, lng: 127.9999 })
+    } finally {
+      Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
+    }
+  })
+
   it('recommended=true면 목록에서도 혜택 매장 pill로 보여주고, 아니면 pill을 그리지 않는다', async () => {
     window.kakao = createKakaoMock().kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([

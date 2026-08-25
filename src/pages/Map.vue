@@ -1198,9 +1198,15 @@ onMounted(async () => {
   // 이미 허용돼 있어 금방 응답하는 흔한 경우엔 실제 위치를 그대로 초기 중심으로 쓰고,
   // GEOLOCATION_TIMEOUT_MS 안에 응답이 없으면 기다리지 않고 기본 중심으로 진행한다 -
   // 늦게 도착한 응답은 myLocation만 갱신해 "내 위치" 마커를 옮긴다(watch(myLocation, ...)).
+  //
+  // savedCenter가 아니라 mapViewStore.hasLocatedOnce로 재시도 여부를 판단한다 - map의 'idle'
+  // 이벤트가 실제 위치든 이 타임아웃으로 떨어진 기본값(서울시청)이든 구분 없이 그대로
+  // mapViewStore.center에 저장해버려서, savedCenter만 보면 "최초 시도가 타임아웃났다"는 사실이
+  // 그 순간부터 영원히 "이미 위치를 저장해놨다"로 오인된다 - 그러면 이후 재방문마다 GPS를 다시
+  // 시도하지 않고 계속 서울시청에 고정되는 문제가 있었다.
   const GEOLOCATION_TIMEOUT_MS = 1200
   let initialCenter = savedCenter ?? defaultCenter
-  if (!savedCenter && navigator.geolocation) {
+  if (!mapViewStore.hasLocatedOnce && navigator.geolocation) {
     const gps = await new Promise((resolve) => {
       let settled = false
       const timer = setTimeout(() => {
@@ -1226,6 +1232,7 @@ onMounted(async () => {
     if (gps) {
       myLocation.value = gps
       initialCenter = gps
+      mapViewStore.hasLocatedOnce = true
     }
   }
 
