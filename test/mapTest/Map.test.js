@@ -35,8 +35,8 @@ vi.mock('@/utils/imageDataUri', () => ({
   toDataUri: vi.fn((url) => Promise.resolve(url ?? null)),
 }))
 
-// 매장 상세(바텀시트)의 "이 매장 추천 카드"는 Storedetail.vue와 같은 백엔드 엔드포인트를
-// 쓴다 - 프론트에서 카드 혜택을 자체 매칭하지 않으므로 이 서비스만 목으로 대체하면 된다.
+// 매장 상세(바텀시트)의 "이 매장 추천 카드"는 백엔드 엔드포인트를 그대로 쓴다 - 프론트에서
+// 카드 혜택을 자체 매칭하지 않으므로 이 서비스만 목으로 대체하면 된다.
 vi.mock('@/services/recommendationService', () => ({
   fetchMerchantCardRecommendations: vi.fn(),
 }))
@@ -1363,6 +1363,24 @@ describe('주변 제휴 매장 바텀시트 3단계 drag/snap', () => {
     expect(sheet.attributes('data-position')).toBe('collapsed')
   })
 
+  it('현재 노출된 시트 높이에 맞춰 sheet-body 높이를 collapsed/middle/expanded마다 계산한다', async () => {
+    const wrapper = await mountSizedSheet()
+    const body = wrapper.find('.sheet-body')
+    const handle = wrapper.find('.sheet-handle-area')
+
+    expect(body.attributes('style')).toContain('height: 0px')
+
+    await handle.trigger('click')
+    expect(wrapper.find('.store-sheet').attributes('data-position')).toBe('middle')
+    expect(body.attributes('style')).toContain('height: 170px')
+
+    await handle.trigger('pointerdown', { clientY: 400, pointerId: 6 })
+    await handle.trigger('pointermove', { clientY: 80, pointerId: 6 })
+    await handle.trigger('pointerup', { clientY: 80, pointerId: 6 })
+    expect(wrapper.find('.store-sheet').attributes('data-position')).toBe('expanded')
+    expect(body.attributes('style')).toContain('height: 330px')
+  })
+
   it('시트가 middle/expanded로 올라가면 재검색/내 위치 버튼도 같은 만큼 위로 따라 올라간다', async () => {
     const wrapper = await mountSizedSheet()
     const handle = wrapper.find('.sheet-handle-area')
@@ -1418,14 +1436,31 @@ describe('주변 제휴 매장 바텀시트 3단계 drag/snap', () => {
   it('sheet-body는 drag 대상이 아니고 스크롤 가능 상태를 유지한다', async () => {
     const wrapper = await mountSizedSheet()
     const body = wrapper.find('.sheet-body')
+    await wrapper.find('.sheet-handle-area').trigger('click')
     body.element.scrollTop = 120
 
     await body.trigger('pointerdown', { clientY: 300, pointerId: 3 })
     await body.trigger('pointermove', { clientY: 100, pointerId: 3 })
     await body.trigger('pointerup', { clientY: 100, pointerId: 3 })
 
-    expect(wrapper.find('.store-sheet').attributes('data-position')).toBe('collapsed')
+    expect(wrapper.find('.store-sheet').attributes('data-position')).toBe('middle')
     expect(body.element.scrollTop).toBe(120)
+  })
+
+  it('매장 상세 주소는 고정 헤더가 아닌 middle 상태의 스크롤 본문 안에 있다', async () => {
+    const wrapper = await mountSizedSheet([{ ...CAFE_MERCHANT, address: '서울시 중구 테스트로 1' }])
+
+    await wrapper.find('.sheet-item').trigger('click')
+    const body = wrapper.find('.sheet-body')
+    body.element.scrollTop = 80
+    await body.trigger('pointerdown', { clientY: 300, pointerId: 7 })
+    await body.trigger('pointermove', { clientY: 100, pointerId: 7 })
+    await body.trigger('pointerup', { clientY: 100, pointerId: 7 })
+
+    expect(wrapper.find('.store-sheet').attributes('data-position')).toBe('middle')
+    expect(wrapper.find('.sheet-handle-area').find('.store-address').exists()).toBe(false)
+    expect(body.find('.store-address').text()).toBe('서울시 중구 테스트로 1')
+    expect(body.element.scrollTop).toBe(80)
   })
 
   it('정렬 버튼에서 시작한 포인터는 sheet drag로 처리되지 않고 기존 클릭이 동작한다', async () => {
@@ -1522,8 +1557,8 @@ describe('다른 화면에서 넘어온 쿼리로 지도 상태를 복원한다'
     expect(wrapper.findAll('.sheet-item-info strong').map((el) => el.text())).toEqual(['동네 마트'])
   })
 
-  it('홈 화면 추천에서 ?merchantId=&lat=&lng=로 들어오면 그 좌표로 지도를 옮기고, 검색 결과가 도착하면 해당 매장 상세를 연다', async () => {
-    const { kakao, trigger, mapInstance } = createKakaoMock()
+  it('홈 화면 추천에서 ?merchantId=&lat=&lng=로 들어오면 그 좌표로 지도를 옮기고, idle을 기다리지 않고 바로 그 위치를 재검색해 매장 상세를 연다', async () => {
+    const { kakao, mapInstance } = createKakaoMock()
     window.kakao = kakao
     routeMock.query = { merchantId: String(CAFE_MERCHANT.id), lat: '37.5', lng: '127.1' }
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
@@ -1533,28 +1568,25 @@ describe('다른 화면에서 넘어온 쿼리로 지도 상태를 복원한다'
 
     expect(mapInstance.setCenter).toHaveBeenCalled()
     expect(fetchMerchantDetail).not.toHaveBeenCalled() // lat/lng이 이미 왔으니 상세 조회로 좌표를 다시 구할 필요가 없다
-    // 최초 검색 결과가 도착하면 그 매장 상세가 자동으로 열린다.
-    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
-
-    // setCenter로 지도를 옮긴 뒤 실제로 idle해지면, 옮긴 위치 기준으로 한 번 더 재검색한다.
-    fetchRecommendedNearbyMerchants.mockClear()
-    trigger(mapInstance, 'idle')
-    await flushPromises()
+    // idle 이벤트를 기다리지 않고, 옮긴 위치 기준 재검색이 바로 한 번만 나가고 그 결과로 상세가 열린다.
     expect(fetchRecommendedNearbyMerchants).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
   })
 
-  it('?merchantId=만 있고 좌표가 없으면 매장 상세를 조회해 그 좌표로 지도를 옮긴다', async () => {
+  it('?merchantId=만 있고 좌표가 없으면 매장 상세를 조회해 그 좌표로 지도를 옮기고, 바로 재검색해 매장 상세를 연다', async () => {
     const { kakao, mapInstance } = createKakaoMock()
     window.kakao = kakao
     routeMock.query = { merchantId: String(CAFE_MERCHANT.id) }
     fetchMerchantDetail.mockResolvedValue({ ...CAFE_MERCHANT, lat: 37.55, lng: 127.15 })
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])
 
-    mountMapPage()
+    const wrapper = mountMapPage()
     await flushPromises()
 
     expect(fetchMerchantDetail).toHaveBeenCalledWith(CAFE_MERCHANT.id)
     expect(mapInstance.setCenter).toHaveBeenCalled()
+    expect(fetchRecommendedNearbyMerchants).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.sheet-title').text()).toBe('동네 카페')
   })
 
   it('일반 진입(쿼리 없음)이어도 이전에 보던 매장 상세가 mapViewStore에 남아있으면, 검색 결과가 도착하는 대로 다시 그 상세를 연다', async () => {

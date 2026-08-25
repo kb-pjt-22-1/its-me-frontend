@@ -2,7 +2,7 @@
   <div class="layout-container">
     <div class="fixed-top">
       <header class="page-header">
-        <button class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
+        <button type="button" class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
@@ -11,9 +11,9 @@
       </header>
 
       <div class="date-nav">
-        <button class="date-arrow" @click="shiftMonth(-1)" aria-label="이전 달">&lt;</button>
+        <button type="button" class="date-arrow" @click="shiftMonth(-1)" aria-label="이전 달">&lt;</button>
         <h3>{{ currentMonthLabel }}</h3>
-        <button class="date-arrow" :disabled="isCurrentMonth" @click="shiftMonth(1)" aria-label="다음 달">&gt;</button>
+        <button type="button" class="date-arrow" :disabled="isCurrentMonth" @click="shiftMonth(1)" aria-label="다음 달">&gt;</button>
       </div>
     </div>
 
@@ -23,7 +23,6 @@
       <template v-else>
         <Button
           tag="div" variant="box" class="summary-card"
-          style="flex-direction: row; justify-content: space-between; align-items: center; min-height: auto;"
         >
           <div class="summary-text">
             <p>{{ monthShort }} 총 결제</p>
@@ -45,6 +44,7 @@
             <button
               v-for="item in group.items"
               :key="item.paymentId"
+              type="button"
               class="history-item"
               @click="openPaymentDetail(item.paymentId)"
             >
@@ -214,7 +214,14 @@ onMounted(() => {
 
 .loading-text, .empty-text { text-align: center; padding: 60px 0; font-size: 0.9rem; }
 
-.summary-card { padding: 22px; margin-bottom: 1px; }
+.summary-card {
+  padding: 22px;
+  margin-bottom: 1px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  min-height: auto;
+}
 .summary-text p, .summary-benefit p { margin: 0 0 8px; font-size: 12px; color: rgba(255, 255, 255, .75); }
 .summary-text h2 { margin: 0; font-size: 20px; color: #ffffff; }
 .summary-benefit { text-align: right; }

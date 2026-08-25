@@ -14,7 +14,6 @@ vi.mock('@/composables/useLocationReporting', () => ({
 import App from '@/App.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCardsStore } from '@/stores/cards'
-import { useMerchantsStore } from '@/stores/merchants'
 import { useBookmarksStore } from '@/stores/bookmarks'
 import { usePaymentStore } from '@/stores/payment'
 import { useNotificationsStore } from '@/stores/notifications'
@@ -23,19 +22,17 @@ function setupStores() {
   setActivePinia(createPinia())
   const authStore = useAuthStore()
   const cardsStore = useCardsStore()
-  const merchantsStore = useMerchantsStore()
   const bookmarksStore = useBookmarksStore()
   const paymentStore = usePaymentStore()
   const notificationsStore = useNotificationsStore()
 
   cardsStore.fetchCards = vi.fn()
-  merchantsStore.fetchMerchants = vi.fn()
   bookmarksStore.fetchBookmarks = vi.fn()
   paymentStore.fetchHistory = vi.fn()
   notificationsStore.fetchNotifications = vi.fn()
   authStore.registerFcmToken = vi.fn()
 
-  return { authStore, cardsStore, merchantsStore, bookmarksStore, paymentStore, notificationsStore }
+  return { authStore, cardsStore, bookmarksStore, paymentStore, notificationsStore }
 }
 
 function mountApp(routeName = 'home') {
@@ -73,7 +70,6 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
     expect(wrapper.find('.app-splash').exists()).toBe(false)
     expect(wrapper.find('.page-container').exists()).toBe(true)
     expect(stores.cardsStore.fetchCards).not.toHaveBeenCalled()
-    expect(stores.merchantsStore.fetchMerchants).not.toHaveBeenCalled()
     expect(stores.bookmarksStore.fetchBookmarks).not.toHaveBeenCalled()
     expect(stores.paymentStore.fetchHistory).not.toHaveBeenCalled()
     expect(stores.notificationsStore.fetchNotifications).not.toHaveBeenCalled()
@@ -101,7 +97,6 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
     mountApp()
 
     expect(stores.cardsStore.fetchCards).toHaveBeenCalledTimes(1)
-    expect(stores.merchantsStore.fetchMerchants).toHaveBeenCalledTimes(1)
     expect(stores.bookmarksStore.fetchBookmarks).toHaveBeenCalledTimes(1)
     expect(stores.paymentStore.fetchHistory).toHaveBeenCalledTimes(1)
     expect(stores.notificationsStore.fetchNotifications).toHaveBeenCalledTimes(1)
@@ -122,7 +117,6 @@ describe('부트스트랩 판정 후 (isBootstrapped=true)', () => {
     await nextTick()
 
     expect(stores.cardsStore.fetchCards).toHaveBeenCalledTimes(1)
-    expect(stores.merchantsStore.fetchMerchants).toHaveBeenCalledTimes(1)
     expect(stores.bookmarksStore.fetchBookmarks).toHaveBeenCalledTimes(1)
     expect(stores.paymentStore.fetchHistory).toHaveBeenCalledTimes(1)
     expect(stores.notificationsStore.fetchNotifications).toHaveBeenCalledTimes(1)

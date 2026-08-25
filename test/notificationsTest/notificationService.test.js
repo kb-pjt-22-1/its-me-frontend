@@ -12,12 +12,12 @@ beforeEach(() => {
 })
 
 describe('reportLocation', () => {
-  it('위도/경도를 body로 POST /notifications/location을 호출한다', async () => {
+  it('위도/경도를 body로 POST /v1/notifications/location을 호출한다', async () => {
     api.post.mockResolvedValueOnce({})
 
     await reportLocation(37.5665, 126.978)
 
-    expect(api.post).toHaveBeenCalledWith('/notifications/location', {
+    expect(api.post).toHaveBeenCalledWith('/v1/notifications/location', {
       latitude: 37.5665,
       longitude: 126.978,
     })

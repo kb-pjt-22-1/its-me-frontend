@@ -20,7 +20,8 @@ const tiers = (category) => ({ performanceTiers: [
 ] })
 const makeCard = (id, overrides = {}) => ({
   userCardId: id, cardName: `카드${id}`, panLast4: `000${id}`, status: 'ACTIVE', annualFee: id * 10000,
-  currentAmount: id * 50000, previousMonthAmount: 100000, recommendationEnabled: true, isPrimary: false,
+  currentAmount: id * 50000, previousMonthAmount: 100000, previousPerformanceMet: true,
+  recommendationEnabled: true, isPrimary: false,
   benefitsInfo: tiers(`혜택${id}`), ...overrides,
 })
 
@@ -150,22 +151,24 @@ describe('선택 카드 반응과 액션', () => {
   })
 })
 
-describe('삭제와 자동 연동', () => {
-  it('선택 카드 삭제 후 다음 카드, 마지막 카드 삭제 후 이전 카드를 선택한다', async () => {
+describe('삭제 UI 제거와 자동 연동', () => {
+  it('여러 카드가 있어도 삭제 UI를 표시하지 않고 카드 선택 기능은 유지한다', async () => {
     const { wrapper, store } = await mountPage([makeCard(1), makeCard(2), makeCard(3)])
-    vi.spyOn(store, 'deleteCard').mockImplementation(async (id) => { store.cards = store.cards.filter((c) => c.userCardId !== id) })
+    const deleteSpy = vi.spyOn(store, 'deleteCard')
+
     await wrapper.findAll('.indicator')[1].trigger('click'); await flushPromises()
-    await wrapper.find('.delete-card-btn').trigger('click'); await flushPromises()
-    expect(wrapper.find('.selected-heading').text()).toContain('카드3')
-    await wrapper.find('.delete-card-btn').trigger('click'); await flushPromises()
-    expect(wrapper.find('.selected-heading').text()).toContain('카드1')
+
+    expect(wrapper.find('.selected-heading').text()).toContain('카드2')
+    expect(wrapper.find('.delete-card-btn').exists()).toBe(false)
+    expect(deleteSpy).not.toHaveBeenCalled()
   })
 
-  it('마지막 카드 삭제 후 빈 상태를 표시한다', async () => {
-    const { wrapper, store } = await mountPage([makeCard(1)])
-    vi.spyOn(store, 'deleteCard').mockImplementation(async () => { store.cards = [] })
-    await wrapper.find('.delete-card-btn').trigger('click'); await flushPromises()
-    expect(wrapper.text()).toContain('등록된 카드가 없어요')
+  it('카드가 한 장이어도 삭제 UI 없이 해당 카드 상세를 유지한다', async () => {
+    const { wrapper } = await mountPage([makeCard(1)])
+
+    expect(wrapper.find('.delete-card-btn').exists()).toBe(false)
+    expect(wrapper.find('.selected-heading').text()).toContain('카드1')
+    expect(wrapper.text()).not.toContain('등록된 카드가 없어요')
   })
 
   it('빈 상태의 자동 연동 후 카드를 선택한다', async () => {

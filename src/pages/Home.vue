@@ -243,7 +243,7 @@
 
         <div v-if="recentTransactions.length === 0" class="empty-text muted-text">최근 결제 내역이 없어요.</div>
 
-        <Button v-else tag="div" variant="box-outline" style="min-height: auto;">
+        <Button v-else tag="div" variant="box-outline" class="recent-transactions-card">
           <div
             v-for="item in recentTransactions"
             :key="item.paymentId"
@@ -728,6 +728,7 @@ onMounted(() => {
   margin-bottom: 15px;
 }
 
+.recent-transactions-card { min-height: auto; }
 .transaction-item { width: 100%; padding: 10px 0; cursor: pointer; }
 .transaction-item:first-child { padding-top: 0; }
 .transaction-item:last-child { padding-bottom: 0; }

@@ -33,10 +33,13 @@
           <p v-else-if="paymentRows.length === 0" class="loading-text muted-text">사용 가능한 카드가 없어요.</p>
 
           <template v-else>
-            <div ref="cardSliderRef" class="card-slider" :class="{ 'is-locked': isAuthenticated || isIssuingToken }" @scroll.passive="handleCardSlide">
-              <button v-for="(row, index) in paymentRows" :key="row.card.userCardId" type="button" class="card-slide" :class="{ selected: selectedMethodId === row.card.userCardId }" :disabled="isAuthenticated || isIssuingToken" :aria-label="`${row.card.cardName} 선택`" @click.stop="selectSlide(row, index)">
-                <img v-if="getCardImage(row.card)" :src="getCardImage(row.card)" :alt="`${row.card.cardName} 이미지`" class="slide-card-image">
-                <span v-else class="slide-card-image slide-card-fallback" :style="{ background: row.card.color || '#24211d' }"></span>
+            <div ref="cardSliderRef" class="card-slider" :class="{ 'is-locked': isIssuingToken || isCompleting }" @scroll.passive="handleCardSlide">
+              <button v-for="(row, index) in paymentRows" :key="row.card.userCardId" type="button" class="card-slide" :class="{ selected: selectedMethodId === row.card.userCardId, 'card-slide--recommended': isRecommendedCard(row.card.userCardId) }" :disabled="isIssuingToken || isCompleting" :aria-label="`${row.card.cardName} 선택`" @click.stop="selectSlide(row, index)">
+                <span class="slide-card-visual">
+                  <span v-if="isRecommendedCard(row.card.userCardId)" class="recommended-badge">추천</span>
+                  <img v-if="getCardImage(row.card)" :src="getCardImage(row.card)" :alt="`${row.card.cardName} 이미지`" class="slide-card-image">
+                  <span v-else class="slide-card-image slide-card-fallback" :style="{ background: row.card.color || '#24211d' }"></span>
+                </span>
               </button>
             </div>
 
@@ -109,6 +112,7 @@ import { useCardsStore } from '@/stores/cards';
 import { useMerchantsStore } from '@/stores/merchants';
 import { usePaymentStore } from '@/stores/payment';
 import { findBenefitForCategory } from '@/services/cardService';
+import { fetchMerchantCardRecommendations } from '@/services/recommendationService';
 import { useToast } from '@/composables/useToast';
 import { getCardImage } from '@/utils/cardImages';
 
@@ -135,6 +139,20 @@ let expiryTimer = null;
 let cardSlideTimer = null;
 
 const merchant = computed(() => merchantsStore.getByIdWithCategory(route.query.merchantId) ?? null);
+const isMerchantPayment = computed(() => Boolean(route.query.merchantId));
+const merchantCardComparisons = ref([]);
+const merchantCardComparisonById = computed(() => new Map(
+  merchantCardComparisons.value.map((row, index) => [row.userCardId, { ...row, index }]),
+));
+
+const recommendedCardId = computed(() => {
+  if (!isMerchantPayment.value) return null;
+  return merchantCardComparisons.value.find((row) => row.recommended)?.userCardId ?? null;
+});
+
+function isRecommendedCard(userCardId) {
+  return recommendedCardId.value === userCardId;
+}
 
 const paymentRows = computed(() => {
   const rows = cardsStore.cards.filter((card) => card.status === 'ACTIVE').map((card) => {
@@ -142,9 +160,29 @@ const paymentRows = computed(() => {
     return { card, benefit };
   });
 
-  if (!merchant.value) return rows;
+  // 일반 결제: 카드 탭과 동일하게 대표카드가 맨 앞으로
+  if (!isMerchantPayment.value) {
+    return [...rows].sort(
+        (a, b) =>
+            Number(b.card.isPrimary) - Number(a.card.isPrimary),
+    );
+  }
 
+  // 매장 결제: 혜택이 큰 카드 순서
   return [...rows].sort((a, b) => {
+    const comparisonA = merchantCardComparisonById.value.get(a.card.userCardId);
+    const comparisonB = merchantCardComparisonById.value.get(b.card.userCardId);
+
+    // 매장 상세/지도의 추천 정렬 기준을 그대로 우선 적용한다.
+    if (comparisonA || comparisonB) {
+      if (!comparisonA) return 1;
+      if (!comparisonB) return -1;
+      if (comparisonA.recommended !== comparisonB.recommended) return comparisonA.recommended ? -1 : 1;
+      if (comparisonA.performanceMet !== comparisonB.performanceMet) return comparisonA.performanceMet ? -1 : 1;
+      if (comparisonA.benefitApplicable !== comparisonB.benefitApplicable) return comparisonA.benefitApplicable ? -1 : 1;
+      return comparisonA.index - comparisonB.index;
+    }
+
     const rateA = a.benefit?.discountRate ?? a.benefit?.discountAmount ?? -1;
     const rateB = b.benefit?.discountRate ?? b.benefit?.discountAmount ?? -1;
     return rateB - rateA;
@@ -163,8 +201,14 @@ const selectedCardLast4 = computed(() =>
 watch(() => cardsStore.cards, async (cards) => {
   if (!cards.length || selectedMethodId.value !== null) return;
 
-  if (queriedUserCardId && cardsStore.getById(queriedUserCardId)) selectedMethodId.value = queriedUserCardId;
-  else selectedMethodId.value = cardsStore.primaryCard?.userCardId ?? cards[0]?.userCardId;
+  if (queriedUserCardId && cardsStore.getById(queriedUserCardId)) {
+    selectedMethodId.value = queriedUserCardId;
+    // 매장 상세/지도/홈 추천에서 카드를 이미 골라 "결제하기"를 누르고 넘어온 경우다 - 여기서
+    // 카드를 다시 고르고 인증 버튼을 한 번 더 누르게 하지 않고, PIN 시트를 곧바로 띄운다.
+    openPinSheet();
+  } else {
+    selectedMethodId.value = cardsStore.primaryCard?.userCardId ?? cards[0]?.userCardId;
+  }
 
   await nextTick();
   centerSelectedCard('auto');
@@ -190,16 +234,22 @@ function centerSelectedCard(behavior = 'smooth') {
 }
 
 function selectSlide(row, index) {
-  if (isAuthenticated.value || isIssuingToken.value) return;
+  if (isIssuingToken.value || isCompleting.value) return;
+  clearTimeout(cardSlideTimer);
   selectedMethodId.value = row.card.userCardId;
-  cardSliderRef.value?.children[index]?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  cardSliderRef.value?.children[index]?.scrollIntoView?.({
+    behavior: 'smooth',
+    block: 'nearest',
+    inline: 'center',
+  });
 }
 
 function handleCardSlide() {
-  if (isAuthenticated.value || isIssuingToken.value) return;
+  if (isIssuingToken.value || isCompleting.value) return;
   clearTimeout(cardSlideTimer);
 
   cardSlideTimer = setTimeout(() => {
+    if (isIssuingToken.value || isCompleting.value) return;
     const slider = cardSliderRef.value;
     if (!slider) return;
 
@@ -269,18 +319,33 @@ async function checkPin() {
 }
 
 async function issuePaymentToken() {
+  const issuedForCardId = selectedMethodId.value;
+  let tokenIssued = false;
   isIssuingToken.value = true;
 
   try {
-    await paymentStore.createPaymentToken(selectedMethodId.value, route.query.merchantId ? Number(route.query.merchantId) : undefined);
+    await paymentStore.createPaymentToken(issuedForCardId, route.query.merchantId ? Number(route.query.merchantId) : undefined);
+    tokenIssued = true;
   } catch {
     toast.error('바코드를 발급하지 못했어요. 다시 시도해주세요.');
     isAuthenticated.value = false;
   } finally {
     isIssuingToken.value = false;
   }
+
+  // 추천 정보가 늦게 도착하는 등 발급 중 선택 카드가 바뀌었다면, 방금 만든 토큰을
+  // 그대로 노출하지 않고 선택된 카드 기준으로 한 번만 교체한다.
+  if (tokenIssued && isAuthenticated.value && selectedMethodId.value !== issuedForCardId) {
+    await replacePaymentTokenForCard(selectedMethodId.value);
+  }
 }
 
+// isIssuingToken을 소스 계산에 넣는 것이 의도적이다: createPaymentToken 액션은 currentToken을
+// 먼저 채운 뒤(아직 isIssuingToken=true인 시점) finally에서 isIssuingToken을 false로 내린다.
+// 소스에 isIssuingToken을 넣어야 그 전환 자체가 "값이 바뀜"으로 잡혀 워처가 재평가된다 -
+// currentToken.tokenValue만 소스로 쓰면 토큰이 채워진 시점엔 아직 isIssuingToken=true라
+// 콜백이 조기 return하고, 이후 플래그만 내려가도 tokenValue 자체는 안 바뀌었으니 다시
+// 트리거되지 않는다.
 watch(
     () => isAuthenticated.value && !isIssuingToken.value ? paymentStore.currentToken?.tokenValue : null,
     async (tokenValue) => {
@@ -293,6 +358,30 @@ watch(
       } catch {}
     },
 );
+
+async function replacePaymentTokenForCard(userCardId) {
+  if (!isAuthenticated.value || isIssuingToken.value || isCompleting.value) return;
+  isIssuingToken.value = true;
+  try {
+    const currentTokenId = paymentStore.currentToken?.paymentTokenId;
+    // 기존 카드로 발급된 바코드 토큰 취소
+    if (currentTokenId) {
+      await paymentStore.cancelPaymentToken(currentTokenId);
+    }
+    // 새로 선택한 카드로 바코드 토큰 발급
+    await paymentStore.createPaymentToken(userCardId, route.query.merchantId ? Number(route.query.merchantId) : undefined);
+  } catch {
+    toast.error('선택한 카드의 바코드를 발급하지 못했어요.');
+    isAuthenticated.value = false;
+  } finally {
+    isIssuingToken.value = false;
+  }
+}
+
+watch(selectedMethodId, (newCardId, previousCardId) => {
+  if (!isAuthenticated.value || !newCardId || !previousCardId || newCardId === previousCardId) return;
+  replacePaymentTokenForCard(newCardId);
+});
 
 const nowMs = ref(Date.now());
 
@@ -350,13 +439,29 @@ onMounted(async () => {
 
   if (cardsStore.cards.length === 0) await cardsStore.fetchCards();
 
-  cardsStore.ensureBenefitsLoaded(
-      cardsStore.cards.filter((card) => card.status === 'ACTIVE').map((card) => card.userCardId),
+  // 혜택 로딩이 끝날 때까지 기다려야 혜택순 정렬이 정확하게 됨
+  await cardsStore.ensureBenefitsLoaded(
+      cardsStore.cards
+          .filter((card) => card.status === 'ACTIVE')
+          .map((card) => card.userCardId),
   );
 
   if (route.query.merchantId) {
     if (merchantsStore.categories.length === 0) await merchantsStore.fetchCategories();
     await merchantsStore.fetchMerchantDetail(route.query.merchantId);
+
+    try {
+      merchantCardComparisons.value = await fetchMerchantCardRecommendations(route.query.merchantId);
+    } catch (err) {
+      console.error('[Payments] 카드 비교 조회 실패', err);
+      merchantCardComparisons.value = [];
+    }
+
+    // 홈처럼 카드 ID 없이 매장 ID만 전달된 경우
+    // 추천 API와 혜택 로딩이 모두 끝난 뒤 혜택순 첫 카드를 자동 선택
+    if (!queriedUserCardId) {
+      selectedMethodId.value = paymentRows.value[0]?.card.userCardId ?? selectedMethodId.value;
+    }
   }
 
   await nextTick();
@@ -380,16 +485,19 @@ onBeforeRouteLeave(() => {
 .payment-box { flex:none; width:100%; height:calc(100% - 32px); margin:8px 0 24px; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; padding:0 0 18px; border-radius:22px; }
 .payment-content { flex:1; min-height:0; display:flex; flex-direction:column; }
 .payment-box--ready { cursor:pointer; }
-.payment-ready,.barcode-payment { flex:1; min-height:0; display:flex; flex-direction:column; }
-.card-stage,.barcode-stage,.payment-state { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; }
+.card-stage { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; }
 .loading-text { padding:20px; text-align:center; font-size:.9rem; }
 
-.card-slider { --slide-width:min(66vw,250px); width:100%; display:flex; align-items:center; gap:18px; overflow-x:auto; padding:4px calc((100% - var(--slide-width))/2) 16px; box-sizing:border-box; scroll-padding-inline:calc((100% - var(--slide-width))/2); scroll-snap-type:x mandatory; scrollbar-width:none; overscroll-behavior-x:contain; }
+.card-slider { --slide-width:min(66vw,250px); width:100%; display:flex; align-items:center; gap:18px; overflow-x:auto; padding:13px calc((100% - var(--slide-width))/2) 16px; box-sizing:border-box; scroll-padding-inline:calc((100% - var(--slide-width))/2); scroll-snap-type:x mandatory; scrollbar-width:none; overscroll-behavior-x:contain; }
 .card-slider::-webkit-scrollbar { display:none; }
 .card-slider.is-locked { overflow-x:hidden; }
 .card-slide { flex:0 0 var(--slide-width); padding:0; border:0; scroll-snap-align:center; background:transparent; opacity:.28; transform:scale(.88); transition:opacity .2s,transform .2s; cursor:pointer; }
+.card-slide--recommended { opacity:.55; }
 .card-slide.selected { opacity:1; transform:scale(1); }
 .card-slide:disabled { cursor:default; }
+.slide-card-visual { position:relative; display:block; width:100%; }
+.card-slide--recommended .slide-card-visual::after { content:""; position:absolute; inset:-2.5px; z-index:1; border:2.5px solid #ffbe49; border-radius:13px; pointer-events:none; }
+.recommended-badge { position:absolute; top:-10px; left:12px; z-index:2; padding:2px 8px; border-radius:6px; background:#ffbe49; color:var(--charcoal,#24211d); font-size:10px; font-weight:800; line-height:1.4; pointer-events:none; }
 .slide-card-image { display:block; width:100%; aspect-ratio:1.586/1; margin:auto; object-fit:contain; border-radius:10px; filter:drop-shadow(0 7px 11px rgba(0,0,0,.14)); }
 .slide-card-fallback { background:var(--dark,#24211d); }
 .selected-card-heading { display: flex; align-items: baseline; justify-content: center; gap: 7px; max-width: 85%; margin-top: 6px; }

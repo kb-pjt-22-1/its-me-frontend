@@ -148,11 +148,10 @@
       <div class="available-heading">
         <div class="section-header">
           <h3 class="section-title">이번 달 받을 수 있는 혜택</h3>
-          <button type="button" class="link-btn">전체 카드</button>
         </div>
 
         <p class="section-sub muted-text">
-          보유한 전체 카드의 카테고리별 혜택 현황이에요.
+          보유한 전체 카드의 카테고리별 혜택 현황
         </p>
       </div>
 
@@ -268,8 +267,8 @@
 
                 <p class="be-status-title">
                   {{ card.isBreakEven
-                    ? `${card.breakEvenDateLabel}, 연회비 본전을 뽑았어요`
-                    : '아직 연회비 본전 전이에요' }}
+                    ? `${card.breakEvenDateLabel}, 연회비 본전을 달성했어요`
+                    : '아직 연회비 본전 달성 전이에요' }}
                 </p>
               </div>
 
@@ -618,7 +617,7 @@ function formatAxisAmount(value) {
 }
 
 function shortBreakEvenDate(label) {
-  const matched = label?.match(/(\d+)월\s*(\d+)일/);
+  const matched = label?.match(/(\d{1,2})월\s*(\d{1,2})일/);
   return matched ? `${matched[1]}/${matched[2]}` : label;
 }
 

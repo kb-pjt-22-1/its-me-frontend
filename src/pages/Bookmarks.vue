@@ -1,7 +1,7 @@
 <template>
   <div class="page-container">
     <header class="page-header">
-      <button class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
+      <button type="button" class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="15 18 9 12 15 6"></polyline>
         </svg>
@@ -25,7 +25,6 @@
           :key="shop.merchantId"
           variant="box-outline"
           class="store-card"
-          style="flex-direction: row; align-items: center; min-height: auto; gap: 15px;"
           @click="goToStore(shop.merchantId)"
         >
           <div class="store-icon"><img :src="shop.categoryIcon" alt="" /></div>
@@ -66,12 +65,20 @@ const toast = useToast();
 const merchantsStore = useMerchantsStore();
 const cardsStore = useCardsStore();
 
-onMounted(() => {
-  bookmarksStore.fetchBookmarks();
-  if (merchantsStore.merchants.length === 0) merchantsStore.fetchMerchants();
+onMounted(async () => {
+  await bookmarksStore.fetchBookmarks();
   // fetchCards()는 실적만 받아오고 benefitsInfo는 안 채운다 - bestDiscountLabel이 그걸로
   // 매칭하니, 이 페이지가 뜨는 시점에 지금 가진 카드만큼만 받아온다.
   cardsStore.ensureBenefitsLoaded(cardsStore.cards.map((c) => c.userCardId));
+
+  // 매장 전체(2만 건+, LIMIT 없음)를 받는 대신, 지금 북마크한 매장들만 개별로 받는다.
+  const merchantIds = bookmarksStore.bookmarks
+    .map((b) => b.merchantId ?? b.merchant_id ?? b.merchant?.id)
+    .filter((id) => id != null);
+  await Promise.allSettled([
+    merchantsStore.fetchCategories(),
+    ...merchantIds.map((merchantId) => merchantsStore.fetchMerchantDetail(merchantId)),
+  ]);
 });
 
 // 보유 카드 중 이 매장 카테고리에 맞는 최고 혜택 찾기
@@ -107,7 +114,10 @@ const enrichedBookmarks = computed(() =>
   })
 );
 
-const goToStore = (merchantId) => router.push(`/stores/${merchantId}`);
+// 매장 상세 페이지로 바로 가지 않고 지도 화면으로 이동해서 그 매장의 상세(바텀시트)를
+// 띄운다. Map.vue의 focusMerchantFromQuery가 이 merchantId 쿼리를 보고 지도를 그 매장
+// 위치로 옮긴 뒤 상세를 연다 (Home.vue의 goToMerchantOnMap과 동일한 패턴).
+const goToStore = (merchantId) => router.push({ path: '/map', query: { merchantId } });
 
 const handleRemove = async (merchantId) => {
   try {
@@ -141,6 +151,10 @@ const handleRemove = async (merchantId) => {
 :deep(.store-card.btn--box-outline) {
   padding: 14px 16px;
   border: 1.5px solid var(--line, #e7e4de);
+  flex-direction: row;
+  align-items: center;
+  min-height: auto;
+  gap: 15px;
 }
 
 .store-icon {

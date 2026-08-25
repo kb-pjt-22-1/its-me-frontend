@@ -2,7 +2,7 @@
   <div class="layout-container">
     <div class="scroll-area">
       <header class="page-header">
-        <button class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
+        <button type="button" class="icon-btn-outline" @click="$router.back()" aria-label="뒤로가기">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
@@ -38,14 +38,14 @@
 
       <div class="menu-section">
         <p class="section-title">고객지원</p>
-          <div class="menu-item">고객센터 &gt;</div>
-          <div class="menu-item">공지사항 &gt;</div>
-          <div class="menu-item">약관 및 정책 &gt;</div>
+        <div class="menu-item" @click="handleComingSoon">고객센터 &gt;</div>
+        <div class="menu-item" @click="handleComingSoon">공지사항 &gt;</div>
+        <div class="menu-item" @click="handleComingSoon">약관 및 정책 &gt;</div>
       </div>
 
       <div class="footer-actions">
-        <button class="logout-btn" @click="handleLogout">로그아웃</button>
-        <button class="withdraw-btn danger-text" @click="handleWithdraw">회원 탈퇴</button>
+        <button type="button" class="logout-btn" @click="handleLogout">로그아웃</button>
+        <button type="button" class="withdraw-btn danger-text" @click="handleWithdraw">회원 탈퇴</button>
       </div>
     </div>
 
@@ -93,6 +93,12 @@ onMounted(() => {
 const handleLogout = async () => {
   await authStore.logout();
   router.push('/login');
+};
+
+// 고객센터/공지사항/약관 및 정책은 아직 실제 페이지가 없다 - 클릭해도 아무 반응 없이
+// 조용히 넘어가는 대신, 준비 중임을 알린다.
+const handleComingSoon = () => {
+  toast.info('아직 준비 중인 기능이에요.');
 };
 
 const handleWithdraw = async () => {
@@ -159,8 +165,7 @@ const handleWithdraw = async () => {
 
 .menu-section { margin-bottom: 20px; }
 
-.section-title,
-.menu-section-title {
+.section-title {
   font-size: 0.9rem;
   color: var(--muted, #8f897f);
   margin-bottom: 10px;

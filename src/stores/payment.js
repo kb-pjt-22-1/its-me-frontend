@@ -1,21 +1,15 @@
 import { defineStore } from 'pinia'
 import {
   createPaymentToken,
-  fetchPayableCards,
-  fetchRecommendedCard,
-  fetchPaymentTokenStatus,
   completePaymentToken,
   cancelPaymentToken,
   fetchPaymentHistory,
   fetchPaymentDetail,
 } from '@/services/paymentService'
-import { verifyPin as verifyPinRequest } from '@/services/paymentAuthService'
 import { useAuthStore } from './auth'
 
 export const usePaymentStore = defineStore('payment', {
   state: () => ({
-    payableCards: [],
-    recommendedCard: null,
     currentToken: null,
     // App.vue가 로그인/앱 진입 시 채워두는 "최근/기본 범위" 이력. Map.vue(혜택순 정렬 보조
     // 기준)와 Home.vue/Menu.vue(이번 달 혜택 합계)가 참조한다 - PaymentsList.vue의 월별
@@ -28,26 +22,14 @@ export const usePaymentStore = defineStore('payment', {
   }),
 
   actions: {
-    async fetchPayableCards() {
-      this.payableCards = await fetchPayableCards()
-    },
-
-    async fetchRecommendedCard(merchantId, amount) {
-      this.recommendedCard = await fetchRecommendedCard(merchantId, amount)
-      return this.recommendedCard
-    },
-
-    async verifyPin(pin) {
-      return verifyPinRequest(pin)
-    },
-
+    // createPaymentToken/completePaymentToken/cancelPaymentToken/fetchPaymentDetail은 일부러
+    // catch하지 않는다 - 바코드 발급·결제 완료·취소는 실패를 조용히 삼키면 안 되는 흐름이라,
+    // Payments.vue 등 호출부가 직접 try/catch로 받아 토스트를 띄운다. 반면 아래 fetchHistory/
+    // fetchMonthlyHistory는 화면 진입 시 자동으로 도는 조회라 실패해도 이전 값을 유지한 채
+    // 조용히 넘어가는 쪽을 택했다(각 catch에 이유를 남겨뒀다).
     async createPaymentToken(userCardId, merchantId = null) {
       this.currentToken = await createPaymentToken(userCardId, merchantId)
       return this.currentToken
-    },
-
-    async fetchTokenStatus(paymentTokenId) {
-      return fetchPaymentTokenStatus(paymentTokenId)
     },
 
     // 결제 완료 - 성공하면 방금 만든 결제 건을 history 맨 앞에 바로 얹어둔다.
