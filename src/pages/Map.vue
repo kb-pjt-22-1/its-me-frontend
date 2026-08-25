@@ -11,7 +11,9 @@
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
+        <label for="map-search-query" class="sr-only">매장명 또는 카테고리 검색</label>
         <input
+            id="map-search-query"
             :value="searchQuery"
             type="text"
             placeholder="지금 화면에 보이는 매장명 또는 카테고리 검색"
