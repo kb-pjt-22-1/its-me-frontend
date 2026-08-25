@@ -59,9 +59,6 @@ vi.mock('@/stores/merchants', () => ({ useMerchantsStore: () => merchantsStoreMo
 
 vi.mock('@/services/paymentService', () => ({
   createPaymentToken: vi.fn(),
-  fetchPayableCards: vi.fn(),
-  fetchRecommendedCard: vi.fn(),
-  fetchPaymentTokenStatus: vi.fn(),
   completePaymentToken: vi.fn(),
   cancelPaymentToken: vi.fn(),
   fetchPaymentHistory: vi.fn(),

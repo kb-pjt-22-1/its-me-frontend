@@ -2,19 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 vi.mock('@/services/merchantsService', () => ({
-  fetchMerchantList: vi.fn(),
   fetchMerchantDetail: vi.fn(),
   fetchMerchantCategories: vi.fn(),
 }))
 
-import { fetchMerchantList, fetchMerchantDetail, fetchMerchantCategories } from '@/services/merchantsService'
+import { fetchMerchantDetail, fetchMerchantCategories } from '@/services/merchantsService'
 import { useMerchantsStore } from '@/stores/merchants'
-import { useAuthStore } from '@/stores/auth'
-
-function login(authStore) {
-  authStore.accessToken = 'token'
-  authStore.user = { userId: 1, loginId: 'tester', name: '테스터' }
-}
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -85,45 +78,6 @@ describe('fetchCategories', () => {
     await store.fetchCategories()
 
     expect(fetchMerchantCategories).not.toHaveBeenCalled()
-  })
-})
-
-describe('fetchMerchants', () => {
-  it('로그인하지 않았으면 아무것도 하지 않는다', async () => {
-    const store = useMerchantsStore()
-
-    await store.fetchMerchants()
-
-    expect(fetchMerchantList).not.toHaveBeenCalled()
-    expect(store.merchants).toEqual([])
-  })
-
-  it('로그인한 상태면 매장 목록과 카테고리를 함께 불러온다', async () => {
-    const store = useMerchantsStore()
-    login(useAuthStore())
-    const merchants = [{ id: 1, categoryCode: '5812' }]
-    const categories = [{ categoryCode: '5812', categoryName: '음식점' }]
-    fetchMerchantList.mockResolvedValueOnce(merchants)
-    fetchMerchantCategories.mockResolvedValueOnce(categories)
-
-    await store.fetchMerchants()
-
-    expect(fetchMerchantList).toHaveBeenCalledTimes(1)
-    expect(fetchMerchantCategories).toHaveBeenCalledTimes(1)
-    expect(store.merchants).toEqual(merchants)
-    expect(store.categories).toEqual(categories)
-  })
-
-  it('카테고리를 이미 갖고 있으면 카테고리는 다시 요청하지 않는다', async () => {
-    const store = useMerchantsStore()
-    login(useAuthStore())
-    store.categories = [{ categoryCode: '5812', categoryName: '음식점' }]
-    fetchMerchantList.mockResolvedValueOnce([{ id: 1, categoryCode: '5812' }])
-
-    await store.fetchMerchants()
-
-    expect(fetchMerchantCategories).not.toHaveBeenCalled()
-    expect(store.categories).toEqual([{ categoryCode: '5812', categoryName: '음식점' }])
   })
 })
 

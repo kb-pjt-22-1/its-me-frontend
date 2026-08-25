@@ -7,16 +7,17 @@ vi.mock('vue-router', () => ({
   useRouter: () => routerMock,
 }))
 
-const { confirmMock, toastSuccess, toastError } = vi.hoisted(() => ({
+const { confirmMock, toastSuccess, toastError, toastInfo } = vi.hoisted(() => ({
   confirmMock: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
+  toastInfo: vi.fn(),
 }))
 vi.mock('@/composables/useConfirmDialog', () => ({
   useConfirmDialog: () => ({ confirm: confirmMock }),
 }))
 vi.mock('@/composables/useToast', () => ({
-  useToast: () => ({ success: toastSuccess, error: toastError }),
+  useToast: () => ({ success: toastSuccess, error: toastError, info: toastInfo }),
 }))
 
 const { withdrawMock } = vi.hoisted(() => ({ withdrawMock: vi.fn() }))
@@ -79,6 +80,23 @@ describe('Menu.vue (라우팅되는 메뉴 페이지)', () => {
 
     expect(authStore.logout).toHaveBeenCalledTimes(1)
     expect(routerMock.push).toHaveBeenCalledWith('/login')
+  })
+
+  it('고객센터/공지사항/약관 및 정책은 아직 페이지가 없어 클릭하면 준비 중 토스트만 띄운다', async () => {
+    const wrapper = mountMenu()
+    const items = wrapper.findAll('.menu-item').filter((item) =>
+      ['고객센터', '공지사항', '약관 및 정책'].some((label) => item.text().includes(label)),
+    )
+
+    expect(items).toHaveLength(3)
+
+    for (const item of items) {
+      await item.trigger('click')
+    }
+
+    expect(toastInfo).toHaveBeenCalledTimes(3)
+    expect(toastInfo).toHaveBeenCalledWith('아직 준비 중인 기능이에요.')
+    expect(routerMock.push).not.toHaveBeenCalled()
   })
 })
 

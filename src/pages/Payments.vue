@@ -340,6 +340,12 @@ async function issuePaymentToken() {
   }
 }
 
+// isIssuingToken을 소스 계산에 넣는 것이 의도적이다: createPaymentToken 액션은 currentToken을
+// 먼저 채운 뒤(아직 isIssuingToken=true인 시점) finally에서 isIssuingToken을 false로 내린다.
+// 소스에 isIssuingToken을 넣어야 그 전환 자체가 "값이 바뀜"으로 잡혀 워처가 재평가된다 -
+// currentToken.tokenValue만 소스로 쓰면 토큰이 채워진 시점엔 아직 isIssuingToken=true라
+// 콜백이 조기 return하고, 이후 플래그만 내려가도 tokenValue 자체는 안 바뀌었으니 다시
+// 트리거되지 않는다.
 watch(
     () => isAuthenticated.value && !isIssuingToken.value ? paymentStore.currentToken?.tokenValue : null,
     async (tokenValue) => {
@@ -479,8 +485,7 @@ onBeforeRouteLeave(() => {
 .payment-box { flex:none; width:100%; height:calc(100% - 32px); margin:8px 0 24px; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; padding:0 0 18px; border-radius:22px; }
 .payment-content { flex:1; min-height:0; display:flex; flex-direction:column; }
 .payment-box--ready { cursor:pointer; }
-.payment-ready,.barcode-payment { flex:1; min-height:0; display:flex; flex-direction:column; }
-.card-stage,.barcode-stage,.payment-state { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; }
+.card-stage { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; }
 .loading-text { padding:20px; text-align:center; font-size:.9rem; }
 
 .card-slider { --slide-width:min(66vw,250px); width:100%; display:flex; align-items:center; gap:18px; overflow-x:auto; padding:13px calc((100% - var(--slide-width))/2) 16px; box-sizing:border-box; scroll-padding-inline:calc((100% - var(--slide-width))/2); scroll-snap-type:x mandatory; scrollbar-width:none; overscroll-behavior-x:contain; }

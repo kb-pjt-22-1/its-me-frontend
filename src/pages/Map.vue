@@ -1181,19 +1181,48 @@ onMounted(async () => {
   const defaultCenter = { lat: 37.5665, lng: 126.978 } // 서울시청
   const savedCenter = mapViewStore.center
   const savedLevel = mapViewStore.level
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
+
+  // getCurrentPosition은 권한 프롬프트 응답이나 GPS fix를 몇 초씩(때로는 응답 없이 계속)
+  // 기다릴 수 있어서, 그 안에서만 initMap을 부르면 그동안 지도 자체가 안 보였다. 권한이
+  // 이미 허용돼 있어 금방 응답하는 흔한 경우엔 실제 위치를 그대로 초기 중심으로 쓰고,
+  // GEOLOCATION_TIMEOUT_MS 안에 응답이 없으면 기다리지 않고 기본 중심으로 진행한다 -
+  // 늦게 도착한 응답은 myLocation만 갱신해 "내 위치" 마커를 옮긴다(watch(myLocation, ...)).
+  const GEOLOCATION_TIMEOUT_MS = 1200
+  let initialCenter = savedCenter ?? defaultCenter
+  if (!savedCenter && navigator.geolocation) {
+    const gps = await new Promise((resolve) => {
+      let settled = false
+      const timer = setTimeout(() => {
+        if (settled) return
+        settled = true
+        resolve(null)
+      }, GEOLOCATION_TIMEOUT_MS)
+      navigator.geolocation.getCurrentPosition(
         (position) => {
-          const center = { lat: position.coords.latitude, lng: position.coords.longitude }
-          myLocation.value = center
-          initMap(kakao, savedCenter ?? center, savedCenter ? savedLevel : undefined)
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          resolve({ lat: position.coords.latitude, lng: position.coords.longitude })
         },
-        () => initMap(kakao, savedCenter ?? defaultCenter, savedCenter ? savedLevel : undefined),
-    )
-  } else {
-    initMap(kakao, savedCenter ?? defaultCenter, savedCenter ? savedLevel : undefined)
+        () => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          resolve(null)
+        },
+      )
+    })
+    if (gps) {
+      myLocation.value = gps
+      initialCenter = gps
+    }
   }
 
+  initMap(kakao, initialCenter, savedCenter ? savedLevel : undefined)
+
+  // 초기 위치는 위에서 한 번 받고(또는 타임아웃으로 건너뛰고), 그 이후로 계속 움직이는 건
+  // watchPosition이 이어서 담당한다 - 늦게 도착하는 최초 응답도 이게 잡아서 myLocation을
+  // 채워준다.
   startWatchingMyLocation()
 })
 

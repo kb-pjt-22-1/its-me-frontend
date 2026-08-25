@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
-import { fetchMerchantList, fetchMerchantDetail, fetchMerchantCategories, fetchMerchantBrands } from '@/services/merchantsService'
-import { useAuthStore } from './auth'
+import { fetchMerchantDetail, fetchMerchantCategories, fetchMerchantBrands } from '@/services/merchantsService'
 
 export const useMerchantsStore = defineStore('merchants', {
   state: () => ({
@@ -45,18 +44,6 @@ export const useMerchantsStore = defineStore('merchants', {
     async fetchBrands() {
       if (this.brands.length > 0) return
       this.brands = await fetchMerchantBrands()
-    },
-
-    async fetchMerchants() {
-      const authStore = useAuthStore()
-      if (!authStore.isAuthenticated) return
-
-      const [merchants, categories] = await Promise.all([
-        fetchMerchantList(),
-        this.categories.length === 0 ? fetchMerchantCategories() : Promise.resolve(this.categories),
-      ])
-      this.merchants = merchants
-      this.categories = categories
     },
 
     async fetchMerchantDetail(merchantId) {
