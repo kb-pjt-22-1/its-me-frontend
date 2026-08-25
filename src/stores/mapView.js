@@ -10,5 +10,9 @@ export const useMapViewStore = defineStore('mapView', {
     searchQuery: '',
     selectedCategory: null,
     selectedMerchantId: null,
+    // GPS로 실제 내 위치를 성공적으로 받아온 적이 있는지. center는 GPS 실패 시 기본값(서울시청)
+    // 으로 채워진 뒤 'idle' 이벤트로 그대로 저장되기도 해서, center 존재 여부만으로는 "복원할
+    // 만한 진짜 위치"인지 "그냥 기본값으로 떨어진 것"인지 구분이 안 된다 - 이 플래그로 구분한다.
+    hasLocatedOnce: false,
   }),
 })
