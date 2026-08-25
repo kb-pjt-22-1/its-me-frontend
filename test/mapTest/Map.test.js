@@ -1182,6 +1182,46 @@ describe('하단 시트("주변 제휴 매장") - bounds 데이터를 재사용'
     expect(wrapper.findAll('.page-btn')[1].attributes('disabled')).toBeDefined()
   })
 
+  it('GPS 위치가 미세하게 갱신돼도(매장 순서가 안 바뀌면) 보고 있던 페이지가 1로 되돌아가지 않는다', async () => {
+    let reportPosition = null
+    const originalGeolocation = navigator.geolocation
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success) => success({ coords: { latitude: 37.5, longitude: 127.1 } }),
+        watchPosition: (success) => {
+          reportPosition = success
+          return 1
+        },
+        clearWatch: () => {},
+      },
+    })
+
+    try {
+      window.kakao = createKakaoMock().kakao
+      fetchRecommendedNearbyMerchants.mockResolvedValue(MANY_MERCHANTS)
+
+      const wrapper = mountMapPage()
+      await flushPromises()
+
+      const nextBtn = wrapper.findAll('.page-btn')[1]
+      await nextBtn.trigger('click')
+      await flushPromises()
+      expect(wrapper.find('.page-indicator').text()).toBe('2 / 2')
+
+      // 매장 간 간격(~111m)에 비해 훨씬 작은, 가만히 서 있어도 생기는 수준의 GPS 오차 - 거리
+      // 순위는 안 바뀐다.
+      reportPosition({ coords: { latitude: 37.500011, longitude: 127.1 } })
+      await flushPromises()
+
+      expect(wrapper.find('.page-indicator').text()).toBe('2 / 2')
+      const secondPageItems = wrapper.findAll('.sheet-item-info strong').map((el) => el.text())
+      expect(secondPageItems).toEqual(['매장11', '매장12'])
+    } finally {
+      Object.defineProperty(navigator, 'geolocation', { configurable: true, value: originalGeolocation })
+    }
+  })
+
   it('목록에서 매장을 클릭해도 같은 자리에서 상세로 전환된다', async () => {
     window.kakao = createKakaoMock().kakao
     fetchRecommendedNearbyMerchants.mockResolvedValue([CAFE_MERCHANT])

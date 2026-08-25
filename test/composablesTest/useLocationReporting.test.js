@@ -126,6 +126,44 @@ describe('위치 보고 조건', () => {
   })
 })
 
+describe('백그라운드 -> 포그라운드 복귀', () => {
+  function setVisibility(state) {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: state })
+    document.dispatchEvent(new Event('visibilitychange'))
+  }
+
+  afterEach(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+  })
+
+  it('백그라운드에 있다가 포그라운드로 돌아오면, 스로틀 간격/거리 안이어도 다음 위치를 즉시 보고한다', () => {
+    useLocationReporting().start()
+    successCallback(definePosition(37.5665, 126.978))
+    reportLocationMock.mockClear()
+
+    vi.advanceTimersByTime(5_000) // 최소 간격(20초) 안 지남
+    setVisibility('hidden')
+    setVisibility('visible')
+
+    successCallback(definePosition(37.56651, 126.978)) // 간격도 안 지나고 거리도 임계 미만
+
+    expect(reportLocationMock).toHaveBeenCalledWith(37.56651, 126.978)
+  })
+
+  it('백그라운드로 가기만 하고 포그라운드로 돌아오지 않으면 스로틀을 그대로 유지한다', () => {
+    useLocationReporting().start()
+    successCallback(definePosition(37.5665, 126.978))
+    reportLocationMock.mockClear()
+
+    vi.advanceTimersByTime(5_000)
+    setVisibility('hidden')
+
+    successCallback(definePosition(37.56651, 126.978))
+
+    expect(reportLocationMock).not.toHaveBeenCalled()
+  })
+})
+
 describe('stop()', () => {
   it('clearWatch를 호출하고, 다음 start() 이후 첫 위치를 다시 즉시 보고한다', () => {
     const location = useLocationReporting()
