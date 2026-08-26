@@ -641,7 +641,13 @@ const pagedNearbyMerchants = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
   return nearbyMerchants.value.slice(start, start + PAGE_SIZE)
 })
-watch(nearbyMerchants, () => {
+// nearbyMerchants는 myLocation이 갱신될 때마다(GPS는 가만히 있어도 몇 미터씩 흔들린다)
+// 거리 재계산 때문에 매번 새 배열로 다시 만들어진다 - 그 배열 자체를 watch하면 목록 내용이
+// 그대로여도 매번 "바뀐 것"으로 잡혀 바텀시트가 보고 있던 페이지를 계속 1로 되돌렸다.
+// 실제로 검색/카테고리/정렬 기준이 바뀌어 매장 "순서 자체"가 달라졌을 때만 리셋하도록
+// id 순서로 만든 서명(문자열)을 대신 watch한다 - 원시값이라 내용이 같으면 콜백이 안 불린다.
+const nearbyMerchantsSignature = computed(() => nearbyMerchants.value.map((m) => m.id).join(','))
+watch(nearbyMerchantsSignature, () => {
   currentPage.value = 1
 })
 

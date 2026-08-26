@@ -414,6 +414,10 @@ async function reissueToken() {
 
 async function completePayment() {
   const paymentTokenId = paymentStore.currentToken?.paymentTokenId;
+  // 토큰 발급 시점에 issuePaymentToken이 selectedMethodId와 실제 발급된 카드를 이미
+  // 일치시켜뒀으므로(불일치 시 replacePaymentTokenForCard로 재발급), 여기서도 이 값이
+  // 곧 결제에 쓰인 카드다.
+  const paidCardId = selectedMethodId.value;
 
   if (!paymentTokenId) {
     toast.error('결제 토큰 정보가 없어요. 다시 인증해주세요.');
@@ -425,6 +429,9 @@ async function completePayment() {
 
   try {
     const payment = await paymentStore.completePaymentToken(paymentTokenId);
+    // 카드관리 화면(CardDetailsPanel)이 이번 달 이용실적/혜택을 결제 이전 값으로 캐시해둔
+    // 채 계속 보여주지 않도록, 방금 쓴 카드의 캐시를 비워 다음 조회 때 새로 받아오게 한다.
+    cardsStore.invalidateCardDetail(paidCardId);
     toast.success(`${payment.merchantName}에서 ${Number(payment.finalAmount).toLocaleString()}원 결제 완료!`);
   } catch {
     toast.error('결제를 완료하지 못했어요. 다시 시도해주세요.');

@@ -194,6 +194,17 @@ export const useCardsStore = defineStore('cards', {
       })
     },
 
+    // 결제 완료 등으로 이번 달 이용실적/혜택 소진량이 실제로 바뀐 카드는, benefitsInfo가
+    // 남아있는 한 fetchCardFullDetail이 재조회를 건너뛴다(위 fetchCardFullDetail 주석 참고) -
+    // 캐시를 비워서 다음 조회(카드관리 화면 재방문 등) 때 currentAmount/혜택 목록이 새로
+    // 받아와지게 한다. previousMonthAmount 등 전월 실적은 결제로 바뀌지 않으므로 그대로 둔다.
+    invalidateCardDetail(userCardId) {
+      const card = this.getById(userCardId)
+      if (!card) return
+      card.benefitsInfo = undefined
+      this.detailLoadedById[userCardId] = false
+    },
+
     async registerCard(payload) {
       const card = await registerCard(payload)
       this.cards.push(card)
