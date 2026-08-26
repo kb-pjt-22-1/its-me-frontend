@@ -251,6 +251,28 @@ describe('ensureBenefitsLoaded', () => {
     })
 })
 
+describe('invalidateCardDetail', () => {
+    it('benefitsInfo와 detailLoadedById를 비워 다음 fetchCardFullDetail이 다시 조회하게 한다', () => {
+        const store = useCardsStore()
+        store.cards = [{ userCardId: 1, status: 'ACTIVE', benefitsInfo: { performanceTiers: [] }, currentAmount: 10_000 }]
+        store.detailLoadedById[1] = true
+
+        store.invalidateCardDetail(1)
+
+        expect(store.getById(1).benefitsInfo).toBeUndefined()
+        expect(store.detailLoadedById[1]).toBe(false)
+        // 전월 실적 등 결제로 바뀌지 않는 값은 그대로 남아있어야 한다
+        expect(store.getById(1).currentAmount).toBe(10_000)
+    })
+
+    it('존재하지 않는 userCardId는 조용히 무시한다', () => {
+        const store = useCardsStore()
+        store.cards = []
+
+        expect(() => store.invalidateCardDetail(999)).not.toThrow()
+    })
+})
+
 describe('cards store 자동 연동(sync)', () => {
     it('연동 후 syncedCount를 반환하고 목록을 다시 불러온다', async () => {
         serviceMocks.syncCards.mockResolvedValue({ syncedCount: 2 })

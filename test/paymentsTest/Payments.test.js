@@ -46,6 +46,7 @@ const cardsStoreMock = {
   },
   fetchCards: vi.fn(),
   ensureBenefitsLoaded: vi.fn(),
+  invalidateCardDetail: vi.fn(),
 }
 vi.mock('@/stores/cards', () => ({ useCardsStore: () => cardsStoreMock }))
 
@@ -427,9 +428,12 @@ describe('결제 완료', () => {
     expect(completePaymentTokenApi).toHaveBeenCalledWith('tok-1')
     expect(toastMock.success).toHaveBeenCalledWith('스타벅스 강남점에서 4,400원 결제 완료!')
     expect(wrapper.text()).toContain('간편 비밀번호 인증 후 바코드가 표시됩니다')
+    // 카드관리 화면이 결제 이전 실적/혜택을 캐시된 채 계속 보여주지 않도록, 방금 쓴
+    // 카드의 캐시를 무효화해서 다음 조회 때 새로 받아오게 한다.
+    expect(cardsStoreMock.invalidateCardDetail).toHaveBeenCalledWith(1)
   })
 
-  it('완료에 실패하면 에러 토스트만 띄운다', async () => {
+  it('완료에 실패하면 에러 토스트만 띄우고 카드 캐시는 건드리지 않는다', async () => {
     verifyPin.mockResolvedValue()
     createPaymentTokenApi.mockResolvedValue({ paymentTokenId: 'tok-1', tokenValue: 'ABC123XYZ' })
     completePaymentTokenApi.mockRejectedValue(new Error('network error'))
@@ -442,6 +446,7 @@ describe('결제 완료', () => {
     await flushPromises()
 
     expect(toastMock.error).toHaveBeenCalledWith('결제를 완료하지 못했어요. 다시 시도해주세요.')
+    expect(cardsStoreMock.invalidateCardDetail).not.toHaveBeenCalled()
   })
 })
 
