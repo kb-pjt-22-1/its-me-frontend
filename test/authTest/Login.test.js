@@ -92,13 +92,13 @@ describe('로그인 실패 안내', () => {
     expect(wrapper.text()).toContain('비밀번호를 5회 이상 틀렸습니다. 잠시 후 다시 시도해주세요')
   })
 
-  it('401/423이 아닌 다른 실패(예: 네트워크 오류)는 에러 메시지를 그대로 보여준다', async () => {
+  it('네트워크 오류 등 응답을 못 받은 실패는 통일된 안내 문구를 보여준다', async () => {
     loginRequest.mockRejectedValueOnce({ message: 'Network Error' })
     const wrapper = mountPage()
 
     await submitLogin(wrapper)
 
-    expect(wrapper.text()).toContain('Network Error')
+    expect(wrapper.text()).toContain('요청 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.')
   })
 
   it('로그인에 성공하면 지정된 경로로 이동한다', async () => {
